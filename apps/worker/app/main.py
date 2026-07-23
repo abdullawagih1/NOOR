@@ -17,15 +17,31 @@ import time
 import uuid
 from typing import Literal, Optional
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from app.auth import verify_internal_token
+from app.settings import get_settings
+
 APP_START_TIME = time.time()
+
+# Eager, not lazy: a missing/weak WORKER_INTERNAL_TOKEN must crash the
+# process at startup, not surface as a confusing 401/403 the first time
+# something calls /jobs.
+settings = get_settings()
 
 app = FastAPI(
     title="Noor Worker",
     description="External processing worker for Noor V1 — Clinical Evidence Assistant.",
     version="0.1.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_origins_list,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -95,7 +111,7 @@ def ready() -> dict:
 # against a stable schema immediately).
 # ---------------------------------------------------------------------------
 
-@app.post("/jobs", response_model=JobAcceptedResponse)
+@app.post("/jobs", response_model=JobAcceptedResponse, dependencies=[Depends(verify_internal_token)])
 def accept_job(job: JobMessage) -> JobAcceptedResponse:
     """
     Validates an incoming job message against the approved contract and

@@ -1,5 +1,73 @@
 # Changelog
 
+## [Unreleased] — Environment Variables Audit, Standardization, and Security Hardening
+
+### Added
+
+* `apps/web/lib/env/{public,server,serverSchema}.ts` — centralized,
+  zod-validated environment access. `public.ts`/`server.ts` are lazy
+  functions (not pre-parsed constants) so the existing "static routes
+  build without any Supabase config" property is preserved (re-verified —
+  same route split as before). `server.ts` imports the `server-only` npm
+  package; `serverSchema.ts` deliberately doesn't, so it stays unit-testable
+  outside Next's bundler (`server-only` throws unconditionally in a plain
+  Node/tsx process, discovered this session).
+* `apps/worker/app/settings.py` — pydantic-settings `Settings` model.
+  `WORKER_INTERNAL_TOKEN` has no default: the process now refuses to start
+  at all if it's missing or under 32 characters (a real
+  `pydantic.ValidationError` at import time, not a hypothetical — verified
+  three ways: missing, too-short, and valid).
+* `apps/worker/app/auth.py` — **`POST /jobs` now actually requires
+  authentication.** The environment audit found `WORKER_INTERNAL_TOKEN`
+  had been declared in every `.env.example` since Sprint 0 but never
+  implemented anywhere — the endpoint accepted any request, unauthenticated,
+  this whole time. Fixed: `Authorization: Bearer <token>`, constant-time
+  comparison, 401 on missing/malformed header, 403 on wrong token, neither
+  response leaks the expected value.
+* CORS middleware wired into the Worker using the previously
+  declared-but-unused `ALLOWED_ORIGINS` setting.
+* `apps/worker/.env.example` — didn't exist before this session.
+* `apps/web/tests/env.test.ts` (9 assertions) — valid/missing/malformed
+  public and server env, optional-vs-required field behavior.
+* Worker tests expanded from 5 to 9: missing token, malformed
+  `Authorization` header, wrong token, and a check that error responses
+  never leak the expected token value.
+* `docs/operations/environment-variables.md` (full inventory,
+  classification, rotation, incident-response guidance),
+  `docs/operations/worker-deployment.md` (new).
+
+### Fixed
+
+* Real, once-thought-benign gap closed: the Worker's only real endpoint
+  had no authentication at all. Found via a systematic audit
+  (`grep -R "process\.env"` / `os.getenv` across the whole repo), not
+  assumed — the audit table is in this session's conversation record.
+* `.env.example` files (root, `apps/web`, new `apps/worker`) rewritten to
+  an accurate, consistent, documented template — the root file previously
+  listed `SUPABASE_ANON_KEY` without the `NEXT_PUBLIC_` prefix actually
+  required by the code that reads it.
+
+### Verified this session (not assumed)
+
+* Boundary enforcement is real, not just documented: a throwaway `"use
+  client"` component was made to import `lib/env/server.ts`; `next build`
+  failed with an actual webpack error; the test file was then removed and
+  a clean build reconfirmed.
+* No secret leakage into the browser bundle: built `apps/web` with
+  canary values for every server secret
+  (`CANARY-SERVICE-ROLE-SECRET-...`, `CANARY-WORKER-TOKEN-...`), grepped
+  the entire `.next/static` output — none appeared. Noted, not a defect:
+  `lib/supabase/client.ts` (browser client) has no call sites yet, so
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` doesn't currently reach the client
+  bundle either — simply because nothing client-side reads it yet.
+* `git grep` across tracked files for `sb_secret_`, real-looking
+  `SUPABASE_SERVICE_ROLE_KEY=`/`WORKER_INTERNAL_TOKEN=`/
+  `AI_GATEWAY_API_KEY=`/`SUPABASE_DB_PASSWORD=` values, and dangerous
+  `NEXT_PUBLIC_`-prefixed secret names — all clean.
+* Full local verification suite (lint/typecheck/test/build for Web;
+  compile/pytest for Worker) re-run clean after every change in this
+  session, not just once at the end.
+
 ## [Unreleased] — Sprint 0.5: Hosted Infrastructure & Design System Activation
 
 ### Added

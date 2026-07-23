@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { sanitizeNextPath } from "@/lib/auth/redirect";
+import { getPublicEnv } from "@/lib/env/public";
 
 export async function signInWithPassword(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "").trim();
@@ -30,7 +31,7 @@ export async function signOut(): Promise<void> {
 }
 
 function getAppUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return getPublicEnv().NEXT_PUBLIC_APP_URL;
 }
 
 /**

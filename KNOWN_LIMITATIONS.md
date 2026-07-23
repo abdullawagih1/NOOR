@@ -51,10 +51,14 @@ the same PR that resolves an item.
    passed), but actual form submission through a rendered browser page
    remains unverified. Sprint 1 task, not faked here.
 
-8. **Client/server boundary is convention-only.** Nothing yet prevents a
-   future "use client" component from accidentally importing
-   `lib/supabase/service-role.ts`. An eslint boundary rule is a named
-   Sprint 1 task.
+8. ~~Client/server boundary is convention-only.~~ **Resolved this
+   session.** `lib/supabase/service-role.ts` and the new
+   `lib/env/server.ts` both import the `server-only` npm package, which
+   turns an accidental "use client" import into a real `next build`
+   failure — verified directly (a throwaway Client Component was made to
+   import `lib/env/server.ts`, the build failed with a genuine webpack
+   error, then the test file was removed). Not an eslint rule, but a
+   stronger guarantee: enforced by the bundler itself.
 
 9. **`next@15.5.21`** (upgraded this session from 14.2.35 — see ADR 0006)
    resolves every Next-specific advisory `npm audit` flagged. One new
@@ -84,3 +88,20 @@ the same PR that resolves an item.
     the build/typecheck/lint gates, and one documented, scoped WCAG
     contrast exception (`muted-soft` on placeholder text only — see
     `docs/design-system/ACCESSIBILITY.md`).
+
+14. ~~Worker `/jobs` has zero authentication.~~ **Resolved this session.**
+    A full environment-variable audit found `WORKER_INTERNAL_TOKEN` had
+    been declared in every `.env.example` since Sprint 0 but never
+    actually implemented or checked anywhere — the endpoint accepted any
+    request. Now enforced via `apps/worker/app/auth.py`
+    (`Authorization: Bearer <token>`, constant-time comparison, 401/403,
+    no token-value leakage in errors) and the process refuses to start at
+    all without a valid (≥32-char) token. See
+    `docs/operations/worker-deployment.md`.
+
+15. **No dependency store shared between Web and Worker for
+    `WORKER_INTERNAL_TOKEN`.** Both sides must be configured with the
+    identical value by hand in their respective hosting environments;
+    there's no automated secret-sync. Acceptable for Sprint 0.5 (no real
+    call site exists yet between them); worth revisiting once Sprint 1
+    wires an actual Web→Worker call.

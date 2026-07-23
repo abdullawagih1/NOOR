@@ -38,9 +38,28 @@ exists.
   a membership row to a different organization.
 * Storage buckets (0003) are private by default with organization-scoped
   RLS on `storage.objects`; no anonymous reads, no service-role key in the
-  browser (`lib/supabase/service-role.ts` is server-only, documented as
-  never importable from a client component, and has no call sites yet in
-  Sprint 0).
+  browser — `lib/supabase/service-role.ts` and `lib/env/server.ts` both
+  import the `server-only` npm package, which turns an accidental "use
+  client" import into a **real build failure**, not just a documented
+  convention. Verified this session: a throwaway Client Component was made
+  to import `lib/env/server.ts`, `next build` failed with an actual
+  webpack error, then the test file was removed and the clean build was
+  re-confirmed.
+* Centralized, validated environment access (`apps/web/lib/env/{public,
+  server,serverSchema}.ts`, `apps/worker/app/settings.py`) — no more raw
+  `process.env`/`os.getenv` scattered through the codebase. Confirmed
+  clean via a full grep audit — no `NEXT_PUBLIC_`-prefixed secret ever
+  exists, and a canary-value build (real-looking fake secrets for every
+  server variable) confirmed none reach `.next/static`.
+* Worker `/jobs` now requires `Authorization: Bearer <WORKER_INTERNAL_TOKEN>`
+  (previously **no authentication existed at all** on this endpoint —
+  found during this session's environment audit, not previously known).
+  Constant-time comparison (`secrets.compare_digest`); missing/malformed
+  header → 401, wrong token → 403, neither response leaks the expected
+  value (`test_accept_job_error_does_not_reveal_expected_token`). The
+  Worker process now refuses to start at all if `WORKER_INTERNAL_TOKEN` is
+  missing or under 32 characters — verified via a real
+  `pydantic.ValidationError` at import time, not a hypothetical.
 * Login redirect handling (`lib/auth/redirect.ts`) rejects absolute URLs and
   protocol-relative (`//host`) strings for the `next` parameter — no open
   redirect via the login flow. Covered by `apps/web/tests/redirect.test.ts`
@@ -65,9 +84,6 @@ exists.
 
 ## Known gaps (Sprint 1+)
 
-* No automated eslint/import-boundary rule yet prevents a future "use
-  client" component from importing `lib/supabase/service-role.ts` —
-  currently convention-only. Tracked in `KNOWN_LIMITATIONS.md`.
 * No dependency vulnerability scanning beyond `npm audit` run manually —
   not wired into CI as a blocking gate yet.
 * A new transitive dependency, `sharp` (pulled in by Next 15's image

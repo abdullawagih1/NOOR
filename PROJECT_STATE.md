@@ -1,8 +1,30 @@
 # PROJECT_STATE.md
 
-**Last updated:** Sprint 0.5 session (Claude Code, this environment)
+**Last updated:** Environment Variables Audit & Security Hardening session
+(Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code, running locally against
-the actual repository, with real GitHub/Vercel/Docker access this session)
+the actual repository)
+
+---
+
+## -1. This session: Environment Variables Audit, Standardization, and Security Hardening
+
+A full repository audit (`grep -R "process\.env"`, `os.getenv`,
+`SUPABASE_|NEXT_PUBLIC_|WORKER_|AI_GATEWAY_`) found every variable
+reference across `apps/web`, `apps/worker`, CI, and docs, and surfaced one
+real, previously-unknown security gap: **the Worker's `POST /jobs`
+endpoint had zero authentication** — `WORKER_INTERNAL_TOKEN` had been
+declared in `.env.example` since Sprint 0 but never actually implemented
+anywhere. Fixed and verified this session (see `SECURITY.md`,
+`docs/operations/worker-deployment.md`). Also implemented: centralized
+validated env access on both sides (`apps/web/lib/env/*`,
+`apps/worker/app/settings.py`), a real (not assumed) `server-only`
+bundler-enforcement test, a real (not assumed) canary-secret browser-bundle
+leak test, and 13 new tests (9 Web env, 4 Worker auth) — all green. Full
+inventory, classification, and rotation/incident guidance:
+`docs/operations/environment-variables.md`. This did not touch the
+hosted-Supabase or Vercel-Deployment-Protection blockers below — those are
+unchanged from the prior session.
 
 ---
 
@@ -10,12 +32,12 @@ the actual repository, with real GitHub/Vercel/Docker access this session)
 
 **Sprint 0.5 — Hosted Infrastructure & Design System Activation.**
 Sprint 0 (platform foundation) was completed and remediated in a prior
-session — see §1 for that history. This session connects the verified
-local foundation to real hosted infrastructure and activates the Noor
-Design System. Status: **in progress, not complete** — hosted Supabase is
-blocked pending credentials (see §5, gap G-01), and Vercel Preview HTTP
-verification is blocked by Vercel's own Deployment Protection (§5, gap
-G-08). Everything achievable without those two items is done and verified.
+session — see §1 for that history. Status: **in progress, not complete** —
+hosted Supabase is blocked pending credentials (see §5, gap G-01), and
+Vercel Preview HTTP verification is blocked by Vercel's own Deployment
+Protection (§5, gap G-08). Everything achievable without those two items,
+including this session's environment-variable hardening, is done and
+verified.
 
 ---
 

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getPublicEnv } from "@/lib/env/public";
 
 /**
  * Cookie-aware Supabase client for Server Components, Route Handlers, and
@@ -14,19 +15,10 @@ import { cookies } from "next/headers";
  * refreshes the session before the request reaches a Server Component.
  */
 export async function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    throw new Error(
-      "Supabase server configuration missing. Set NEXT_PUBLIC_SUPABASE_URL " +
-        "and NEXT_PUBLIC_SUPABASE_ANON_KEY (see .env.example)."
-    );
-  }
-
+  const env = getPublicEnv();
   const cookieStore = await cookies();
 
-  return createServerClient(url, anonKey, {
+  return createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
     cookies: {
       getAll() {
         return cookieStore.getAll();

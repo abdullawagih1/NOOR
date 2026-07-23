@@ -66,17 +66,23 @@ npm run dev --workspace=apps/web
 
 Copy `apps/web/.env.example` to `apps/web/.env.local` and fill in
 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (from `supabase
-start` output, or a hosted project) before running `dev` — the app throws a
-clear error rather than silently running unauthenticated if these are unset.
+start` output, or a hosted project) before running `dev` — validated at
+request time by `lib/env/public.ts`, which throws a clear error rather
+than silently running unauthenticated if these are unset. Full variable
+reference: `docs/operations/environment-variables.md`.
 
 ### Worker
 
 ```bash
 cd apps/worker
 pip install -r requirements.txt
+cp .env.example .env   # set WORKER_INTERNAL_TOKEN — openssl rand -hex 32
 python -m pytest tests/ -v
 uvicorn app.main:app --reload --port 8080
 ```
+
+The process refuses to start without `WORKER_INTERNAL_TOKEN` (≥32
+characters) — see `docs/operations/worker-deployment.md`.
 
 ### Database / RLS tests
 
@@ -142,7 +148,7 @@ needs to be addressed first or results will be false positives.
 * `clinical/risk-management/RISK_REGISTER.md`
 * `docs/architecture/DECISIONS.md`
 * `docs/design-system/NOOR_DESIGN_SYSTEM.md`
-* `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci}.md`
+* `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci,environment-variables,worker-deployment}.md`
 * `SECURITY.md`
 * `KNOWN_LIMITATIONS.md`
 

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getPublicEnv } from "@/lib/env/public";
 
 const PROTECTED_PREFIXES = ["/admin", "/clinician", "/reviewer", "/quality"];
 
@@ -20,12 +21,14 @@ function isProtectedPath(pathname: string): boolean {
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request: { headers: request.headers } });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
+  let env;
+  try {
+    env = getPublicEnv();
+  } catch {
     // Fail closed on protected routes rather than silently letting traffic
-    // through when the environment is misconfigured.
+    // through when the environment is misconfigured. Middleware must never
+    // throw uncaught, so this is a try/catch rather than letting
+    // getPublicEnv()'s validation error propagate.
     if (isProtectedPath(request.nextUrl.pathname)) {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = "/login";
@@ -35,7 +38,7 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
-  const supabase = createServerClient(url, anonKey, {
+  const supabase = createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
