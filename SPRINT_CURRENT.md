@@ -1,47 +1,37 @@
-# Sprint Current: Sprint 0 — Platform Foundation
+# Sprint Current: Sprint 0.5 — Hosted Infrastructure & Design System Activation
 
-**Status:** Technically complete, awaiting hosted-infrastructure verification.
-See `PROJECT_STATE.md` for the full gap report and exit-criteria review.
-
-This sprint was remediated in a follow-up session after an independent
-review found the prior delivery's repository had no `.git`, a pass-through
-auth middleware, an unseeded permissions table, and RLS verified only
-against plain Postgres. That review's findings were reproduced and fixed —
-see `CHANGELOG.md` for the itemized diff.
+**Status:** In progress. Two items are genuinely blocked on external
+decisions (see `PROJECT_STATE.md` §5/§6); everything else in scope is done
+and verified.
 
 ## Objectives
 
-- [x] Repository audit (reproduced independently this session, not assumed)
-- [x] Git repository actually initialized on `main` (was missing entirely)
-- [x] Monorepo structure, cleaned of tracked build artifacts
-- [x] Identity/tenancy/RLS foundation, migrated and tested (0001)
-- [x] Permissions seeded and mapped to roles; auth-hardening triggers (0002)
-- [x] Storage foundation: 5 private buckets + RLS (0003)
-- [x] Real Supabase Auth: SSR clients, session refresh, login/logout/callback,
-      permission-gated workspace routes, controlled 403/access-denied pages
-- [x] RLS re-verified against a real local Supabase stack (not just plain
-      Postgres) — real `authenticated` role, real GoTrue `auth.uid()`, a
-      real JWT exercised against PostgREST
-- [x] CI workflow corrected (was silently resolving the wrong lockfile in
-      this npm-workspaces monorepo) and every job's commands independently
-      reproduced locally
-- [x] Worker scaffold with health endpoint and job contract
-- [x] Intended Use draft
-- [x] Initial Risk Register
-- [x] ADR directory
-- [x] PROJECT_STATE.md — rewritten to match actual verified state
-- [ ] Hosted Supabase project (blocked — no credentials/infra access in this
-      environment; **top Sprint 1 task**, downgraded risk since the schema/
-      RLS/auth design is now proven locally against real Supabase)
-- [ ] CI actually executed on GitHub Actions (blocked — no push access; the
-      intended remote exists and was confirmed empty via `git ls-remote`)
-- [ ] Vercel deployment (blocked — no hosted Supabase project yet to point at)
+- [x] Re-verify Sprint 0's local foundation before changing anything
+- [x] Push the repository to GitHub for real (was never pushed before)
+- [x] Get CI actually running and passing on GitHub Actions (twice, now)
+- [x] Add a push trigger + secret-scan job to CI
+- [x] Noor Design System: tokens, 32 components, `/design-system` showcase,
+      ADR 0005, accessibility contrast audit
+- [x] Restyle every existing route onto the design system
+- [x] Password reset flow (forgot-password, update-password), signup
+      policy documented (invite-only)
+- [x] Next.js security-advisory decision — spiked and applied the 15.5.21
+      upgrade, ADR 0006
+- [x] Real HTTP smoke test against a local `next start` + real local
+      Supabase (10/10 passed)
+- [x] Vercel: authenticated, project linked and correctly configured
+      (monorepo root directory fix), Preview build succeeds
+- [ ] Hosted Supabase Development project — **BLOCKED**, needs credentials
+      (`SUPABASE_ACCESS_TOKEN` or you running `supabase login`)
+- [ ] Full HTTP verification of the deployed Vercel Preview — **BLOCKED**
+      by this team's default Vercel Authentication (Deployment Protection);
+      needs a decision (disable it, or generate a Protection Bypass secret)
 - [ ] Clinical domain confirmed (blocked — awaiting your decision)
-- [ ] Named clinical reviewer confirmed (blocked — awaiting your decision)
 
 ## Next sprint
 
-Sprint 1 backlog: see `MASTER_BACKLOG.md`. First recommended task:
-**S1-08 (hosted Supabase project)** — it unblocks S1-01 through S1-06 and
-lets the now-locally-verified Sprint 0 RLS suite be re-verified against
-hosted infrastructure.
+Sprint 0.5 is not complete until both blocked items above close. Once they
+do: apply migrations to the hosted project, re-run the RLS suite and
+`scripts/smoke-test-web.mjs` against it, wire real env vars into Vercel.
+Only then: **Sprint 1 — Guideline Registry Schema and Lifecycle**
+(see `MASTER_BACKLOG.md`).

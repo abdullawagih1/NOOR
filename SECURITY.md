@@ -43,31 +43,55 @@ exists.
   Sprint 0).
 * Login redirect handling (`lib/auth/redirect.ts`) rejects absolute URLs and
   protocol-relative (`//host`) strings for the `next` parameter — no open
-  redirect via the login flow.
+  redirect via the login flow. Covered by `apps/web/tests/redirect.test.ts`
+  (6 assertions).
+* Password reset (`/forgot-password`) always returns the same generic
+  success message whether or not the email matches an account — no
+  account-enumeration oracle.
 * `.env.example` files exist at root and per-app; `.gitignore` excludes all
   `.env*` variants except `.env.example`, plus build artifacts, caches, and
   Supabase CLI local state (`.branches/`, `.temp/`).
+* **`next@15.5.21`** (upgraded from `14.2.35` this session — ADR 0006):
+  resolves every Next-specific advisory `npm audit` had flagged, including
+  ones genuinely reachable through this app's Server Action / Middleware
+  usage (DoS, SSRF, internal-endpoint disclosure). Spiked in an isolated
+  git worktree before applying to confirm the breaking-change fix (Next
+  15's async `cookies()`/`searchParams`) was small and safe.
+* CI: `gitleaks` secret-scan job added, runs on every push/PR — confirmed
+  passing on real GitHub Actions runs (not just locally).
+* `/design-system` returns 404 whenever `NODE_ENV=production` — verified
+  via a real production build; unreachable on any deployed environment,
+  reachable only in local dev, where it renders mocked data only.
 
 ## Known gaps (Sprint 1+)
 
 * No automated eslint/import-boundary rule yet prevents a future "use
   client" component from importing `lib/supabase/service-role.ts` —
   currently convention-only. Tracked in `KNOWN_LIMITATIONS.md`.
-* No secret scanning configured in CI yet.
-* **`next@14.2.35` carries several disclosed high-severity advisories**
-  (`npm audit`, this session) whose only available fix is `next@16` — a
-  breaking major-version upgrade affecting App Router APIs this session's
-  auth work depends on. Not applied unilaterally; flagged for an explicit
-  Sprint 1 decision rather than a forced upgrade during a hardening pass.
-* No dependency vulnerability scanning configured in CI yet.
+* No dependency vulnerability scanning beyond `npm audit` run manually —
+  not wired into CI as a blocking gate yet.
+* A new transitive dependency, `sharp` (pulled in by Next 15's image
+  pipeline), carries its own disclosed advisory. `apps/web` doesn't use
+  `next/image` anywhere, so this is currently inert — re-check before ever
+  adopting it.
 * No prompt-injection, malicious-PDF, or data-exfiltration test suite exists
   yet — there is no ingestion or generation pipeline to test against.
 * MFA, session/device management, and SSO are Supabase Auth features not yet
   configured because no hosted Supabase project exists yet — only a local
-  CLI stack has been verified against.
+  CLI stack has been verified against (blocked on credentials — see
+  `docs/operations/hosted-supabase-setup.md`).
 * Password-based login only; no magic-link or SSO flow wired to a UI yet
-  (the `/auth/callback` code-exchange route exists and is real, but nothing
-  currently sends a user through it besides a future password-reset link).
+  (the `/auth/callback` code-exchange route exists and is real — password
+  reset now uses it).
+* **Vercel Deployment Protection ("Vercel Authentication")** is enabled by
+  default on this team and gates every route of the deployed Preview
+  behind Vercel's own SSO, including `/login` — a security-posture
+  decision for the project owner (disable it, or configure a Protection
+  Bypass for Automation secret), not applied unilaterally. See
+  `docs/operations/vercel-preview-deployment.md`. Note for future
+  automated testing: `fetch()` auto-following that redirect produces a
+  false-positive 200 (Vercel's own SSO page, not the app) — always inspect
+  the response body, not just the status code.
 
 ## Reporting a vulnerability found in this repository
 

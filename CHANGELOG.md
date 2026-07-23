@@ -1,6 +1,80 @@
 # Changelog
 
-## [Unreleased] — Sprint 0 remediation (Claude Code, this session)
+## [Unreleased] — Sprint 0.5: Hosted Infrastructure & Design System Activation
+
+### Added
+
+* **`packages/ui`** (new workspace): canonical design tokens (colors,
+  typography, spacing, radius, shadows — 16 clinical/system semantic states
+  with icon + label + accessible description each), 22 generic primitives,
+  10 Noor clinical components, `TokensStyleTag` (single-source CSS-variable
+  injector). Tailwind CSS 3.4 added to `apps/web` as the utility layer,
+  configured to import these tokens directly (`tailwind.config.ts`).
+* `/design-system` showcase route (dev-only — 404s when
+  `NODE_ENV=production`, verified via a real build).
+* ADR 0005 (design-system composition) and ADR 0006 (Next.js
+  security-version strategy).
+* Password reset flow: `/forgot-password`, `/update-password`, wired
+  through the existing `/auth/callback` route. Public signup stays
+  disabled — documented as an intentional invite-only V1 Controlled Beta
+  policy.
+* `docs/design-system/{NOOR_DESIGN_SYSTEM,ACCESSIBILITY,SEMANTIC_STATES}.md`,
+  `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci}.md`.
+* `scripts/smoke-test-web.mjs`: real HTTP smoke test (route protection,
+  page availability, dev-only-route enforcement) — run against a local
+  `next start` + real local Supabase this session, 10/10 passed.
+* `apps/web/tests/{redirect,permissions}.test.ts`: open-redirect coverage
+  for `sanitizeNextPath`, and a consistency check that every permission key
+  referenced in code is actually seeded by migration 0002.
+* CI: push-to-`main` trigger (previously PR-only) and a `gitleaks`
+  secret-scan job.
+
+### Changed
+
+* **Next.js 14.2.35 → 15.5.21.** `npm audit` flagged ~19 advisories against
+  14.2.35 with no non-breaking fix available; several were genuinely
+  reachable through this app's actual Server Action / Middleware usage.
+  Spiked the upgrade in an isolated git worktree first, hit and fixed Next
+  15's "Async Request APIs" breaking change (`cookies()`/`searchParams` are
+  now Promises — 7 files touched), fully re-verified, then applied to
+  `main`. See ADR 0006 for the complete advisory list and exposure
+  analysis.
+* Every existing route (login, 403, access-denied, all 4 workspace shells)
+  restyled onto `packages/ui` components; workspace navigation is now
+  derived from the signed-in user's actual permissions, not hardcoded by
+  route name.
+
+### Fixed
+
+* This is genuinely the first session the repository was pushed to GitHub
+  (`git ls-remote` had confirmed the remote existed but was empty). CI now
+  has two real, green GitHub Actions runs to point to, not just local
+  YAML validation.
+* Vercel project misconfiguration: the first `vercel link`/`deploy` (run
+  from `apps/web`) scoped the upload to that directory alone, so the build
+  failed trying to fetch the private `@noor/ui` workspace package from the
+  public npm registry. Fixed by setting the project's Root Directory to
+  `apps/web` via the Vercel API (no CLI subcommand exists for this) and
+  re-linking from the repository root.
+
+### Known, not fixed this session (see KNOWN_LIMITATIONS.md, PROJECT_STATE.md)
+
+* No hosted Supabase project — blocked on credentials
+  (`SUPABASE_ACCESS_TOKEN` or an interactive `supabase login`, neither
+  available in this headless session).
+* Vercel's default Deployment Protection ("Vercel Authentication") gates
+  every route on the deployed Preview behind Vercel's own SSO — blocks
+  automated HTTP verification of the live deployment. A caught, corrected
+  false-positive: an early smoke-test pass against the Preview URL reported
+  "200 OK" for several routes that were actually Vercel's SSO interstitial
+  page, not Noor's app — `fetch()` had auto-followed the redirect. Fixed by
+  inspecting response bodies, not just status codes; documented so it
+  isn't repeated.
+* No Playwright/browser-driven E2E of the login/password-reset forms —
+  Next's Server Action wire protocol isn't a stable plain-`fetch` target;
+  documented as a Sprint 1 gap rather than faked.
+
+## [Unreleased] — Sprint 0 remediation (Claude Code, prior session)
 
 An independent review of the prior sandbox delivery found the repository
 had no `.git`, a stubbed auth middleware, an unseeded permissions table, a

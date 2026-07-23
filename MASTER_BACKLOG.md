@@ -5,17 +5,18 @@ Epics E-01 through E-30 and the 10-week plan are defined in
 tracks execution status against that backlog and holds the Sprint 1
 executable breakdown requested in the Sprint 0 mission (§18.E).
 
-## Epic status after Sprint 0
+## Epic status after Sprint 0.5
 
-| ID | Epic | Status after Sprint 0 remediation |
+| ID | Epic | Status |
 |----|------|------------------------|
-| E-01 | Identity, Orgs & RBAC foundation | **Implemented and verified** (migrations 0001+0002; permissions/role_permissions now seeded — previously declared but empty) |
-| E-02 | RLS & multi-tenant authorization framework | **Implemented and verified** (11/11 RLS assertions passing against plain Postgres **and** a real local Supabase stack) |
-| E-03 | App shell + role-based workspace routing | **Implemented and verified** — real Supabase SSR auth, session refresh, permission-gated layouts on all 4 workspaces, controlled 403/access-denied pages. Login/logout/callback exist and build/typecheck/lint clean |
+| E-01 | Identity, Orgs & RBAC foundation | **Implemented and verified** (migrations 0001+0002; permissions/role_permissions seeded) |
+| E-02 | RLS & multi-tenant authorization framework | **Implemented and verified** (11/11 RLS assertions, plain Postgres **and** real local Supabase) |
+| E-03 | App shell + role-based workspace routing | **Implemented and verified** — real Supabase SSR auth, session refresh, permission-gated layouts on all 4 workspaces + Noor Design System styling, controlled 403/access-denied pages, password reset flow |
 | E-06 | Worker service scaffold | **Implemented and verified** (5/5 pytest passing) |
 | E-15 | AI Gateway (registry, validators) | **Partially implemented** — structured-answer schema + safety invariants done (`packages/clinical-schemas`); no provider adapters, registry tables, or gateway service yet |
-| E-23 | Audit logging (correlation ID) | **Partially implemented** — `audit_events` table + RLS + trigger-based append-only enforcement done; nothing writes to it yet, no correlation-ID propagation through a real request path |
-| E-27 | CI/CD pipelines & environments | **Partially implemented** — `.github/workflows/pr.yml` corrected (was resolving the wrong lockfile due to npm workspaces; fixed and every job's commands independently reproduced locally); still never executed on GitHub Actions (no remote push access) |
+| E-23 | Audit logging (correlation ID) | **Partially implemented** — `audit_events` table + RLS + trigger-based append-only enforcement done; nothing writes to it yet |
+| E-27 | CI/CD pipelines & environments | **Implemented and verified** — CI corrected and has run green on GitHub Actions twice (real runs, not just local reproduction); Vercel project linked and building successfully; hosted Supabase and Vercel HTTP verification remain blocked (see PROJECT_STATE.md) |
+| E-31 *(new)* | Noor Design System foundation | **Implemented and verified** — `packages/ui`: tokens, 32 components, `/design-system` showcase, ADR 0005, accessibility contrast audit. See `docs/design-system/` |
 | E-04, E-05, E-07–E-14, E-16–E-22, E-24–E-26, E-28–E-30 | All other epics | **Not started** |
 
 ## Sprint 1 executable backlog
@@ -85,19 +86,19 @@ executable breakdown requested in the Sprint 0 mission (§18.E).
 - **Acceptance criteria:** Decision doc recorded as ADR; adapter interface compiles and is provider-agnostic (swapping providers requires no call-site changes).
 - **Tests required:** Adapter interface unit tests with a mock provider
 
-### S1-08 — Hosted Supabase project + environment wiring
-- **Description:** Local Supabase CLI verification is now done (this session: `supabase start`, all migrations + both RLS test files re-run against the real `authenticated` role and real GoTrue `auth.uid()`, plus a real GoTrue-user → JWT → PostgREST round trip — see PROJECT_STATE.md). What remains is standing up an actual **hosted** Supabase project for Local/Preview/Staging and wiring real environment variables end to end (Vercel ↔ hosted Supabase).
+### S1-09 — CI execution on GitHub Actions — **DONE (Sprint 0.5)**
+- **Description:** Pushed to `github.com/abdullawagih1/NOOR`; `pr.yml` now runs on push-to-main too (not just PRs), plus a `secret-scan` job. Confirmed 5/5 green twice on real GitHub Actions runs (see PROJECT_STATE.md for run URLs).
 - **Team:** DevOps
-- **Dependencies:** None (can start immediately) — **this is the top remaining blocking gap**
-- **Priority:** P0
-- **Risk:** Medium (downgraded from High — the schema/RLS/auth design is now proven against real Supabase behavior locally, not just plain Postgres; remaining risk is hosted-environment-specific, e.g. connection pooling, email delivery, network path)
-- **Acceptance criteria:** All 3 migrations and both RLS test files run unmodified against the hosted project; CI job `database` in `.github/workflows/pr.yml` goes green on GitHub Actions; `apps/web/.env.example` values are replaced with real hosted project values in Vercel's environment configuration (never committed).
-- **Tests required:** Full Sprint 0 RLS suite re-run against the hosted project
+- **Status:** Closed this session.
 
-### S1-09 — CI execution on GitHub Actions
-- **Description:** Push this repository to `github.com/abdullawagih1/NOOR` and confirm all four `pr.yml` jobs (web, worker, clinical-schemas, database) actually run and pass on a real pull request.
+### S1-10 — Hosted Supabase project — **BLOCKED, credentials required**
+- **Description:** Local Supabase CLI verification is done (Sprint 0 remediation + Sprint 0.5 re-verification). Creating the actual hosted Development project requires `supabase login` (interactive browser OAuth) or a `SUPABASE_ACCESS_TOKEN` — neither is available in this headless session. See `docs/operations/hosted-supabase-setup.md` for the exact, ready-to-run commands once either exists.
 - **Team:** DevOps
-- **Dependencies:** Git push access (not available in this delivery environment — see PROJECT_STATE.md)
-- **Priority:** P0
-- **Risk:** Low, but currently blocked on access, not effort
-- **Acceptance criteria:** A PR shows 4/4 green checks.
+- **Priority:** P0 — top blocking gap
+- **Acceptance criteria:** All 3 migrations + both RLS test files pass unmodified against the hosted project (same 11/11 as local).
+
+### S1-11 — Vercel Deployment Protection decision — **BLOCKED, owner decision required**
+- **Description:** Vercel's default "Vercel Authentication" gates every route on the deployed Preview (including `/login`) behind Vercel's own SSO, blocking automated HTTP verification. Requires the project owner to either disable it or generate a "Protection Bypass for Automation" secret. See `docs/operations/vercel-preview-deployment.md`.
+- **Team:** DevOps
+- **Priority:** P1
+- **Acceptance criteria:** `scripts/smoke-test-web.mjs` run against the live Preview URL produces genuine (not SSO-page) results.

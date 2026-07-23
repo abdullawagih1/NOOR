@@ -6,14 +6,16 @@ retrieves and cites only approved, versioned guideline text, and refuses to
 answer when evidence is insufficient. Noor is not an autonomous diagnostician
 — the clinician always retains final clinical authority.
 
-This repository is at **Sprint 0**: the identity/tenancy/RLS foundation,
-real Supabase Auth (SSR clients, session refresh, login/logout, permission-
-gated workspace routes), the worker service scaffold, and the shared
-clinical schema contract exist and are verified — against plain Postgres
-*and* a real local Supabase stack. No **hosted** Supabase project, GitHub
-remote push, Vercel deployment, guideline ingestion pipeline, or LLM
-integration exists yet. See `PROJECT_STATE.md` for the authoritative current
-status.
+This repository is at **Sprint 0.5**: the identity/tenancy/RLS foundation,
+real Supabase Auth (SSR clients, session refresh, login/logout/password-
+reset, permission-gated workspace routes), the Noor Design System
+(`packages/ui`), the worker service scaffold, and the shared clinical
+schema contract exist and are verified — against plain Postgres, a real
+local Supabase stack, and (for the web app) a real running server. The
+repository is pushed to GitHub with CI passing on real GitHub Actions runs,
+and Vercel is linked and building successfully. No **hosted** Supabase
+project, guideline ingestion pipeline, or LLM integration exists yet — see
+`PROJECT_STATE.md` for the authoritative current status and open gaps.
 
 ## Architecture
 
@@ -32,12 +34,14 @@ architecture documents referenced there.
 apps/web/             Next.js application (real Supabase Auth, role-based workspaces)
 apps/worker/           FastAPI worker (long-running AI/document processing)
 packages/clinical-schemas/   Shared structured-answer contract (zod)
+packages/ui/           Noor Design System — tokens + 32 components (packages/ui)
 supabase/config.toml   Supabase CLI project config (local dev stack)
 supabase/migrations/   Versioned SQL migrations
 supabase/tests/rls/    RLS test suite (same-tenant / cross-tenant / auth-hardening)
 supabase/seed.sql      Synthetic seed data — no real patient data, ever
+scripts/               Reproducible verification scripts (HTTP smoke test)
 clinical/              Intended Use, risk register, evaluation sets
-docs/                  Architecture, database, API, operations documentation
+docs/                  Architecture, database, design-system, operations documentation
 ```
 
 This is an **npm workspaces** monorepo (root `package.json`:
@@ -112,11 +116,33 @@ npm run typecheck --workspace=packages/clinical-schemas
 npm test --workspace=packages/clinical-schemas
 ```
 
+### Design system
+
+```bash
+npm run typecheck --workspace=packages/ui
+npm run dev --workspace=apps/web    # then visit /design-system (dev only — 404s in production)
+```
+
+See `docs/design-system/NOOR_DESIGN_SYSTEM.md`.
+
+### HTTP smoke test (real running server)
+
+```bash
+BASE_URL=http://localhost:3000 node scripts/smoke-test-web.mjs
+```
+
+Requires `apps/web` built with real `NEXT_PUBLIC_SUPABASE_*` env vars and
+running (`next start` or `next dev`). See `docs/operations/vercel-preview-deployment.md`
+before pointing `BASE_URL` at a Vercel Preview — Deployment Protection
+needs to be addressed first or results will be false positives.
+
 ## Governing documents
 
 * `clinical/intended-use/INTENDED_USE.md`
 * `clinical/risk-management/RISK_REGISTER.md`
 * `docs/architecture/DECISIONS.md`
+* `docs/design-system/NOOR_DESIGN_SYSTEM.md`
+* `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci}.md`
 * `SECURITY.md`
 * `KNOWN_LIMITATIONS.md`
 
