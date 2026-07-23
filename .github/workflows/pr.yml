@@ -1,0 +1,97 @@
+name: PR Pipeline
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # Noor's web app and clinical-schemas package are npm workspaces
+  # (root package.json: "workspaces": ["apps/web", "packages/*"]). `npm ci`
+  # only understands the ROOT package-lock.json — running it from inside a
+  # workspace member directory silently resolves to the workspace root
+  # anyway, so the install step below runs unscoped and later steps target
+  # the workspace explicitly with `--workspace`. There is no per-app
+  # package-lock.json anymore; committing one alongside the root lockfile
+  # was misleading (npm never actually read it).
+  web:
+    name: Web — lint, typecheck, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run lint --workspace=apps/web
+      - run: npm run typecheck --workspace=apps/web
+      - run: npm run build --workspace=apps/web
+
+  clinical-schemas:
+    name: Clinical schemas — typecheck, contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run typecheck --workspace=packages/clinical-schemas
+      - run: npm test --workspace=packages/clinical-schemas
+
+  worker:
+    name: Worker — compile, unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m py_compile app/main.py
+      - run: python -m pytest tests/ -v
+
+  database:
+    name: Supabase — migrations + RLS tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: noor_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply migrations
+        run: |
+          for f in supabase/migrations/*.sql; do
+            echo "Applying $f"
+            PGPASSWORD=postgres psql -h localhost -U postgres -d noor_test -v ON_ERROR_STOP=1 -f "$f"
+          done
+      - name: Load seed data
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -d noor_test -v ON_ERROR_STOP=1 -f supabase/seed.sql
+      - name: Run RLS test suite
+        run: |
+          for f in supabase/tests/rls/*.sql; do
+            echo "Running $f"
+            PGPASSWORD=postgres psql -h localhost -U postgres -d noor_test -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+  # NOTE (DevOps/SRE Agent): this pipeline validates against a plain
+  # Postgres service container using the auth.uid() convention documented in
+  # supabase/migrations/0001_identity_and_rls.sql. It is a stand-in for full
+  # `supabase db test` / Supabase CLI integration, which requires Docker
+  # socket access this pipeline does not yet provision — tracked as a Sprint
+  # 1 DevOps task (see MASTER_BACKLOG.md, gap G-04).

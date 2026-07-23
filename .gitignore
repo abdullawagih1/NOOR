@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+apps/*/node_modules/
+packages/*/node_modules/
+/node_modules/
+
+# Next.js
+.next/
+out/
+
+# TypeScript
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Testing
+coverage/
+htmlcov/
+
+# Build artifacts
+dist/
+build/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS and IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Misc
+*.log
+package-lock.json.bak
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
