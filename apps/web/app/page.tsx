@@ -1,30 +1,32 @@
+import { PageHeader, Card } from "@noor/ui";
+
 export default function HomePage() {
   return (
-    <main className="noor-shell">
-      <span className="noor-badge">Noor V1 — Sprint 0 Foundation</span>
-      <h1>Noor — Clinical Intelligence OS</h1>
-      <p>
-        Evidence-grounded clinical evidence assistant. This build establishes
-        the Sprint 0 application shell and role-based workspace routing; no
-        clinical data or generation pipeline is wired yet.
+    <main className="mx-auto flex max-w-2xl flex-col gap-lg p-xl">
+      <PageHeader eyebrow="Noor V1 — Sprint 0.5" title="Noor — Clinical Intelligence OS" />
+      <p className="text-base text-body">
+        Evidence-grounded clinical evidence assistant. This build establishes the
+        application shell, real authentication, and the Noor design-system
+        foundation; no clinical data or generation pipeline is wired yet.
       </p>
-      <div className="noor-card">
-        <strong>Workspaces (stubs)</strong>
-        <ul>
+      <Card>
+        <strong className="text-sm font-semibold text-ink">Workspaces (content stubs, real auth)</strong>
+        <ul className="mt-sm flex flex-col gap-xs text-sm">
           <li>
-            <a href="/clinician">Clinician Workspace</a>
+            <a href="/clinician" className="text-primary hover:underline">Clinician Workspace</a>
           </li>
           <li>
-            <a href="/admin">Admin Workspace</a>
+            <a href="/admin" className="text-primary hover:underline">Admin Workspace</a>
           </li>
           <li>
-            <a href="/reviewer">Clinical Reviewer Workspace</a>
+            <a href="/reviewer" className="text-primary hover:underline">Clinical Reviewer Workspace</a>
           </li>
           <li>
-            <a href="/quality">Quality &amp; Safety Workspace</a>
+            <a href="/quality" className="text-primary hover:underline">Quality &amp; Safety Workspace</a>
           </li>
         </ul>
-      </div>
+      </Card>
+      <a href="/login" className="text-sm text-primary hover:underline">Sign in →</a>
     </main>
   );
 }

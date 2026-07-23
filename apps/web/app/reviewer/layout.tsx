@@ -9,9 +9,9 @@ export default async function ReviewerLayout({ children }: { children: React.Rea
   const context = await requirePermission(PERMISSIONS.WORKSPACE_REVIEWER_ACCESS);
 
   return (
-    <>
-      <WorkspaceHeader roleKeys={context.roleKeys} />
+    <div className="mx-auto max-w-4xl p-xl">
+      <WorkspaceHeader roleKeys={context.roleKeys} permissionKeys={context.permissionKeys} />
       {children}
-    </>
+    </div>
   );
 }

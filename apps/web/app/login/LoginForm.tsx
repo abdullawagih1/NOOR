@@ -2,33 +2,33 @@
 
 import { useFormStatus } from "react-dom";
 import { signInWithPassword } from "@/lib/auth/actions";
+import { Button, TextInput, PasswordInput, Alert } from "@noor/ui";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="noor-button" disabled={pending}>
+    <Button type="submit" disabled={pending} className="w-full">
       {pending ? "Signing in…" : "Sign in"}
-    </button>
+    </Button>
   );
 }
 
 export function LoginForm({ next, error }: { next: string; error?: string }) {
   return (
-    <form action={signInWithPassword} className="noor-form">
+    <form action={signInWithPassword} className="flex flex-col gap-md">
       <input type="hidden" name="next" value={next} />
-      <label htmlFor="email">Email</label>
-      <input id="email" name="email" type="email" autoComplete="email" required />
-
-      <label htmlFor="password">Password</label>
-      <input id="password" name="password" type="password" autoComplete="current-password" required />
+      <TextInput label="Email" id="email" name="email" type="email" autoComplete="email" required />
+      <PasswordInput label="Password" id="password" name="password" autoComplete="current-password" required />
 
       {error ? (
-        <p role="alert" className="noor-error">
-          {error}
-        </p>
+        <Alert tone="critical" title={error} />
       ) : null}
 
       <SubmitButton />
+
+      <a href="/forgot-password" className="text-sm text-primary hover:underline">
+        Forgot your password?
+      </a>
     </form>
   );
 }

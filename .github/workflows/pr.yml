@@ -3,8 +3,21 @@ name: PR Pipeline
 on:
   pull_request:
     branches: [main, develop]
+  push:
+    branches: [main]
 
 jobs:
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # Noor's web app and clinical-schemas package are npm workspaces
   # (root package.json: "workspaces": ["apps/web", "packages/*"]). `npm ci`
   # only understands the ROOT package-lock.json — running it from inside a
@@ -26,6 +39,7 @@ jobs:
       - run: npm ci
       - run: npm run lint --workspace=apps/web
       - run: npm run typecheck --workspace=apps/web
+      - run: npm run test --workspace=apps/web
       - run: npm run build --workspace=apps/web
 
   clinical-schemas:

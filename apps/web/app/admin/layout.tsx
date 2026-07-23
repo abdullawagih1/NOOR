@@ -9,9 +9,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const context = await requirePermission(PERMISSIONS.WORKSPACE_ADMIN_ACCESS);
 
   return (
-    <>
-      <WorkspaceHeader roleKeys={context.roleKeys} />
+    <div className="mx-auto max-w-4xl p-xl">
+      <WorkspaceHeader roleKeys={context.roleKeys} permissionKeys={context.permissionKeys} />
       {children}
-    </>
+    </div>
   );
 }

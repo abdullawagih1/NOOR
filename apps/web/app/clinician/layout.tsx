@@ -9,9 +9,9 @@ export default async function ClinicianLayout({ children }: { children: React.Re
   const context = await requirePermission(PERMISSIONS.WORKSPACE_CLINICIAN_ACCESS);
 
   return (
-    <>
-      <WorkspaceHeader roleKeys={context.roleKeys} />
+    <div className="mx-auto max-w-4xl p-xl">
+      <WorkspaceHeader roleKeys={context.roleKeys} permissionKeys={context.permissionKeys} />
       {children}
-    </>
+    </div>
   );
 }

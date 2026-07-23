@@ -1,21 +1,25 @@
 import { LoginForm } from "./LoginForm";
 import { sanitizeNextPath } from "@/lib/auth/redirect";
+import { Card, PageHeader, Alert } from "@noor/ui";
 
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams: { next?: string; error?: string };
+  searchParams: { next?: string; error?: string; notice?: string };
 }) {
   const next = sanitizeNextPath(searchParams.next);
 
   return (
-    <main className="noor-shell">
-      <span className="noor-badge">Noor V1</span>
-      <h1>Sign in</h1>
-      <p>Access your organization&apos;s Noor workspace.</p>
-      <div className="noor-card">
+    <main className="mx-auto flex max-w-md flex-col gap-lg p-xl">
+      <PageHeader eyebrow="Noor V1" title="Sign in" description="Access your organization's Noor workspace." />
+      {searchParams.notice ? <Alert tone="success" title={searchParams.notice} /> : null}
+      <Card>
         <LoginForm next={next} error={searchParams.error} />
-      </div>
+      </Card>
+      <p className="text-center text-xs text-muted">
+        Noor is invite-only during Controlled Beta — accounts are provisioned by your
+        organization administrator, not self-service signup.
+      </p>
     </main>
   );
 }
