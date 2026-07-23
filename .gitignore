@@ -46,3 +46,6 @@ supabase/.branches/
 supabase/.temp/
 
 .vercel
+
+# Claude Code local tooling state
+.claude/
