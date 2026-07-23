@@ -49,7 +49,7 @@ function firstOrSelf<T>(value: T | T[] | null | undefined): T | null {
  * earliest-created one. Organization switching is Sprint 1+ scope.
  */
 export async function getAuthenticatedContext(): Promise<ResolvedAccess> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },

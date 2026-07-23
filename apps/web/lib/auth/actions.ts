@@ -13,7 +13,7 @@ export async function signInWithPassword(formData: FormData): Promise<void> {
     redirect(`/login?error=${encodeURIComponent("Email and password are required.")}&next=${encodeURIComponent(next)}`);
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
@@ -24,7 +24,7 @@ export async function signInWithPassword(formData: FormData): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
-  const supabase = createClient();
+  const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");
 }
@@ -46,7 +46,7 @@ export async function requestPasswordReset(formData: FormData): Promise<void> {
     redirect(`/forgot-password?error=${encodeURIComponent("Enter your email address.")}`);
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${getAppUrl()}/auth/callback?next=${encodeURIComponent("/update-password")}`,
   });
@@ -65,7 +65,7 @@ export async function updatePassword(formData: FormData): Promise<void> {
     redirect(`/update-password?error=${encodeURIComponent("Passwords do not match.")}`);
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

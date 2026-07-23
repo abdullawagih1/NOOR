@@ -5,16 +5,17 @@ import { Card, PageHeader } from "@noor/ui";
 // never be statically prerendered.
 export const dynamic = "force-dynamic";
 
-export default function UpdatePasswordPage({
+export default async function UpdatePasswordPage({
   searchParams,
 }: {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>;
 }) {
+  const params = await searchParams;
   return (
     <main className="mx-auto flex max-w-md flex-col gap-lg p-xl">
       <PageHeader title="Choose a new password" description="This completes your password reset." />
       <Card>
-        <UpdatePasswordForm error={searchParams.error} />
+        <UpdatePasswordForm error={params.error} />
       </Card>
     </main>
   );

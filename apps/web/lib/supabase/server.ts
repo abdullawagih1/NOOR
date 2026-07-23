@@ -13,7 +13,7 @@ import { cookies } from "next/headers";
  * below is a documented no-op there, relied upon because middleware already
  * refreshes the session before the request reaches a Server Component.
  */
-export function createClient() {
+export async function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -24,7 +24,7 @@ export function createClient() {
     );
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   return createServerClient(url, anonKey, {
     cookies: {
