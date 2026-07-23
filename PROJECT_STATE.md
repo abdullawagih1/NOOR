@@ -34,12 +34,14 @@ from the prior document without being re-verified.
   empty — confirmed via `git ls-remote` (exit 0, zero refs returned) this
   session. No push has been attempted; no credentials exist in this
   environment for it.
-* This document is committed in the same commit as the rest of the
-  remediation work. Run `git log -1 --format=%H` after checkout to get the
-  exact hash — it is intentionally not hardcoded here to avoid ever
-  repeating the mistake this session was created to fix (a commit hash that
-  can't be reproduced by whoever reads it).
-* Working tree: clean immediately after the commit described above.
+* This document (an earlier version of it) was committed together with the
+  rest of the remediation work as commit `559aa5d816dd99827962ed4a06dfeb5787a3ba2c`
+  ("Sprint 0 remediation: real git repo, real Supabase Auth, verified RLS").
+  This paragraph was added in a follow-up commit immediately after, purely
+  to record that hash — run `git log --oneline` yourself to confirm it
+  rather than trusting this sentence; that is exactly the discipline this
+  session was created to enforce.
+* Working tree: clean after both commits.
 
 ---
 
