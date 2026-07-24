@@ -6,16 +6,21 @@ retrieves and cites only approved, versioned guideline text, and refuses to
 answer when evidence is insufficient. Noor is not an autonomous diagnostician
 — the clinician always retains final clinical authority.
 
-This repository is at **Sprint 0.5**: the identity/tenancy/RLS foundation,
-real Supabase Auth (SSR clients, session refresh, login/logout/password-
-reset, permission-gated workspace routes), the Noor Design System
-(`packages/ui`), the worker service scaffold, and the shared clinical
-schema contract exist and are verified — against plain Postgres, a real
-local Supabase stack, and (for the web app) a real running server. The
-repository is pushed to GitHub with CI passing on real GitHub Actions runs,
-and Vercel is linked and building successfully. No **hosted** Supabase
-project, guideline ingestion pipeline, or LLM integration exists yet — see
-`PROJECT_STATE.md` for the authoritative current status and open gaps.
+This repository is at **Sprint 0.5** (Technically Complete — Hosted
+Verification Blocked): the identity/tenancy/RLS foundation, real Supabase
+Auth (SSR clients, session refresh, login/logout/password-reset,
+permission-gated workspace routes), the Noor Design System (`packages/ui`),
+the worker service scaffold, and the shared clinical schema contract exist
+and are verified — against plain Postgres, a real local Supabase stack,
+and **a real hosted Supabase Development project** (Auth, RLS, Storage,
+and Audit all verified with real JWTs — see
+`docs/verification/sprint-0.5-hosted-verification.md`). The repository is
+pushed to GitHub with CI passing on real GitHub Actions runs, and Vercel
+Preview is deployed with the hosted Development values wired in. One
+dashboard-only action remains (Vercel's Protection Bypass secret) before
+full authenticated Preview HTTP testing closes — see `PROJECT_STATE.md`
+for the authoritative current status and open gaps. No guideline ingestion
+pipeline or LLM integration exists yet.
 
 ## Architecture
 
@@ -149,6 +154,7 @@ needs to be addressed first or results will be false positives.
 * `docs/architecture/DECISIONS.md`
 * `docs/design-system/NOOR_DESIGN_SYSTEM.md`
 * `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci,environment-variables,worker-deployment}.md`
+* `docs/verification/sprint-0.5-hosted-verification.md`
 * `SECURITY.md`
 * `KNOWN_LIMITATIONS.md`
 

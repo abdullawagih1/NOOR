@@ -1,5 +1,72 @@
 # Changelog
 
+## [Unreleased] — Hosted Supabase Development Setup & Sprint 0.5 Closure
+
+### Added
+
+* `supabase/migrations/0004_revoke_anon_table_grants.sql` — fixes a real
+  finding from hosted verification: `anon` held full CRUD grants on every
+  public table (a legacy Supabase project-creation default). RLS already
+  blocked practical access; this closes the grant-layer gap too. Guarded
+  to no-op on the plain-Postgres CI container (no `anon` role there).
+* `docs/verification/sprint-0.5-hosted-verification.md` — complete,
+  command-by-command hosted verification record: 26 Auth/RLS/
+  Authorization/Feature-flag/Audit assertions + 8 Storage assertions, all
+  executed with real GoTrue-issued JWTs, all passed.
+* A stable Vercel Preview alias, `noor-preview-dev.vercel.app`, re-pointed
+  to the latest Preview deployment after every deploy — needed because
+  Vercel's per-deployment URLs are ephemeral and Supabase's Auth redirect
+  allowlist needs a fixed target.
+* Supabase Auth site URL + explicit redirect allowlist configured (no
+  wildcards) against that stable alias.
+* Vercel Preview environment variables (6, Preview-scoped, encrypted)
+  pointing at the hosted "Noor Development" project.
+* `scripts/smoke-test-web.mjs` rewritten to inspect response **bodies**
+  for every check, not just status codes — explicitly detects and reports
+  Vercel's SSO interstitial rather than mistaking it for a pass (fixes a
+  real false-positive bug from a prior session) and accepts an optional
+  `BYPASS_TOKEN` for authenticated Preview testing once configured.
+
+### Fixed
+
+* Hosted "Noor Development" project connected (it already existed,
+  created between sessions) and all migrations applied to a genuinely
+  green-field remote database (confirmed via `supabase migration list`
+  before/after).
+* The `anon`-grants finding above.
+
+### Investigated and documented (not a defect)
+
+* A password-reset status-code difference (429 vs 200 for existing vs
+  non-existent addresses) turned out to be GoTrue's own default
+  email-send rate limit on an SMTP-less Development project — root-caused
+  with a clean two-fresh-address test rather than assumed. Noor's own
+  `requestPasswordReset()` server action never branches on this response,
+  so the product surface remains non-enumerating regardless.
+
+### Verified this session (not assumed)
+
+* All hosted checks above, with real JWTs, against the real project —
+  not superuser-only SQL queries.
+* A genuine, unplanned proof of the audit append-only trigger: cleaning up
+  a test audit row was *rejected* by `prevent_audit_event_mutation()` on
+  the hosted project, exactly as designed; cleanup only succeeded via the
+  documented `noor.allow_audit_maintenance` override.
+* Local re-verification (lint/typecheck/test/build for Web; typecheck/test
+  for clinical-schemas and ui; compile/pytest for Worker; full RLS suite
+  against plain Postgres, both before and after migration 0004) — all
+  green.
+* All synthetic hosted test data (2 orgs, 8 users) deleted after
+  verification, confirmed via a zero-count query.
+
+### Known, not fixed this session
+
+* Vercel "Protection Bypass for Automation" requires a dashboard action —
+  confirmed no CLI command exists and the REST API rejects the plausible
+  field names/endpoints (400/404) for enabling it programmatically.
+* No custom SMTP on the hosted Development project — acceptable pre-Beta,
+  should be configured before real password-reset email volume matters.
+
 ## [Unreleased] — Environment Variables Audit, Standardization, and Security Hardening
 
 ### Added

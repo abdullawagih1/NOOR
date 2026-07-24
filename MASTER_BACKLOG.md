@@ -91,14 +91,14 @@ executable breakdown requested in the Sprint 0 mission (§18.E).
 - **Team:** DevOps
 - **Status:** Closed this session.
 
-### S1-10 — Hosted Supabase project — **BLOCKED, credentials required**
-- **Description:** Local Supabase CLI verification is done (Sprint 0 remediation + Sprint 0.5 re-verification). Creating the actual hosted Development project requires `supabase login` (interactive browser OAuth) or a `SUPABASE_ACCESS_TOKEN` — neither is available in this headless session. See `docs/operations/hosted-supabase-setup.md` for the exact, ready-to-run commands once either exists.
+### S1-10 — Hosted Supabase project — **DONE**
+- **Description:** Connected to the pre-existing "Noor Development" project (`quohfsaqeqzbbvmrhmbr`, `eu-west-3`, Postgres 17). All 4 migrations applied (0004 new — fixes a real `anon`-grant finding, see below). 26 Auth/RLS/Authorization/Feature-flag/Audit assertions + 8 Storage assertions, all with real GoTrue JWTs — every one passed. Full record: `docs/verification/sprint-0.5-hosted-verification.md`.
 - **Team:** DevOps
-- **Priority:** P0 — top blocking gap
-- **Acceptance criteria:** All 3 migrations + both RLS test files pass unmodified against the hosted project (same 11/11 as local).
+- **Status:** Closed this session.
+- **Real finding fixed along the way:** `anon` held full CRUD grants on every public table (legacy Supabase project-creation default). RLS already blocked practical access; migration `0004_revoke_anon_table_grants.sql` closes the grant-layer gap too, guarded to no-op on the plain-Postgres CI container.
 
-### S1-11 — Vercel Deployment Protection decision — **BLOCKED, owner decision required**
-- **Description:** Vercel's default "Vercel Authentication" gates every route on the deployed Preview (including `/login`) behind Vercel's own SSO, blocking automated HTTP verification. Requires the project owner to either disable it or generate a "Protection Bypass for Automation" secret. See `docs/operations/vercel-preview-deployment.md`.
+### S1-11 — Vercel Deployment Protection decision — **PARTIALLY DONE, one dashboard step remains**
+- **Description:** Vercel's default "Vercel Authentication" gates every route on the deployed Preview. Decision made and applied: **keep it enabled** (not disabled) per explicit policy — Preview URLs may carry pre-release/real data later. Preview env vars configured with hosted Development values and redeployed; Supabase Auth URLs configured against a stable alias. Remaining: "Protection Bypass for Automation" must be enabled via the Vercel **dashboard** — confirmed this session there is no CLI command and the REST API rejects the plausible field names/endpoints (400/404). See `docs/operations/vercel-preview-deployment.md`.
 - **Team:** DevOps
 - **Priority:** P1
-- **Acceptance criteria:** `scripts/smoke-test-web.mjs` run against the live Preview URL produces genuine (not SSO-page) results.
+- **Acceptance criteria:** `BASE_URL=https://noor-preview-dev.vercel.app BYPASS_TOKEN=<secret> node scripts/smoke-test-web.mjs` produces genuine (not SSO-page) results for every route. Without the token, the script now correctly *detects and reports* the protection wall rather than false-passing — verified this session.

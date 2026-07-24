@@ -1,94 +1,122 @@
 # Vercel Preview Deployment
 
-## Status as of Sprint 0.5
+## Status
 
-**Deployment pipeline: verified working.** Full HTTP behavioral
-verification against the live Preview URL: **BLOCKED** by Vercel's default
-Deployment Protection (see below) — a project setting, not a code issue.
+**Deployed and configured with hosted Development Supabase values.**
+Deployment Protection remains enabled (kept on purpose, per mission
+policy — see below); full authenticated HTTP verification needs one
+remaining **dashboard-only** action (Protection Bypass secret).
 
-## What was actually done this session
+## Stable Preview alias
 
-The Vercel CLI was already authenticated on this machine
-(`vercel whoami` → a real account). The monorepo root/framework
-configuration was **not** correct on the first attempt and had to be fixed:
-
-1. `vercel link` run from `apps/web` created a project whose upload scope
-   was *only* `apps/web` (42 files) — it had no visibility into the root
-   `package.json`/lockfile or `packages/ui`. The build failed:
-   ```
-   npm error 404 Not Found - GET https://registry.npmjs.org/@noor%2fui
-   ```
-   This is the real, empirical reason a monorepo needs its **Root
-   Directory** project setting configured, not just "run vercel from the
-   app folder."
-2. Fixed via the Vercel REST API (`PATCH /v9/projects/{id}`) since the CLI
-   has no subcommand for it: `rootDirectory: "apps/web"`, `framework:
-   "nextjs"`.
-3. Re-linked from the **repository root** and deployed again — this time
-   2.2MB uploaded (the whole repo) and the build succeeded.
-4. First deployment landed as `target: production` even though `--yes` was
-   used (undocumented but empirically confirmed Vercel behavior: **a
-   project's first-ever deployment is always Production**, regardless of
-   `--target`/`--prod` flags). No harm done — the deployment has no working
-   Supabase credentials wired, so it serves only the static pages.
-5. A second deploy with `--target=preview` correctly returned
-   `target: preview` (confirmed via `vercel inspect`) — this is the
-   reproducible path going forward.
-
-## The real blocker: Vercel Deployment Protection ("Vercel Authentication")
-
-Every route on the deployed URL — **including `/login`, `/`, and `/403`,
-not just the protected workspace routes** — redirects unauthenticated
-visitors to `vercel.com/sso-api`:
+Vercel's per-deployment URLs are ephemeral (`noor-<random>-....vercel.app`)
+and change on every deploy, which is awkward for a Supabase Auth redirect
+allowlist. This session created an explicit, stable alias instead:
 
 ```
-$ curl -sD - -o /dev/null https://<preview-url>/login
-HTTP/1.1 302 Found
-Location: https://vercel.com/sso-api?url=...
+https://noor-preview-dev.vercel.app
 ```
 
-This is the team's default "Vercel Authentication" protection, which gates
-*any* visitor who isn't logged into Vercel and a member of this team — it
-runs in front of the Next.js app entirely, before our own middleware ever
-executes. An HTTP smoke test that doesn't inspect the response *body* (only
-the status code) will silently pass against Vercel's own SSO interstitial
-page instead of Noor's actual page — this happened once during this
-session's testing and was caught by checking the response body, not
-trusted at face value. Treat any future Preview URL smoke-test "200 OK"
-result as unverified until the body is confirmed to be Noor's own HTML, not
-Vercel's.
+**Re-point it after every future Preview deploy:**
+```bash
+vercel deploy --target=preview
+# note the returned Preview URL, e.g. noor-xxxxx-abdullah-wagihs-projects.vercel.app
+vercel alias set noor-xxxxx-abdullah-wagihs-projects.vercel.app noor-preview-dev.vercel.app
+```
 
-**This needs one of two decisions, made deliberately, not silently
-bypassed:**
+Supabase's Auth redirect allowlist points at this stable alias, not at any
+specific deployment URL — see `docs/operations/hosted-supabase-setup.md`.
 
-1. Disable "Vercel Authentication" for this project (Project Settings →
-   Deployment Protection) — makes Preview URLs reachable by anyone with the
-   link, including automated smoke tests and any teammate without a Vercel
-   seat.
-2. Keep it enabled and use **"Protection Bypass for Automation"** (Project
-   Settings → Deployment Protection → generates a secret) — pass it as
-   `x-vercel-protection-bypass: <secret>` header (or
-   `?x-vercel-set-bypass-cookie=true` query param once) from CI/smoke-test
-   scripts, keeping protection on for casual visitors.
+## Environment configuration (this session)
 
-Neither was chosen in this session — it's a security-posture decision for
-the project owner, not something to change unilaterally.
+Preview-scoped variables set via `vercel env add <name> preview` (values
+never printed, piped from a local file, encrypted at rest in Vercel):
 
-## Reproducing this deployment
+```
+APP_ENV=preview
+NEXT_PUBLIC_APP_URL=https://noor-preview-dev.vercel.app
+NEXT_PUBLIC_SUPABASE_URL=https://quohfsaqeqzbbvmrhmbr.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<hosted Development anon key>
+SUPABASE_URL=https://quohfsaqeqzbbvmrhmbr.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<hosted Development service-role key>
+```
+
+`WORKER_BASE_URL`/`WORKER_INTERNAL_TOKEN` were **not** added — no Web→Worker
+call site exists yet (Sprint 1), matching the "don't add Worker variables
+prematurely" rule.
+
+Confirm what's set (names only, values always show `Encrypted`):
+```bash
+vercel env ls preview
+```
+
+## Monorepo configuration (fixed in a prior session, still correct)
+
+Root Directory = `apps/web`, framework = `nextjs`, set via the Vercel REST
+API (no CLI subcommand exists for Root Directory). `vercel link` must be
+run from the **repository root**, not `apps/web` — see
+`docs/verification/sprint-0.5-hosted-verification.md` for why (a
+subdirectory-scoped link previously failed to resolve the `@noor/ui`
+workspace package).
+
+## Deploying
 
 ```bash
 # from the repository root
-vercel link --yes --project noor          # once
-vercel deploy --target=preview            # every subsequent Preview
-vercel --prod                             # only with explicit approval
+vercel deploy --target=preview            # every Preview deploy
+vercel alias set <new-url> noor-preview-dev.vercel.app   # keep the stable alias current
+vercel --prod                             # only with explicit approval — do not run casually
 ```
 
-## Preview smoke tests (once hosted Supabase + protection bypass exist)
+A project's **first-ever** deployment lands as `target: production`
+regardless of flags (empirically confirmed, undocumented Vercel behavior)
+— only relevant once, already happened in a prior session with no working
+credentials wired to it at the time.
+
+## Deployment Protection — kept enabled, by design
+
+This project's "Vercel Authentication" protects every route, including
+`/login` and `/` — not just the app's own protected workspace routes. This
+was **not disabled** this session, per explicit mission policy: Deployment
+Protection is a legitimate security control (Preview URLs often contain
+pre-release code and, once real data exists, could expose it to anyone
+with the link) and disabling it is the project owner's call, not
+something to change unilaterally for testing convenience.
+
+**Remaining step — dashboard only, not reachable via API or CLI in this
+session** (confirmed: `PATCH /v9/projects/{id}` with a `protectionBypass`
+field returns `400 should NOT have additional property`; two plausible
+dedicated endpoints both 404):
+
+> Vercel dashboard → `noor` project → Settings → Deployment Protection →
+> **Protection Bypass for Automation** → enable. Vercel generates
+> `VERCEL_AUTOMATION_BYPASS_SECRET` — copy it into a secure local
+> environment or a GitHub Actions secret, never into a committed file.
+
+## Preview smoke tests
 
 ```bash
-BASE_URL=https://<preview-url> node scripts/smoke-test-web.mjs
+# Without a bypass token: correctly detects and reports the protection
+# wall rather than false-passing against Vercel's own SSO page.
+BASE_URL=https://noor-preview-dev.vercel.app node scripts/smoke-test-web.mjs
+
+# With a bypass token (once configured above): runs the full
+# authenticated-content checks.
+BASE_URL=https://noor-preview-dev.vercel.app BYPASS_TOKEN=<secret> node scripts/smoke-test-web.mjs
 ```
 
-If Deployment Protection is on, add the bypass header to every request in
-that script first (`x-vercel-protection-bypass`), or the results will be
-false positives against Vercel's SSO page — see the warning above.
+`scripts/smoke-test-web.mjs` inspects response **bodies**, not just status
+codes — a redirect to `vercel.com/sso-api` is explicitly detected and
+labeled, never mistaken for a real Noor page. This fixes an actual
+false-positive bug from a prior session, where `fetch()` auto-following
+that redirect produced misleading "200 OK" passes.
+
+## Local dev
+
+```bash
+npm run dev --workspace=apps/web
+```
+
+`apps/web/.env.local` (git-ignored) needs the same Supabase values as
+above, sourced from `supabase status` for local CLI verification or from
+the hosted Development project for testing against real hosted data.

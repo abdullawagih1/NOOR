@@ -1,30 +1,66 @@
 # PROJECT_STATE.md
 
-**Last updated:** Environment Variables Audit & Security Hardening session
-(Claude Code, this environment)
+**Last updated:** Hosted Supabase Development Setup & Sprint 0.5 Closure
+session (Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code, running locally against
-the actual repository)
+the actual repository, with real Supabase/Vercel hosted access this
+session)
 
 ---
 
-## -1. This session: Environment Variables Audit, Standardization, and Security Hardening
+## -2. This session: Hosted Supabase Development Setup & Sprint 0.5 Closure
 
-A full repository audit (`grep -R "process\.env"`, `os.getenv`,
-`SUPABASE_|NEXT_PUBLIC_|WORKER_|AI_GATEWAY_`) found every variable
-reference across `apps/web`, `apps/worker`, CI, and docs, and surfaced one
-real, previously-unknown security gap: **the Worker's `POST /jobs`
-endpoint had zero authentication** — `WORKER_INTERNAL_TOKEN` had been
-declared in `.env.example` since Sprint 0 but never actually implemented
-anywhere. Fixed and verified this session (see `SECURITY.md`,
-`docs/operations/worker-deployment.md`). Also implemented: centralized
-validated env access on both sides (`apps/web/lib/env/*`,
-`apps/worker/app/settings.py`), a real (not assumed) `server-only`
-bundler-enforcement test, a real (not assumed) canary-secret browser-bundle
-leak test, and 13 new tests (9 Web env, 4 Worker auth) — all green. Full
-inventory, classification, and rotation/incident guidance:
-`docs/operations/environment-variables.md`. This did not touch the
-hosted-Supabase or Vercel-Deployment-Protection blockers below — those are
-unchanged from the prior session.
+The user provided a Supabase personal access token mid-session (held only
+as an in-memory `SUPABASE_ACCESS_TOKEN` for this session — never printed,
+never committed). A hosted **"Noor Development"** project already existed
+(`quohfsaqeqzbbvmrhmbr`, `eu-west-3`, Postgres 17, created between
+sessions) — linked directly rather than creating a new one. All 3 existing
+migrations applied cleanly to a genuinely green-field remote (confirmed via
+`supabase migration list --linked` showing empty `remote` before, matching
+`local` after).
+
+**Real hosted verification, not assumed:** 26 Auth/RLS/Authorization/
+Feature-flag/Audit assertions and 8 Storage assertions, all executed with
+real GoTrue-issued JWTs against `/rest/v1` and `/storage/v1` — every
+single one passed. Full command-by-command record:
+`docs/verification/sprint-0.5-hosted-verification.md`.
+
+**One real, previously-unknown finding, fixed and re-verified on the spot:**
+hosted verification surfaced that `anon` held full CRUD grants on every
+public table (a legacy Supabase project-creation default this specific
+project inherited) — RLS already blocked practical access, but this was a
+real defense-in-depth gap. Wrote and applied migration
+`0004_revoke_anon_table_grants.sql`, re-verified locally (plain Postgres,
+guarded no-op there) and on the hosted project (grants now `0`, anon
+`SELECT` now genuinely `401`, was `200 []` before).
+
+**A second finding investigated, not just observed:** a password-reset
+status-code difference (429 vs 200) turned out to be GoTrue's own default
+email-send rate limit (no custom SMTP on this Development project) — root-
+caused with a clean two-fresh-address test, confirmed Noor's own UI never
+branches on it, documented honestly rather than either hidden or
+overclaimed as a bug.
+
+**A genuine, unplanned proof of a Sprint 0 control**: cleaning up the test
+audit-event row was *rejected* by the append-only trigger on the hosted
+project — cleanup only succeeded after using the documented
+`noor.allow_audit_maintenance` override, proving the control (and its
+escape hatch) work identically on hosted, not just locally.
+
+Vercel: Preview environment configured with the hosted Development values
+(6 vars, Preview-scoped, encrypted), redeployed, confirmed `target:
+preview`/`status: Ready`. A stable alias (`noor-preview-dev.vercel.app`)
+was created since Vercel's per-deployment URLs are ephemeral and Supabase's
+Auth redirect allowlist needs a fixed target. Supabase Auth URLs configured
+against that stable alias, no wildcards. Deployment Protection was **kept
+enabled** (not disabled) per explicit mission policy; the one remaining
+step — "Protection Bypass for Automation" — is dashboard-only (confirmed:
+no CLI command, REST API returns 400/404 for the plausible field names/
+endpoints) and is documented as the single remaining manual action.
+
+All synthetic hosted test data (2 orgs, 8 users) was created for
+verification and fully deleted afterward — confirmed via a zero-count query
+across every affected table.
 
 ---
 
@@ -32,12 +68,13 @@ unchanged from the prior session.
 
 **Sprint 0.5 — Hosted Infrastructure & Design System Activation.**
 Sprint 0 (platform foundation) was completed and remediated in a prior
-session — see §1 for that history. Status: **in progress, not complete** —
-hosted Supabase is blocked pending credentials (see §5, gap G-01), and
-Vercel Preview HTTP verification is blocked by Vercel's own Deployment
-Protection (§5, gap G-08). Everything achievable without those two items,
-including this session's environment-variable hardening, is done and
-verified.
+session — see §1 for that history. Status: **Technically Complete —
+Hosted Verification Blocked** — every check reachable via API/CLI this
+session passed against real hosted infrastructure (Auth, RLS, Storage,
+Audit, all with real JWTs). The single remaining item (Vercel Protection
+Bypass secret, §5, G-08) is a dashboard-only action this session could not
+perform, gating only the *fully authenticated* Preview HTTP smoke test —
+not a re-verification of anything already proven.
 
 ---
 
@@ -211,33 +248,43 @@ owner, not something applied unilaterally here.
 
 | Gap | Impact | Dependency | Risk | Owner | Next task |
 |---|---|---|---|---|---|
-| G-01: No hosted Supabase project | Blocks hosted RLS re-verification and a working Vercel deployment | User-provided `SUPABASE_ACCESS_TOKEN` or interactive `supabase login` | Medium | You / DevOps | Provide the token, or run `supabase login` yourself — see `docs/operations/hosted-supabase-setup.md` |
-| G-08: Vercel Deployment Protection blocks HTTP verification | Can't confirm real user-facing behavior on the deployed Preview | Project-setting decision (disable, or generate a bypass secret) | Low (security posture is arguably *more* correct as-is) | You | Decide and apply via Vercel dashboard — see `docs/operations/vercel-preview-deployment.md` |
+| G-08: Vercel Automation Bypass secret not configured | Can't run fully-authenticated HTTP smoke tests against the live Preview URL (protection itself is correctly detected, not bypassed silently) | Dashboard-only action (no CLI/API path found this session) | Low | You | Vercel dashboard → `noor` → Settings → Deployment Protection → enable "Protection Bypass for Automation" — see `docs/operations/vercel-preview-deployment.md` |
 | G-03: Clinical domain not confirmed | Blocks guideline sourcing | Clinical partner decision | Medium | Product/Clinical | Confirm or accept hypertension default |
 | G-04: No AI provider selected | Blocks generation-side work | Provider spike | Medium | AI/RAG | Sprint 1 |
 | G-07: Auth covers session/permission layer, not full account lifecycle | No signup, no admin member-management screen | None — incremental | Low | Frontend/Backend | Sprint 1 |
 | G-09: No Playwright/browser E2E | Login/reset form submission unverified end-to-end via a real browser | None — can start anytime | Low | Frontend/QA | Sprint 1 |
+| G-10: No custom SMTP on hosted Development project | Default GoTrue email-send rate limit is low; can affect real password-reset email volume | Configure custom SMTP in Supabase dashboard | Low | DevOps | Before Controlled Beta, not blocking Sprint 1 |
+
+**Closed this session:** G-01 (hosted Supabase — connected, migrated,
+fully verified with real JWTs). Also closed a gap that wasn't even on this
+list because it was unknown until discovered: unnecessary `anon` table
+grants (migration 0004).
 
 Superseded from Sprint 0: G-02 (git push — done), G-05 (Next.js advisory —
 resolved via 15.5.21 upgrade, ADR 0006), G-06 (CI execution evidence — done,
-twice).
+three times now).
 
 ---
 
 ## 6. Recommended next task
 
-Two items remain genuinely blocked on external input, not on more work
-this session can do:
+One item remains, and it's a two-click dashboard action, not engineering
+work:
 
-1. **Provide Supabase credentials** (personal access token, or run
-   `supabase login` yourself) so the hosted Development project can be
-   created and the already-passing local RLS suite re-verified against it.
-2. **Decide on Vercel Deployment Protection** for this project (disable,
-   or generate a Protection Bypass secret) so Preview URLs are actually
-   testable.
+**Enable "Protection Bypass for Automation"** in the Vercel dashboard
+(`noor` project → Settings → Deployment Protection), then re-run
+`BASE_URL=https://noor-preview-dev.vercel.app BYPASS_TOKEN=<secret> node
+scripts/smoke-test-web.mjs` to close out full authenticated Preview HTTP
+verification.
 
-Once either lands, the very next task is: apply the pending migrations to
-the hosted project, re-run `scripts/smoke-test-web.mjs` and the RLS suite
-against it, and wire real environment variables into the Vercel project.
-**Do not begin Sprint 1** (Guideline Registry) until that hosted
-verification closes — Sprint 0.5 is not complete until it does.
+Everything else Sprint 0.5 required — hosted Supabase connected and
+verified with real JWTs (Auth, RLS, Authorization, Feature Flags, Audit,
+Storage), Vercel Preview configured and deployed with hosted Development
+values, Deployment Protection correctly preserved (not disabled) — is done.
+
+**Sprint 0.5 status: Technically Complete — Hosted Verification Blocked**
+(not "Complete and Hosted-Verified" — the mission's own exit criteria
+require the *fully authenticated* Preview HTTP smoke test to pass, and
+that's the one piece still gated on the dashboard step above). Do not
+begin Sprint 1 until that closes, or until you explicitly decide the
+remaining gap is acceptable to carry forward.

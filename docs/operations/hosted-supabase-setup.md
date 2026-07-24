@@ -1,83 +1,124 @@
 # Hosted Supabase Setup
 
-Status as of Sprint 0.5: **BLOCKED — CREDENTIALS REQUIRED**. Local
-verification against a real Supabase CLI stack is done and passing (see
-`PROJECT_STATE.md`) — this document is the exact, reproducible path from
-there to a hosted Development project.
+Status: **Connected and verified.** The "Noor Development" project is
+linked, all migrations are applied, and Auth/RLS/Storage/Audit are all
+verified against it with real JWTs — see
+`docs/verification/sprint-0.5-hosted-verification.md` for the complete,
+command-by-command evidence. This document is now the reproducible
+reference for repeating or extending that setup, not a blocked TODO.
 
-## Why this is blocked
+## Project
 
-`supabase login` opens an interactive browser OAuth flow. There is no
-`SUPABASE_ACCESS_TOKEN` in this environment, and no browser to complete the
-flow with. One of these unblocks it:
+* Name: **Noor Development**
+* Ref: `quohfsaqeqzbbvmrhmbr`
+* Region: `eu-west-3`
+* Postgres: 17 (`17.6.1.147`)
+* Environment: Development (confirmed, not Production)
 
-1. Run `supabase login` yourself in a terminal with a browser, then tell
-   whoever's driving this to continue from step 2 below.
-2. Generate a personal access token at
-   `https://supabase.com/dashboard/account/tokens` and provide it as
-   `SUPABASE_ACCESS_TOKEN` for the session doing this work.
-
-## Steps once authenticated
+## Reproducing the connection
 
 ```bash
-# 1. Create (or identify) the Development project
-supabase projects create "Noor Development" --org-id <YOUR_ORG_ID> --region <closest-region> --db-password <GENERATED_STRONG_PASSWORD>
-# Note the returned project ref (e.g. abcdefghijklmnop) — this is not a secret,
-# it's a public identifier, safe to record in docs.
+# Authenticate (interactive) or export SUPABASE_ACCESS_TOKEN for a
+# non-interactive session — never commit or print the token.
+supabase login
+# or: export SUPABASE_ACCESS_TOKEN=<your personal access token>
 
-# 2. Link this repo to it
-supabase link --project-ref <PROJECT_REF>
+supabase link --project-ref quohfsaqeqzbbvmrhmbr
 
-# 3. Review the diff before pushing — never push blind
-supabase db diff
+# Review before pushing — never push blind
+supabase migration list --linked
 
-# 4. Push migrations (0001, 0002, 0003 — applies in order, idempotent guards
-#    already in place for anything that would conflict with GoTrue-managed
-#    schema)
-supabase db push
-
-# 5. Re-run the exact same RLS test files used for local verification,
-#    now against the hosted project's connection string:
-psql "$(supabase db url --project-ref <PROJECT_REF>)" -v ON_ERROR_STOP=1 -f supabase/tests/rls/001_tenant_isolation.sql
-psql "$(supabase db url --project-ref <PROJECT_REF>)" -v ON_ERROR_STOP=1 -f supabase/tests/rls/002_auth_hardening.sql
+supabase db push --linked
 ```
 
-## What "done" looks like
-
-* All 3 migrations applied with no manual intervention.
-* Both RLS test files pass unmodified (11/11 assertions) — same numbers as
-  local verification.
-* `select * from storage.buckets;` shows all 5 buckets, all `public = false`.
-* Record here (not with real secret values, just confirmation):
-  * Project ref: _______
-  * Region: _______
-  * Database version: _______
-  * Auth email provider configured: yes/no
-  * Redirect URLs allow-listed (`<APP_URL>/auth/callback`): yes/no
-
-## Environment variables to set (Vercel Preview/Production, never committed)
+## Migrations applied (in order)
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key from project settings>
-SUPABASE_SERVICE_ROLE_KEY=<service role key — server-only, Vercel "Sensitive" env var>
-NEXT_PUBLIC_APP_URL=<the deployment's own URL>
+0001_identity_and_rls.sql          identity/tenancy/RLS foundation
+0002_sprint0_auth_hardening.sql    permission seeds, org-immutability + audit triggers
+0003_storage_foundation.sql        5 private buckets, org-scoped storage RLS
+0004_revoke_anon_table_grants.sql  fixes a real finding from hosted verification —
+                                    see docs/verification/sprint-0.5-hosted-verification.md
 ```
 
-Set Development/Preview/Production values separately in Vercel — never
-reuse a Production service-role key in Preview.
+`0004` exists because hosted verification found `anon` held full CRUD
+grants on every table (a legacy Supabase project-creation default). RLS
+already blocked practical access, but the migration closes the
+grant-layer gap too — read the verification doc for the full root-cause
+account before assuming this is fixed on any *other* hosted project you
+connect later; re-run the same check:
 
-## Redirect URL configuration (Supabase Auth settings)
+```sql
+select count(*) from information_schema.table_privileges
+where grantee = 'anon' and table_schema = 'public';
+-- expect 0 after 0004 is applied
+```
 
-Add every deployment origin's `/auth/callback` to Supabase's allowed
-redirect URLs (Authentication → URL Configuration):
+## Re-running hosted verification
+
+The exact scripts used this session (Auth, RLS, Audit, Storage, cleanup)
+are not committed to the repo — they were scratch Python scripts
+constructed per-session to avoid ever hardcoding project-specific
+synthetic-data UUIDs into version control. To re-verify:
+
+1. Apply migrations (above).
+2. Create 2 synthetic orgs + 8 synthetic users covering: admin/clinician/
+   reviewer/quality roles in one org, an admin in a second org (cross-tenant
+   check), a suspended member, a removed member, and a no-membership user.
+3. Sign in each active user via `POST /auth/v1/token?grant_type=password`
+   to get a real JWT.
+4. Exercise `/rest/v1/*` with each JWT for the RLS/authorization/audit/
+   feature-flag checks listed in `docs/verification/sprint-0.5-hosted-verification.md`.
+5. Exercise `/storage/v1/object/*` for the storage checks.
+6. Clean up: delete audit test rows first (the append-only trigger blocks
+   deletion — use the documented `set local
+   noor.allow_audit_maintenance = 'true'` override in the same
+   transaction), then delete the synthetic organizations (cascades to
+   memberships/settings/flags/access_reviews), then delete the synthetic
+   auth users.
+
+## Auth URL configuration (applied this session)
 
 ```
-http://localhost:3000/auth/callback          (local dev)
-https://<preview-url>.vercel.app/auth/callback
-https://<production-domain>/auth/callback
+Site URL:      https://noor-preview-dev.vercel.app
+Redirect URLs:
+  http://localhost:3000/auth/callback
+  http://localhost:3000/update-password
+  https://noor-preview-dev.vercel.app/auth/callback
+  https://noor-preview-dev.vercel.app/update-password
 ```
 
-Without this, `resetPasswordForEmail`'s `redirectTo` will be silently
-rejected by Supabase (the email link will redirect to the site URL instead
-of the callback route).
+No wildcards. `noor-preview-dev.vercel.app` is a Vercel alias explicitly
+re-pointed to the latest Preview deployment after every deploy (see
+`docs/operations/vercel-preview-deployment.md`) — this avoids needing to
+update Supabase's allowlist every time Vercel's ephemeral per-deployment
+URL changes.
+
+Set/inspect via the Supabase Management API (`PATCH
+/v1/projects/{ref}/config/auth` with `site_url` and `uri_allow_list`), or
+the dashboard (Authentication → URL Configuration).
+
+## Environment variables (set in Vercel Preview this session)
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://quohfsaqeqzbbvmrhmbr.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key — Vercel "Preview" scope>
+SUPABASE_URL=https://quohfsaqeqzbbvmrhmbr.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service role key — Vercel "Preview" scope, Sensitive>
+```
+
+Never reuse these Development-project values for a future Production
+environment — a separate hosted project should back Production when that
+work begins.
+
+## Known limitation: email rate limiting (no custom SMTP)
+
+This Development project has no custom SMTP provider configured, so
+GoTrue's default (low) email-send quota applies. Repeated
+`/auth/v1/recover` calls against real accounts can 429 once exhausted,
+while calls against non-existent addresses never consume the quota (no
+email is ever queued for them) — this is a genuine characteristic of an
+SMTP-less project, not an application bug; Noor's own UI never branches on
+it (see `docs/verification/sprint-0.5-hosted-verification.md`). Configure
+custom SMTP (Authentication → Email → SMTP Settings) before Controlled
+Beta if password-reset email volume needs to exceed the default quota.

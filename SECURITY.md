@@ -9,15 +9,34 @@ exists.
 ## Controls implemented in Sprint 0
 
 * Row-Level Security enabled on every table in `supabase/migrations/0001_*`
-  and `0002_*`, verified by 11 passing assertions across
+  through `0004_*`, verified by 11 passing assertions across
   `supabase/tests/rls/001_tenant_isolation.sql` and
   `002_auth_hardening.sql` — covering same-tenant access, cross-tenant
   denial, suspended-membership denial, removed-membership denial, non-admin
   privileged-write denial, non-privileged audit-read denial, audit-log
   append-only enforcement, permission-mapping correctness, and cross-tenant
-  membership-reassignment denial. Verified against **both** plain Postgres
-  16 and a real local Supabase stack (real `authenticated` role, real
-  GoTrue `auth.uid()`) — see `PROJECT_STATE.md` for exact commands/output.
+  membership-reassignment denial. Verified against plain Postgres 16, a
+  real local Supabase stack, **and now the real hosted "Noor Development"
+  project** — 26 additional Auth/RLS/Authorization/Feature-flag/Audit
+  assertions + 8 Storage assertions, all with real GoTrue-issued JWTs
+  against `/rest/v1` and `/storage/v1`, all passed. See
+  `docs/verification/sprint-0.5-hosted-verification.md`.
+* **Hosted finding, fixed and re-verified same session:** the hosted
+  project had inherited a legacy Supabase default granting `anon` full
+  CRUD (SELECT/INSERT/UPDATE/DELETE/TRUNCATE) on every public table. RLS
+  already blocked practical access (`anon` SELECT returned `200 []`, not
+  real rows) — this was a defense-in-depth gap, not a live exposure — but
+  `supabase/migrations/0004_revoke_anon_table_grants.sql` closes it at the
+  grant layer too. Verified: `anon` SELECT now returns `401 permission
+  denied`, and a direct query confirms zero remaining `anon` grants on any
+  public table.
+* **A genuine, unplanned confirmation of the audit trigger on hosted
+  infrastructure:** cleaning up a test audit row during this session's
+  verification was *rejected* by `prevent_audit_event_mutation()` on the
+  live hosted project — cleanup only succeeded after using the documented
+  `noor.allow_audit_maintenance` override in the same transaction, proving
+  both the block and its escape hatch work identically to local, not just
+  in theory.
 * Real authentication: Supabase SSR clients
   (`apps/web/lib/supabase/{client,server,middleware}.ts`), session refresh
   in `middleware.ts`, and server-side permission checks
@@ -92,22 +111,29 @@ exists.
   adopting it.
 * No prompt-injection, malicious-PDF, or data-exfiltration test suite exists
   yet — there is no ingestion or generation pipeline to test against.
-* MFA, session/device management, and SSO are Supabase Auth features not yet
-  configured because no hosted Supabase project exists yet — only a local
-  CLI stack has been verified against (blocked on credentials — see
-  `docs/operations/hosted-supabase-setup.md`).
+* MFA, session/device management, and SSO are Supabase Auth features not
+  yet configured on the hosted Development project.
 * Password-based login only; no magic-link or SSO flow wired to a UI yet
   (the `/auth/callback` code-exchange route exists and is real — password
   reset now uses it).
+* No custom SMTP configured on the hosted Development project — GoTrue's
+  default (low) email-send rate limit applies. Investigated this session:
+  a real status-code difference between existing/non-existent addresses on
+  `/auth/v1/recover` was root-caused to this rate limit, not an
+  enumeration bug — Noor's own `requestPasswordReset()` never branches on
+  the raw API response. See `docs/operations/hosted-supabase-setup.md`.
 * **Vercel Deployment Protection ("Vercel Authentication")** is enabled by
   default on this team and gates every route of the deployed Preview
-  behind Vercel's own SSO, including `/login` — a security-posture
-  decision for the project owner (disable it, or configure a Protection
-  Bypass for Automation secret), not applied unilaterally. See
-  `docs/operations/vercel-preview-deployment.md`. Note for future
-  automated testing: `fetch()` auto-following that redirect produces a
-  false-positive 200 (Vercel's own SSO page, not the app) — always inspect
-  the response body, not just the status code.
+  behind Vercel's own SSO, including `/login`. **Kept enabled this
+  session, by design** — not a security posture to weaken for testing
+  convenience. The one remaining gap is "Protection Bypass for
+  Automation," which needs a dashboard action (confirmed: no CLI command,
+  REST API rejects the plausible field names/endpoints with 400/404). See
+  `docs/operations/vercel-preview-deployment.md`. `scripts/smoke-test-web.mjs`
+  now correctly detects and reports the protection wall by inspecting
+  response bodies — fixing a real false-positive bug from a prior session
+  where `fetch()` auto-following the SSO redirect produced misleading
+  "200 OK" passes.
 
 ## Reporting a vulnerability found in this repository
 
