@@ -1,5 +1,32 @@
 # Changelog
 
+## [Unreleased] — Sprint 0.5 final closure
+
+### Closed
+
+* **Sprint 0.5 status: Complete and Hosted-Verified.** The one remaining
+  dashboard-only action — Vercel "Protection Bypass for Automation" — was
+  configured by the user directly in the Vercel dashboard (no CLI/API path
+  exists for this step; confirmed in the prior session). The user then ran
+  the unmodified `scripts/smoke-test-web.mjs` against the protected Preview
+  with the bypass token set locally: **10/10 checks passed**, including all
+  6 body-content checks (`/login`, `/forgot-password`, `/403`,
+  `/access-denied`, `/`, `/design-system`) confirming real Noor content was
+  served — not the Vercel SSO interstitial. The bypass token was never
+  handled by this session; it was generated, used, and removed from the
+  user's own shell afterward, never printed, persisted, or committed.
+* `docs/verification/sprint-0.5-hosted-verification.md` updated with the
+  full protected-run evidence and an explanation of why the `isVercelSso`
+  structural check (added in the prior session specifically to fix a
+  false-positive bug) makes a `PASS` here trustworthy rather than a
+  status-code coincidence.
+* `PROJECT_STATE.md`, `SPRINT_CURRENT.md`, `MASTER_BACKLOG.md` (S1-11),
+  `KNOWN_LIMITATIONS.md` updated to reflect closure.
+* This is an HTTP-level, body-content-aware smoke test — **not** browser-
+  driven E2E. Playwright form-submission testing (login, password reset)
+  remains a documented pre-Controlled-Beta requirement
+  (`KNOWN_LIMITATIONS.md` item 8), not a Sprint 1 blocker.
+
 ## [Unreleased] — Hosted Supabase Development Setup & Sprint 0.5 Closure
 
 ### Added

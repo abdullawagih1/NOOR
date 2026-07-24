@@ -12,16 +12,16 @@ the same PR that resolves an item.
    previously-unknown finding surfaced and fixed along the way: `anon` held
    unnecessary full-CRUD table grants (migration 0004).
 
-2. **Vercel Preview *fully authenticated* HTTP verification needs one
-   dashboard action.** Preview is deployed with hosted Development
-   Supabase values, Deployment Protection is correctly preserved (kept
-   enabled, not disabled), and `scripts/smoke-test-web.mjs` correctly
-   detects and reports the protection wall rather than false-passing. What
-   remains: "Protection Bypass for Automation" must be enabled via the
-   Vercel dashboard — confirmed this session there is no CLI command and
-   the REST API rejects the plausible field names/endpoints (400/404) for
-   doing this programmatically. See
-   `docs/operations/vercel-preview-deployment.md`.
+2. ~~Vercel Preview *fully authenticated* HTTP verification needs one
+   dashboard action.~~ **Resolved.** Preview is deployed with hosted
+   Development Supabase values, Deployment Protection is correctly
+   preserved (kept enabled, not disabled). "Protection Bypass for
+   Automation" — dashboard-only, no CLI/API path exists — was configured
+   by the user, who then ran `scripts/smoke-test-web.mjs` against the
+   protected Preview with the bypass token: 10/10 checks passed, including
+   all 6 body-content checks confirming real Noor content (not the Vercel
+   SSO page). See `docs/verification/sprint-0.5-hosted-verification.md`.
+   This is an HTTP-level check, not browser-driven E2E — see item 8.
 
 3. **No custom SMTP on the hosted Development project.** GoTrue's default
    email-send rate limit applies; investigated this session (a real
@@ -57,10 +57,13 @@ the same PR that resolves an item.
 8. **No Playwright/browser-driven E2E.** The login and password-reset forms
    submit via Next.js Server Actions, whose wire protocol isn't a stable
    target for a plain-`fetch` script — real HTTP-level smoke tests exist
-   against both a local `next start` + real local Supabase (10/10) and the
-   hosted Development project's Auth/REST/Storage APIs directly (34/34),
-   but actual form submission through a rendered browser page remains
-   unverified. Sprint 1 task, not faked here.
+   against a local `next start` + real local Supabase (10/10), the hosted
+   Development project's Auth/REST/Storage APIs directly (34/34), and the
+   protected Vercel Preview deployment itself (10/10, body-content
+   verified), but actual form submission through a rendered browser page
+   remains unverified. **Recorded as a pre-Controlled-Beta requirement, not
+   a Sprint 1 blocker** — it does not gate Sprint 1's guideline-registry
+   data-model work.
 
 9. ~~Client/server boundary is convention-only.~~ **Resolved.**
    `lib/supabase/service-role.ts` and `lib/env/server.ts` both import the

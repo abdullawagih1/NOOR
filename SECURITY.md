@@ -124,16 +124,32 @@ exists.
   the raw API response. See `docs/operations/hosted-supabase-setup.md`.
 * **Vercel Deployment Protection ("Vercel Authentication")** is enabled by
   default on this team and gates every route of the deployed Preview
-  behind Vercel's own SSO, including `/login`. **Kept enabled this
-  session, by design** — not a security posture to weaken for testing
-  convenience. The one remaining gap is "Protection Bypass for
-  Automation," which needs a dashboard action (confirmed: no CLI command,
-  REST API rejects the plausible field names/endpoints with 400/404). See
-  `docs/operations/vercel-preview-deployment.md`. `scripts/smoke-test-web.mjs`
-  now correctly detects and reports the protection wall by inspecting
-  response bodies — fixing a real false-positive bug from a prior session
-  where `fetch()` auto-following the SSO redirect produced misleading
-  "200 OK" passes.
+  behind Vercel's own SSO, including `/login`. **Kept enabled throughout —
+  by design, never disabled for testing convenience.** "Protection Bypass
+  for Automation" (dashboard-only; no CLI command, REST API rejects the
+  plausible field names/endpoints with 400/404) was configured by the user
+  directly in the dashboard, then used once to run
+  `scripts/smoke-test-web.mjs` against the protected Preview and removed
+  from the local shell immediately after — never printed, persisted, or
+  committed. `scripts/smoke-test-web.mjs` correctly detects and reports the
+  protection wall by inspecting response bodies (the `isVercelSso` check) —
+  fixing a real false-positive bug from a prior session where `fetch()`
+  auto-following the SSO redirect produced misleading "200 OK" passes; that
+  same check is what makes the protected 10/10 pass trustworthy rather than
+  a status-code coincidence. See
+  `docs/verification/sprint-0.5-hosted-verification.md`.
+
+### Handling the Vercel bypass secret (and secrets like it)
+
+The pattern demonstrated when closing this gap is the one to repeat:
+generate/rotate the secret only in the Vercel dashboard, export it into the
+shell only for the duration of the command that needs it (e.g.
+`$env:BYPASS_TOKEN = "..."` in the same session as the `node` invocation),
+and unset it from the shell immediately afterward. Never write it to a
+`.env` file that could be committed, never paste it into chat, PR, or
+commit-message text, and never log it — `scripts/smoke-test-web.mjs` reads
+it from `process.env.BYPASS_TOKEN` only, sends it as the
+`x-vercel-protection-bypass` header, and never echoes it back in output.
 
 ## Reporting a vulnerability found in this repository
 

@@ -6,21 +6,22 @@ retrieves and cites only approved, versioned guideline text, and refuses to
 answer when evidence is insufficient. Noor is not an autonomous diagnostician
 — the clinician always retains final clinical authority.
 
-This repository is at **Sprint 0.5** (Technically Complete — Hosted
-Verification Blocked): the identity/tenancy/RLS foundation, real Supabase
-Auth (SSR clients, session refresh, login/logout/password-reset,
-permission-gated workspace routes), the Noor Design System (`packages/ui`),
-the worker service scaffold, and the shared clinical schema contract exist
-and are verified — against plain Postgres, a real local Supabase stack,
-and **a real hosted Supabase Development project** (Auth, RLS, Storage,
-and Audit all verified with real JWTs — see
+This repository is at **Sprint 0.5** (**Complete and Hosted-Verified**):
+the identity/tenancy/RLS foundation, real Supabase Auth (SSR clients,
+session refresh, login/logout/password-reset, permission-gated workspace
+routes), the Noor Design System (`packages/ui`), the worker service
+scaffold, and the shared clinical schema contract exist and are verified —
+against plain Postgres, a real local Supabase stack, **a real hosted
+Supabase Development project** (Auth, RLS, Storage, and Audit all verified
+with real JWTs), and **a protected Vercel Preview deployment** (HTTP
+smoke test run through Vercel's Deployment Protection, 10/10 passed with
+body-content verification — see
 `docs/verification/sprint-0.5-hosted-verification.md`). The repository is
-pushed to GitHub with CI passing on real GitHub Actions runs, and Vercel
-Preview is deployed with the hosted Development values wired in. One
-dashboard-only action remains (Vercel's Protection Bypass secret) before
-full authenticated Preview HTTP testing closes — see `PROJECT_STATE.md`
-for the authoritative current status and open gaps. No guideline ingestion
-pipeline or LLM integration exists yet.
+pushed to GitHub with CI passing on real GitHub Actions runs. See
+`PROJECT_STATE.md` for the authoritative current status and open gaps
+(Playwright browser-driven E2E remains a pre-Controlled-Beta requirement,
+not a Sprint 1 blocker). No guideline ingestion pipeline or LLM integration
+exists yet.
 
 ## Architecture
 
@@ -143,9 +144,12 @@ BASE_URL=http://localhost:3000 node scripts/smoke-test-web.mjs
 ```
 
 Requires `apps/web` built with real `NEXT_PUBLIC_SUPABASE_*` env vars and
-running (`next start` or `next dev`). See `docs/operations/vercel-preview-deployment.md`
-before pointing `BASE_URL` at a Vercel Preview — Deployment Protection
-needs to be addressed first or results will be false positives.
+running (`next start` or `next dev`). To point `BASE_URL` at a protected
+Vercel Preview, also set `BYPASS_TOKEN` (Vercel dashboard → Deployment
+Protection → Protection Bypass for Automation) — see
+`docs/operations/vercel-preview-deployment.md`. Without a valid token the
+script correctly detects and reports the protection wall rather than
+false-passing.
 
 ## Governing documents
 

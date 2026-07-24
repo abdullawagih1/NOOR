@@ -233,23 +233,21 @@ and would otherwise require updating Supabase's allowlist on every deploy.
   correctness is guaranteed by deploying from a confirmed-clean tree at
   that exact commit).
 
-## Vercel Deployment Protection — preserved, bypass secret blocked
+## Vercel Deployment Protection — preserved throughout
 
 Deployment Protection remains **enabled** (`ssoProtection.deploymentType:
-all_except_custom_domains`) — not disabled, per the mission's explicit
-instruction. **"Protection Bypass for Automation" could not be configured
-this session** — it has no CLI command and the REST API returned `400
-should NOT have additional property` for the most likely field name and
-`404` for two plausible dedicated endpoints. This is a dashboard-only
-action:
+all_except_custom_domains`) — never disabled, per the mission's explicit
+instruction. "Protection Bypass for Automation" could not be configured
+via CLI/API in the session that deployed Preview (the REST API returned
+`400 should NOT have additional property` for the most likely field name
+and `404` for two plausible dedicated endpoints) — it is dashboard-only,
+and was **subsequently configured by the user** directly in the Vercel
+dashboard (Settings → Deployment Protection → Protection Bypass for
+Automation).
 
-> Vercel dashboard → `noor` project → Settings → Deployment Protection →
-> "Protection Bypass for Automation" → enable it. Vercel generates
-> `VERCEL_AUTOMATION_BYPASS_SECRET`. Pass it to
-> `scripts/smoke-test-web.mjs` as `BYPASS_TOKEN` to run the full
-> authenticated-content checks.
+## Hosted HTTP smoke test — two runs, unprotected then protected
 
-## Hosted HTTP smoke test (real, body-content-aware)
+### Run 1 (this session that deployed Preview) — no bypass token
 
 ```
 $ BASE_URL=https://noor-preview-dev.vercel.app node scripts/smoke-test-web.mjs
@@ -261,14 +259,59 @@ rather than conflating with Noor's `/login` redirect). The 6 direct-content
 checks (`/login`, `/forgot-password`, `/403`, `/access-denied`, `/`,
 `/design-system`) correctly **failed with an explicit "blocked by Vercel
 Deployment Protection" message** rather than reporting a false pass — this
-is the fix for the exact false-positive bug found in the prior session
+is the fix for the exact false-positive bug found in a prior session
 (where `fetch()` auto-following the SSO redirect produced misleading
-"200 OK" passes). The script now inspects the `Location` header for
+"200 OK" passes). The script inspects the `Location` header for
 `vercel.com/sso-api` and refuses to call that a pass.
 
-**Full authenticated hosted-Preview HTTP verification is blocked pending
-the one dashboard action above** — everything the API/CLI can reach was
-verified.
+### Run 2 (follow-up session, after the user configured the bypass secret) — full pass
+
+The user enabled Protection Bypass for Automation in the Vercel dashboard,
+then ran the identical, unmodified script themselves with the bypass token
+set locally:
+
+```powershell
+node scripts/smoke-test-web.mjs
+```
+
+Reported result — **10/10 checks passed**:
+
+```
+PASS  unauthenticated GET /clinician redirects to /login (or is Vercel-protected)
+PASS  unauthenticated GET /admin redirects to /login (or is Vercel-protected)
+PASS  unauthenticated GET /reviewer redirects to /login (or is Vercel-protected)
+PASS  unauthenticated GET /quality redirects to /login (or is Vercel-protected)
+PASS  GET /login returns Noor content (200, not the Vercel SSO page)
+PASS  GET /forgot-password returns Noor content (200, not the Vercel SSO page)
+PASS  GET /403 returns Noor content (200, not the Vercel SSO page)
+PASS  GET /access-denied returns Noor content (200, not the Vercel SSO page)
+PASS  GET / returns Noor content (200, not the Vercel SSO page)
+PASS  GET /design-system follows its production-visibility policy (404 when deployed)
+
+All HTTP smoke checks passed.
+```
+
+**Why this is real evidence, not a status-code-only pass:** every body-
+content check in the script reaches its `assert(status === 200, ...)` (or
+`404` for `/design-system`) only *after* the same `isVercelSso` branch from
+Run 1 has already evaluated `false` for that response — the exact check
+that correctly caught and labeled the protection wall as a failure moments
+earlier, unmodified between runs. A `PASS` here structurally means Vercel's
+edge let the request reach the Next.js app and serve real Noor content,
+not its own SSO interstitial.
+
+**What this does not prove:** browser-driven form submission (login,
+password reset) through a rendered page. This remains an HTTP-level check
+— real evidence of route protection and correct page delivery, not of
+Server Action form interaction. Playwright E2E is recorded as a
+pre-Controlled-Beta requirement (`KNOWN_LIMITATIONS.md`), not a Sprint 0.5
+blocker.
+
+The bypass token itself was never available to, requested by, printed by,
+or persisted in this session — it was generated, used, and removed from
+the user's own shell entirely on their machine.
+
+**Sprint 0.5 hosted verification: complete.**
 
 ## Cleanup
 

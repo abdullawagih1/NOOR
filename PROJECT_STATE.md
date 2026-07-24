@@ -1,14 +1,52 @@
 # PROJECT_STATE.md
 
-**Last updated:** Hosted Supabase Development Setup & Sprint 0.5 Closure
-session (Claude Code, this environment)
-**Updated by:** Noor Delivery Council (Claude Code, running locally against
-the actual repository, with real Supabase/Vercel hosted access this
-session)
+**Last updated:** Sprint 0.5 final closure session (Claude Code, this
+environment)
+**Updated by:** Noor Delivery Council (Claude Code + user-executed
+protected smoke test)
 
 ---
 
-## -2. This session: Hosted Supabase Development Setup & Sprint 0.5 Closure
+## -3. This session: Sprint 0.5 final closure
+
+The one remaining gap from the prior session — Vercel's "Protection Bypass
+for Automation" secret, which required a dashboard action no CLI/API path
+could perform — was configured by the user. The user then ran the
+protected Preview HTTP smoke test themselves (`node
+scripts/smoke-test-web.mjs` with `BYPASS_TOKEN` set locally) and reported
+the result: **10/10 checks passed**, including all 6 body-content checks
+(`/login`, `/forgot-password`, `/403`, `/access-denied`, `/`,
+`/design-system`) that previously, without the bypass token, correctly
+failed with "blocked by Vercel Deployment Protection" rather than
+false-passing.
+
+**Why this result is trustworthy and not a status-code-only pass:**
+`scripts/smoke-test-web.mjs` inspects the response `Location` header for
+every check and explicitly sets `isVercelSso = true` whenever it points at
+`vercel.com/sso-api`, throwing a labeled failure in that case rather than
+returning a bare boolean. A body-content check can only report `PASS` by
+reaching the `assert(status === 200, ...)` line *after* the `isVercelSso`
+branch has already returned false for that response, which happens only
+when Vercel's edge actually let the request reach the Next.js app instead
+of redirecting to its own SSO interstitial. A structural pass therefore
+proves real Noor content was served, not Vercel's protection page — this
+is the same script, unmodified, that correctly caught and reported the
+protection wall as a failure in the prior session before the bypass was
+configured.
+
+**What this session did *not* do:** run the smoke test itself (the bypass
+token was configured and used entirely on the user's machine, then removed
+from their shell after — correct handling, since this session never had
+and does not need that value), and did not perform any browser-driven
+form-submission E2E — the smoke test is still an HTTP-level check only,
+not a Playwright browser interaction. That remains a documented pre-
+Controlled-Beta requirement (§5), not a Sprint 0.5 blocker.
+
+**Sprint 0.5 status: Complete and Hosted-Verified.**
+
+---
+
+## -2. Prior session: Hosted Supabase Development Setup & Sprint 0.5 Closure (partial)
 
 The user provided a Supabase personal access token mid-session (held only
 as an in-memory `SUPABASE_ACCESS_TOKEN` for this session — never printed,
@@ -68,13 +106,13 @@ across every affected table.
 
 **Sprint 0.5 — Hosted Infrastructure & Design System Activation.**
 Sprint 0 (platform foundation) was completed and remediated in a prior
-session — see §1 for that history. Status: **Technically Complete —
-Hosted Verification Blocked** — every check reachable via API/CLI this
-session passed against real hosted infrastructure (Auth, RLS, Storage,
-Audit, all with real JWTs). The single remaining item (Vercel Protection
-Bypass secret, §5, G-08) is a dashboard-only action this session could not
-perform, gating only the *fully authenticated* Preview HTTP smoke test —
-not a re-verification of anything already proven.
+session — see §1 for that history. **Status: Complete and
+Hosted-Verified.** Every check required by the mission passed against real
+hosted infrastructure with real credentials: Auth, RLS, Authorization,
+Feature Flags, Audit, and Storage (all with real GoTrue-issued JWTs, prior
+session), and the fully authenticated Vercel Preview HTTP smoke test (this
+session, user-executed with the Protection Bypass secret, 10/10 passed,
+body-content-verified). Sprint 1 may begin.
 
 ---
 
@@ -248,43 +286,42 @@ owner, not something applied unilaterally here.
 
 | Gap | Impact | Dependency | Risk | Owner | Next task |
 |---|---|---|---|---|---|
-| G-08: Vercel Automation Bypass secret not configured | Can't run fully-authenticated HTTP smoke tests against the live Preview URL (protection itself is correctly detected, not bypassed silently) | Dashboard-only action (no CLI/API path found this session) | Low | You | Vercel dashboard → `noor` → Settings → Deployment Protection → enable "Protection Bypass for Automation" — see `docs/operations/vercel-preview-deployment.md` |
 | G-03: Clinical domain not confirmed | Blocks guideline sourcing | Clinical partner decision | Medium | Product/Clinical | Confirm or accept hypertension default |
 | G-04: No AI provider selected | Blocks generation-side work | Provider spike | Medium | AI/RAG | Sprint 1 |
 | G-07: Auth covers session/permission layer, not full account lifecycle | No signup, no admin member-management screen | None — incremental | Low | Frontend/Backend | Sprint 1 |
-| G-09: No Playwright/browser E2E | Login/reset form submission unverified end-to-end via a real browser | None — can start anytime | Low | Frontend/QA | Sprint 1 |
+| G-09: No Playwright/browser E2E | Login/reset form submission unverified end-to-end via a real browser (the HTTP smoke test proves route protection and page delivery, not form interaction) | None — can start anytime | Low | Frontend/QA | **Pre-Controlled-Beta requirement, not a Sprint 1 blocker** |
 | G-10: No custom SMTP on hosted Development project | Default GoTrue email-send rate limit is low; can affect real password-reset email volume | Configure custom SMTP in Supabase dashboard | Low | DevOps | Before Controlled Beta, not blocking Sprint 1 |
 
-**Closed this session:** G-01 (hosted Supabase — connected, migrated,
-fully verified with real JWTs). Also closed a gap that wasn't even on this
-list because it was unknown until discovered: unnecessary `anon` table
-grants (migration 0004).
+**Closed this session:** G-08 (Vercel Protection Bypass secret — configured
+by the user; protected Preview smoke test run, 10/10 passed, body-content
+verified — see §-3 above and `docs/verification/sprint-0.5-hosted-verification.md`).
+
+**Closed prior session:** G-01 (hosted Supabase — connected, migrated,
+fully verified with real JWTs), plus an unlisted gap discovered and fixed
+along the way: unnecessary `anon` table grants (migration 0004).
 
 Superseded from Sprint 0: G-02 (git push — done), G-05 (Next.js advisory —
 resolved via 15.5.21 upgrade, ADR 0006), G-06 (CI execution evidence — done,
-three times now).
+four times now).
+
+None of the remaining gaps (G-03, G-04, G-07, G-09, G-10) block Sprint 0.5
+closure or the start of Sprint 1 — each is either a product/clinical
+decision independent of this build, or explicitly scoped to a later
+milestone (Sprint 1 incremental work, or pre-Controlled-Beta hardening).
 
 ---
 
 ## 6. Recommended next task
 
-One item remains, and it's a two-click dashboard action, not engineering
-work:
+Sprint 0.5 is closed. Every hosted-infrastructure requirement passed with
+real credentials: hosted Supabase (Auth, RLS, Authorization, Feature
+Flags, Audit, Storage — all real JWTs) and the fully authenticated Vercel
+Preview HTTP smoke test (10/10, body-content-verified, this session).
 
-**Enable "Protection Bypass for Automation"** in the Vercel dashboard
-(`noor` project → Settings → Deployment Protection), then re-run
-`BASE_URL=https://noor-preview-dev.vercel.app BYPASS_TOKEN=<secret> node
-scripts/smoke-test-web.mjs` to close out full authenticated Preview HTTP
-verification.
+```text
+Begin Sprint 1 — Guideline Registry Schema and Lifecycle
+```
 
-Everything else Sprint 0.5 required — hosted Supabase connected and
-verified with real JWTs (Auth, RLS, Authorization, Feature Flags, Audit,
-Storage), Vercel Preview configured and deployed with hosted Development
-values, Deployment Protection correctly preserved (not disabled) — is done.
-
-**Sprint 0.5 status: Technically Complete — Hosted Verification Blocked**
-(not "Complete and Hosted-Verified" — the mission's own exit criteria
-require the *fully authenticated* Preview HTTP smoke test to pass, and
-that's the one piece still gated on the dashboard step above). Do not
-begin Sprint 1 until that closes, or until you explicitly decide the
-remaining gap is acceptable to carry forward.
+Playwright browser-driven E2E (G-09) stays on the backlog as a documented
+pre-Controlled-Beta requirement — it does not gate Sprint 1's data-model
+work.

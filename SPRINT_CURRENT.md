@@ -1,8 +1,10 @@
 # Sprint Current: Sprint 0.5 — Hosted Infrastructure & Design System Activation
 
-**Status:** Technically Complete — Hosted Verification Blocked. One
-dashboard-only action remains (see `PROJECT_STATE.md` §5/§6); every check
-reachable via API/CLI passed against real hosted infrastructure.
+**Status:** Complete and Hosted-Verified. The one dashboard-only action
+(Vercel Protection Bypass for Automation) has been configured by the user
+and the protected Preview smoke test has passed 10/10 with body-content
+verification. See `PROJECT_STATE.md` §-3 and
+`docs/verification/sprint-0.5-hosted-verification.md`.
 
 ## Objectives
 
@@ -33,15 +35,18 @@ reachable via API/CLI passed against real hosted infrastructure.
 - [x] Supabase Auth URLs configured (explicit allowlist, no wildcards)
 - [x] Synthetic hosted test data created, verified against, and fully
       cleaned up
-- [ ] Full authenticated Preview HTTP smoke test — **BLOCKED**, needs
-      "Protection Bypass for Automation" enabled in the Vercel dashboard
-      (no CLI/API path exists for this — confirmed this session)
-- [ ] Clinical domain confirmed (blocked — awaiting your decision)
+- [x] Full authenticated Preview HTTP smoke test — Protection Bypass for
+      Automation configured by the user in the Vercel dashboard;
+      `scripts/smoke-test-web.mjs` run against the protected Preview with
+      the bypass token, 10/10 checks passed, all 6 body-content checks
+      confirmed real Noor content (not the Vercel SSO page). See
+      `docs/verification/sprint-0.5-hosted-verification.md`.
+- [ ] Clinical domain confirmed — separate, Sprint 1 decision (G-03), not
+      a Sprint 0.5 blocker (awaiting your decision on guideline sourcing)
 
 ## Next sprint
 
-One dashboard action remains: enable Protection Bypass for Automation in
-Vercel (`noor` project → Settings → Deployment Protection), then re-run
-`scripts/smoke-test-web.mjs` with `BYPASS_TOKEN` set. Once that closes (or
-is explicitly accepted as an ongoing manual gate): **Sprint 1 — Guideline
-Registry Schema and Lifecycle** (see `MASTER_BACKLOG.md`).
+Sprint 0.5 is closed. **Sprint 1 — Guideline Registry Schema and
+Lifecycle** (see `MASTER_BACKLOG.md`). Playwright browser-driven E2E stays
+on the backlog as a documented pre-Controlled-Beta requirement (see
+`KNOWN_LIMITATIONS.md`), not a Sprint 1 blocker.
