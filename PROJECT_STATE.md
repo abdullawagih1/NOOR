@@ -1,12 +1,90 @@
 # PROJECT_STATE.md
 
-**Last updated:** Sprint 1.1 — Secure Guideline Source Document Intake
-session (Claude Code, this environment)
+**Last updated:** Sprint 1.2A — Durable Processing Orchestration session
+(Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code)
 
 ---
 
-## -5. This session: Sprint 1.1 — Secure Guideline Source Document Intake
+## -6. This session: Sprint 1.2A — Durable Processing Orchestration
+
+Implemented workstream `S1-C1`: a reliable execution control plane for
+the `document_processing_jobs` rows Sprint 1.1 creates `queued` —
+atomic Worker claim, hashed-lease ownership with heartbeat renewal,
+exponential-backoff retry, max-attempt dead-lettering, lease-expiry crash
+recovery, and queued/retry-scheduled cancellation — proven end-to-end
+with a **controlled no-op processor**, deliberately not real PDF
+extraction (that's Sprint 1.2B, `S1-C2`). Migration
+`0007_durable_processing_orchestration.sql`.
+
+**Mandatory review completed first:** Sprint 1.1's
+`completeGuidelineUploadAction` fully buffered the uploaded file into
+memory (`.download().arrayBuffer()`) before computing size/PDF-signature/
+SHA-256. Refactored to genuine incremental streaming
+(`apps/web/lib/documents/streamVerification.ts`) — same trust model, same
+50 MB limit, provably early-aborts on an oversized stream.
+
+**Architecture (ADR 0009):** the database remains the durable
+orchestration source of truth; a queue message, if one is ever
+introduced, would only be a wake-up mechanism, never authoritative. Mode
+A (Worker polling loop) was chosen over introducing Supabase Queues this
+sprint — correctness doesn't depend on it, proven under real dual-process
+concurrency. A hashed lease token (never the plaintext) is the ownership
+mechanism; the six new orchestration functions are structurally
+uncallable by `authenticated` (see below for why that claim required a
+real fix, not just a design intention).
+
+**Two real, hosted-only bugs found and fixed** — neither reproducible
+against local plain Postgres, both found only by actually running
+verification against real hosted Supabase infrastructure:
+
+1. `gen_random_bytes()`/`digest()` (pgcrypto) resolved fine locally
+   (installed directly into `public` by a fresh `postgres:16` container)
+   but not on hosted, where Supabase pre-installs pgcrypto in an
+   `extensions` schema — the first real hosted claim call failed with
+   `function gen_random_bytes(integer) does not exist`. Fixed by adding
+   `extensions` to the two affected functions' `search_path` (safe on
+   both environments: a nonexistent schema in `search_path` is silently
+   skipped).
+2. **The migration's core trust-boundary claim — "these six functions are
+   never granted to `authenticated`" — was false on hosted** until this
+   was found. `revoke all on function ... from public` does not undo
+   Supabase's project-level `ALTER DEFAULT PRIVILEGES ... GRANT EXECUTE
+   ON FUNCTIONS TO anon, authenticated, service_role`, which grants
+   EXECUTE directly to those named roles at function creation time. A
+   real authenticated-JWT call to `claim_next_document_processing_job`
+   returned `200` before the fix — an ordinary signed-in
+   `organization_admin` could genuinely claim and manipulate processing
+   jobs. Fixed with an explicit, guarded `revoke execute ... from
+   authenticated` / `from anon` on every function in this migration;
+   re-verified the grant is now limited to `postgres`/`service_role` only,
+   and the same call now correctly returns `403`/`404`. See ADR 0009's
+   addendum and the verification record for the full account — this is
+   now a documented lesson for every future Worker-only function.
+
+**Verification, real not assumed:** local — web lint/typecheck/build
+clean, all test assertions passing (9 suites, 2 new this sprint); a real
+`postgres:16` Docker container had migrations 0001-0007 + seed + the full
+RLS/orchestration suite (7+4+26+4+17+**27** = 85 assertions) run against
+it, 100% passed; a genuine dual-OS-process concurrency proof (80 real
+jobs, two independent `psql` connections racing) — zero double-claims,
+zero lost jobs; Worker — 27/27 pytest assertions, `compileall` clean.
+Hosted — migration applied and confirmed (`local==remote`), **30/30 real
+assertions** including the security trust-boundary proof, a full
+claim/lease/heartbeat/retry/dead-letter/recovery/cancel lifecycle, RLS
+read-restriction, and a 20-parallel-request real HTTP concurrency race
+(zero duplicate claims) — all with real GoTrue JWTs and real
+`service_role` credential usage, synthetic data cleaned up and confirmed
+zero-residue. Vercel Preview redeployed, healthy, Deployment Protection
+unchanged and correctly enforced. Full record:
+`docs/verification/sprint-1.2a-processing-orchestration-verification.md`.
+
+**Sprint 1.2A (Durable Processing Orchestration): Complete and
+Hosted-Verified.**
+
+---
+
+## -5. Prior session: Sprint 1.1 — Secure Guideline Source Document Intake
 
 Implemented workstream `S1-B`: a trusted, tenant-safe, auditable path from
 an approved guideline version to a verified private source document and a
@@ -262,12 +340,12 @@ across every affected table.
 
 ## 0. Current phase
 
-**Sprint 1 — workstream S1-B, Secure Guideline Source Document Intake,
-just closed.** Sprint 0.5 (hosted infrastructure & design system) is
+**Sprint 1 — workstream S1-C1, Durable Processing Orchestration, just
+closed.** Sprint 0.5 (hosted infrastructure & design system) is
 **Complete and Hosted-Verified** — see §-3/§1 for that history; it is not
 reopened here. See `MASTER_BACKLOG.md` for the reconciled Sprint 1
-workstream breakdown (S1-A through S1-E) — Sprint 1 is no longer tracked
-as a single flat task list.
+workstream breakdown (S1-A/S1-B/S1-C1/S1-C2/S1-D/S1-E) — Sprint 1 is no
+longer tracked as a single flat task list.
 
 **S1-A (Guideline Registry Schema and Lifecycle) — Complete and
 Hosted-Verified** (prior session): schema, lifecycle engine, RLS,
@@ -275,15 +353,29 @@ permissions, application layer, minimal UI — 41/41 Postgres 16 assertions,
 18/18 hosted real-JWT assertions.
 
 **S1-B (Secure Guideline Source Document Intake) — Complete and
-Hosted-Verified** (this session): upload sessions, server-verified object
+Hosted-Verified** (prior session): upload sessions, server-verified object
 intake (size/PDF-signature/SHA-256), duplicate detection, idempotent
 registration and job creation — 60/60 Postgres 16 assertions (cumulative,
 all suites), 16/16 hosted assertions including real Supabase Storage
-upload/download I/O. **G-12 also closed** this session, on both
-environments. Web lint/typecheck/build/test (63/63) all clean. Vercel
-Preview redeployed, healthy, Deployment Protection intact. Full record:
-§-5 above and
+upload/download I/O. **G-12 also closed** that session, on both
+environments. Full record:
 `docs/verification/sprint-1.1-document-intake-verification.md`.
+
+**S1-C1 (Durable Processing Orchestration) — Complete and
+Hosted-Verified** (this session): atomic Worker claim, hashed-lease
+ownership with heartbeat renewal, exponential-backoff retry, dead-letter
+on exhaustion, lease-expiry crash recovery, queued/retry-scheduled
+cancellation, all proven with a controlled no-op processor — 85/85
+Postgres 16 assertions (cumulative, all suites), a genuine dual-OS-process
+concurrency proof (80 jobs, zero double-claims), 30/30 hosted assertions
+including a 20-parallel-request real HTTP concurrency race. **Two real,
+hosted-only bugs found and fixed this session** — a pgcrypto
+`search_path` gap and a default-privileges gap that had silently made the
+migration's core trust-boundary claim false (see §-6 above for the full
+account). Web lint/typecheck/build/test all clean. Vercel Preview
+redeployed, healthy, Deployment Protection intact. Full record: §-6 above
+and
+`docs/verification/sprint-1.2a-processing-orchestration-verification.md`.
 
 ---
 
@@ -462,45 +554,52 @@ owner, not something applied unilaterally here.
 | G-07: Auth covers session/permission layer, not full account lifecycle | No signup, no admin member-management screen | None — incremental | Low | Frontend/Backend | Sprint 1 |
 | G-09: No Playwright/browser E2E | Login/reset form submission unverified end-to-end via a real browser (the HTTP smoke test proves route protection and page delivery, not form interaction) | None — can start anytime | Low | Frontend/QA | **Pre-Controlled-Beta requirement, not a Sprint 1 blocker** |
 | G-10: No custom SMTP on hosted Development project | Default GoTrue email-send rate limit is low; can affect real password-reset email volume | Configure custom SMTP in Supabase dashboard | Low | DevOps | Before Controlled Beta, not blocking Sprint 1 |
-| G-13: No processing-worker claim/retry implementation | `document_processing_jobs` rows exist and reach `queued`, but nothing claims, processes, or requeues them yet | S1-B (done) | Medium | Backend/AI-RAG | Sprint 1.2 (S1-C, see §6) |
+| G-14: No real PDF/OCR/chunking/embedding extraction | The Worker can claim/lease/retry/complete a job end-to-end, but its processor is a controlled no-op — no document content is ever actually read | S1-C1 (done) | Medium | AI/RAG | Sprint 1.2B (S1-C2, see §6) |
 
-**Closed this session:** G-11 (no document-processing... pipeline — the
-*intake* half is now real: source documents, upload sessions, verification,
-and queued jobs all exist and are hosted-verified; the *processing* half
-remains G-13, tracked separately now that intake and processing are
-properly split per ADR 0008) and **G-12** (self-approval regression — see
-§-5 for the full evidence). The Secure Guideline Source Document Intake
-workstream (S1-B) itself is Complete and Hosted-Verified.
+**Closed this session:** G-13 (no processing-worker claim/retry
+implementation — the orchestration control plane is now real: atomic
+claim, hashed-lease ownership, heartbeat renewal, exponential-backoff
+retry, dead-lettering, crash recovery, and cancellation all exist and are
+hosted-verified, proven with a controlled no-op processor; the
+*extraction* half is tracked separately as new gap G-14, since ADR 0009
+deliberately keeps "can a job be claimed/executed/retried/recovered
+exactly once" separate from "what does execution actually do"). The
+Durable Processing Orchestration workstream (S1-C1) itself is Complete
+and Hosted-Verified.
 
 **Closed prior sessions:** G-01 (hosted Supabase), G-08 (Vercel Protection
-Bypass), G-02/G-05/G-06 (Sprint 0 items) — see git history for the
-session-by-session record; not repeated here.
+Bypass), G-11/G-12 (Sprint 1.1 items), G-02/G-05/G-06 (Sprint 0 items) —
+see git history for the session-by-session record; not repeated here.
 
-None of the remaining gaps (G-03, G-04, G-07, G-09, G-10, G-13) block this
+None of the remaining gaps (G-03, G-04, G-07, G-09, G-10, G-14) block this
 task's closure — each is either a product/clinical decision, later Sprint
-1 work explicitly out of this task's scope (processing/parsing, AI
-provider selection), or a documented pre-Controlled-Beta requirement.
+1 work explicitly out of this task's scope (real extraction, AI provider
+selection), or a documented pre-Controlled-Beta requirement.
 
 ---
 
 ## 6. Recommended next task
 
-Workstream S1-B (Secure Guideline Source Document Intake) is closed.
-Schema, upload sessions, server-side object verification, duplicate
-detection, idempotent registration and job creation, application layer,
-and minimal UI are implemented and verified against plain Postgres, the
-real hosted Development project (real JWTs, real Storage I/O), and Vercel
-Preview. G-12 is closed on both environments.
+Workstream S1-C1 (Durable Processing Orchestration) is closed. Atomic
+claim, hashed-lease ownership, heartbeat renewal, exponential-backoff
+retry, dead-lettering, lease-expiry crash recovery, cancellation,
+application layer, and minimal UI are implemented and verified against
+plain Postgres (including a genuine dual-process concurrency proof), the
+real hosted Development project (real JWTs, real `service_role` calls,
+including a 20-parallel-request real HTTP concurrency race), and Vercel
+Preview. Two real, hosted-only bugs (a pgcrypto `search_path` gap and a
+default-privileges gap that had made the trust-boundary claim false) were
+found and fixed this session — see §-6 for the full account.
 
 ```text
-Begin Sprint 1.2 — Processing Worker Claim, Retry, and Extraction Foundation
+Begin Sprint 1.2B — Deterministic PDF Page and Text Extraction
 ```
 
-This is workstream S1-C (`MASTER_BACKLOG.md`): the Worker claims a
-`queued` job, heartbeat/lease semantics, retry with attempt limits, and
-`dead_lettered` handling — publishing to Supabase Queues using the
-existing `apps/worker/app/main.py::JobMessage` contract. Still not PDF
-parsing/chunking/embeddings itself (S1-D). G-03 (clinical domain
+This is workstream S1-C2 (`MASTER_BACKLOG.md`): real PyMuPDF-based
+parsing plugs into the now-proven claim/lease/retry/complete lifecycle,
+replacing S1-C1's controlled no-op processor
+(`apps/worker/app/processing.py::noop_processor`). Still not chunking or
+a reviewer extraction-review queue (S1-D). G-03 (clinical domain
 confirmation) should ideally be resolved before or alongside real content
 work. Playwright browser-driven E2E (G-09) stays a documented
 pre-Controlled-Beta requirement, not a blocker.

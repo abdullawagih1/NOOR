@@ -6,8 +6,8 @@ retrieves and cites only approved, versioned guideline text, and refuses to
 answer when evidence is insufficient. Noor is not an autonomous diagnostician
 — the clinician always retains final clinical authority.
 
-This repository is at **Sprint 1, workstream S1-B — Secure Guideline
-Source Document Intake** (**Complete and Hosted-Verified**). Sprint 0.5's
+This repository is at **Sprint 1, workstream S1-C1 — Durable Processing
+Orchestration**. Sprint 0.5's
 hosted infrastructure foundation (identity/tenancy/RLS, real Supabase
 Auth, the Noor Design System, the worker scaffold, the shared clinical
 schema contract) is unchanged and remains verified — against plain
@@ -40,9 +40,23 @@ Postgres (60/60 cumulative real assertions) and hosted Development
 `docs/verification/sprint-1.1-document-intake-verification.md`,
 `docs/domain/document-intake-lifecycle.md`, and ADR 0008. Document
 *processing* (claiming a queued job, parsing, chunking, embeddings,
-retrieval, generation) do not exist yet — see
+retrieval, generation) did not exist as of that sprint — see
 `docs/architecture/adr/0007-separate-clinical-and-processing-lifecycles.md`,
 ADR 0008, and `KNOWN_LIMITATIONS.md`.
+
+**S1-C1 — durable processing orchestration:** the Worker now claims a
+queued (or due-for-retry) job atomically (`FOR UPDATE SKIP LOCKED`,
+proven safe under real dual-process concurrency — zero double-claims
+across 80 raced jobs), holds it via a hashed lease token with
+heartbeat-based renewal, retries with exponential backoff up to
+`max_attempts`, dead-letters on exhaustion, recovers a crashed Worker's
+job via lease expiry, and supports user cancellation of queued/
+retry-scheduled jobs — all proven end-to-end with a **controlled no-op
+processor**, deliberately not real PDF extraction (that's Sprint 1.2B).
+27/27 real Postgres 16 orchestration assertions, a genuine dual-OS-process
+concurrency proof, and 27/27 Worker pytest assertions. See
+`docs/domain/document-processing-orchestration.md`, ADR 0009, and
+`docs/verification/sprint-1.2a-processing-orchestration-verification.md`.
 
 The repository is pushed to GitHub with CI passing on real GitHub Actions
 runs. See `PROJECT_STATE.md` for the authoritative current status and open
@@ -182,12 +196,12 @@ false-passing.
 * `clinical/intended-use/INTENDED_USE.md`
 * `clinical/risk-management/RISK_REGISTER.md`
 * `docs/architecture/DECISIONS.md`
-* `docs/domain/{guideline-registry,guideline-lifecycle,guideline-source-documents,document-intake-lifecycle}.md`
-* `docs/database/{guideline-registry-schema,secure-document-intake-schema}.md`
-* `docs/security/{guideline-registry-authorization,document-intake-authorization}.md`
-* `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci,environment-variables,worker-deployment,guideline-document-upload}.md`
+* `docs/domain/{guideline-registry,guideline-lifecycle,guideline-source-documents,document-intake-lifecycle,document-processing-orchestration,document-processing-lifecycle}.md`
+* `docs/database/{guideline-registry-schema,secure-document-intake-schema,document-processing-orchestration-schema}.md`
+* `docs/security/{guideline-registry-authorization,document-intake-authorization,worker-orchestration-authorization}.md`
+* `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci,environment-variables,worker-deployment,worker-processing-runbook,job-recovery-and-dead-letter,guideline-document-upload}.md`
 * `docs/design-system/NOOR_DESIGN_SYSTEM.md`
-* `docs/verification/{sprint-0.5-hosted-verification,sprint-1-guideline-registry-verification,sprint-1.1-document-intake-verification}.md`
+* `docs/verification/{sprint-0.5-hosted-verification,sprint-1-guideline-registry-verification,sprint-1.1-document-intake-verification,sprint-1.2a-processing-orchestration-verification}.md`
 * `SECURITY.md`
 * `KNOWN_LIMITATIONS.md`
 

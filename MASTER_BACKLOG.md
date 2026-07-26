@@ -12,13 +12,14 @@ executable breakdown requested in the Sprint 0 mission (§18.E).
 | E-01 | Identity, Orgs & RBAC foundation | **Implemented and verified** (migrations 0001+0002; permissions/role_permissions seeded) |
 | E-02 | RLS & multi-tenant authorization framework | **Implemented and verified** (11/11 Sprint 0 RLS assertions + 26 Sprint 1 guideline-registry assertions, plain Postgres, real local Supabase, **and hosted with real JWTs**) |
 | E-03 | App shell + role-based workspace routing | **Implemented and verified** — real Supabase SSR auth, session refresh, permission-gated layouts on all 4 workspaces + Noor Design System styling, controlled 403/access-denied pages, password reset flow |
-| E-06 | Worker service scaffold | **Implemented and verified** (5/5 pytest passing) |
+| E-06 | Worker service scaffold | **Implemented and verified** (27/27 pytest passing — 9 `/jobs`-contract + 7 orchestration-client + 11 worker-loop assertions) |
 | E-09 *(new)* | Guideline registry (domains, authorities, guidelines, versions) | **Implemented and verified** — see S1-01 below |
 | E-15 | AI Gateway (registry, validators) | **Partially implemented** — structured-answer schema + safety invariants done (`packages/clinical-schemas`); no provider adapters, registry tables, or gateway service yet |
 | E-21 *(new)* | Clinical review / approval workflow | **Implemented and verified** — see S1-01 below |
-| E-23 | Audit logging (correlation ID) | **Implemented and verified for the guideline registry** — `audit_events` writes now real (every guideline-registry mutation writes one, atomically, via SECURITY DEFINER functions); no other subsystem writes to it yet |
+| E-23 | Audit logging (correlation ID) | **Implemented and verified for the guideline registry and processing orchestration** — `audit_events` writes real for every guideline-registry mutation and for processing-job cancellation; routine claim/start/heartbeat/complete/fail/recover events go to `document_intake_events` only (not `audit_events`) by design — see `docs/domain/document-processing-lifecycle.md` |
 | E-27 | CI/CD pipelines & environments | **Implemented and verified** — CI green on GitHub Actions; Vercel Preview deployed and healthy; hosted Supabase fully verified with real JWTs (Sprint 0.5 + Sprint 1) |
 | E-31 *(new)* | Noor Design System foundation | **Implemented and verified** — `packages/ui`: tokens, 32 components, `/design-system` showcase, ADR 0005, accessibility contrast audit. See `docs/design-system/` |
+| E-32 *(new)* | Durable processing orchestration (claim/lease/retry/dead-letter) | **Implemented and verified** — see S1-C1 below |
 | E-04, E-05, E-07, E-08, E-10–E-14, E-16–E-20, E-22, E-24–E-26, E-28–E-30 | All other epics | **Not started** |
 
 ## Sprint 1 workstreams
@@ -53,18 +54,25 @@ more complete design once actually implemented (`S1-B`).
 - **Team:** QA/Database
 - **Status:** Closed this session. `supabase/tests/rls/004_g12_self_approval_regression.sql` (a synthetic role combining `guidelines.create`/`submit_for_review`/`approve`) passes against plain Postgres 16 and hosted Development with real JWTs — self-approval denied, `lifecycle_status` unchanged, no approval lifecycle event, no falsely-claiming audit event. The synthetic role and its mappings were cleaned up on hosted after verification.
 
-### S1-C — Processing Orchestration (worker claim, retry, dead-letter) — Next
-- **Description:** Worker claims a `queued` job (`claimed → processing → succeeded/failed`), heartbeat/lease semantics, retry with `attempt_count`/`max_attempts`, and `dead_lettered` handling. Publishes to Supabase Queues using the existing `apps/worker/app/main.py::JobMessage` contract (job_type aligned to the worker's existing `document_parsing` operation — see ADR 0008). Absorbs the processing half of the old `S1-03`.
+### S1-C1 — Durable Processing Orchestration (worker claim, lease, retry, dead-letter) — **DONE**
+- **Description:** Worker claims a `queued`/due-`retry_scheduled` job atomically (`FOR UPDATE SKIP LOCKED`), hashed-lease-token ownership, heartbeat-based lease renewal, `document_processing_attempts` history, exponential-backoff retry (30s/60s/120s.../900s cap, `max_attempts=3`), lease-expiry crash recovery, queued/retry-scheduled cancellation, and a Worker polling loop running a **controlled no-op processor only** — no real PDF extraction. Split out of the old `S1-C` so orchestration correctness could be proven independently of extraction logic. Absorbs the processing-control half of the old `S1-03`.
 - **Team:** Backend/Supabase + AI/RAG + DevOps
 - **Dependencies:** S1-B (done — `document_processing_jobs` rows now exist to claim)
-- **Priority:** P0
-- **Risk:** Medium — idempotency and lease/heartbeat correctness under worker crash/restart
-- **Tests required:** Claim-race test, heartbeat-timeout requeue test, max-attempts → dead_lettered test
+- **Status:** Closed this session. Migration `0007_durable_processing_orchestration.sql`.
+- **Verification:** 27/27 real assertions against a fresh Postgres 16 Docker container (`supabase/tests/rls/006_processing_orchestration.sql`, includes wrong-worker/wrong-token denial, idempotent-replay, retry-exhaustion → dead-letter, lease-expiry recovery, and cancellation-state coverage) + a genuine dual-OS-process concurrency proof (`supabase/tests/concurrency/verify_concurrent_claim.sh` — 80 real jobs, two independent `psql` connections racing, zero double-claims, zero lost jobs) + 27/27 Worker pytest assertions (`apps/worker/tests/test_orchestration_client.py`, `test_worker_loop.py`) + hosted verification. Full record: `docs/verification/sprint-1.2a-processing-orchestration-verification.md`.
+- **Real bug found and fixed by actually running the new test file** (not by reading the SQL): the first draft's fixture pool had too few jobs for the number of fresh claims the test sequence needed, and separately asserted the shared Docker test database's claim queue would become globally empty — both wrong once the file was actually run against cumulative state left by prior test suites (005/006 both leave some jobs queued by design). Fixed by scoping assertions to the file's own fixture ids/distinctness rather than global counts. See `docs/database/document-processing-orchestration-schema.md`.
 
-### S1-D — Extraction and Verification (PDF parsing, chunking, reviewer extraction queue) — Future
-- **Description:** Real PyMuPDF-based parsing (replacing the Worker's contract-validation-only stub), page extraction, structure-aware chunking, and a real Reviewer extraction-review queue (approve/reject `document_chunks`). Absorbs the old `S1-04`/`S1-05`/`S1-06`.
+### S1-C2 — Deterministic PDF Page and Text Extraction — Next
+- **Description:** Real PyMuPDF-based parsing (replacing S1-C1's controlled no-op processor), page-level text extraction, and structured extraction metadata written to the job's `result_summary`. Does not yet include chunking or a reviewer extraction-review queue (S1-D).
+- **Team:** AI/RAG + Backend
+- **Dependencies:** S1-C1 (done — the claim/lease/retry/complete lifecycle a real processor plugs into now exists and is proven)
+- **Priority:** P0
+- **Risk:** Medium — malformed/malicious PDFs must fail safely (as a reported retryable or terminal failure through the now-proven `fail_document_processing_job()` path), not crash the Worker process
+
+### S1-D — Extraction Review (structure-aware chunking, reviewer extraction queue) — Future
+- **Description:** Structure-aware chunking of S1-C2's extracted text, and a real Reviewer extraction-review queue (approve/reject `document_chunks`). Absorbs the remainder of the old `S1-04`/`S1-05`/`S1-06`.
 - **Team:** AI/RAG + Frontend + Backend
-- **Dependencies:** S1-C
+- **Dependencies:** S1-C2
 - **Risk:** Medium — malformed/malicious PDFs must fail safely, not crash (Red-Team Agent test required before this is called done)
 
 ### S1-E — Retrieval Preparation (embeddings, pgvector, AI provider) — Future

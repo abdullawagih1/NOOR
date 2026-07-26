@@ -1,4 +1,4 @@
-# Known Limitations — Sprint 1.1
+# Known Limitations — Sprint 1.2A
 
 Honest accounting of what this build does and does not verify. Update in
 the same PR that resolves an item.
@@ -50,11 +50,22 @@ the same PR that resolves an item.
    task: "Processing Worker Claim, Retry, and Extraction Foundation"
    (Sprint 1.2, S1-C).
 
-5. **Worker does not process anything yet.** `POST /jobs` validates and
-   acknowledges a job contract; it does not parse PDFs, chunk text, or call
-   any embedding/reranking/LLM provider. No AI provider has been selected.
+5. ~~Worker does not process anything yet.~~ **Partially resolved.** The
+   Worker can now claim, lease, heartbeat, retry, recover, and complete a
+   job end-to-end (`WORKER_PROCESSING_MODE=noop`,
+   `apps/worker/app/worker_loop.py`) — but the processor itself remains a
+   controlled no-op (`apps/worker/app/processing.py`), never parsing a
+   real PDF, chunking text, or calling any embedding/reranking/LLM
+   provider. `POST /jobs` (the queue-message-shaped endpoint) still only
+   validates and acknowledges a contract, unconnected to the new polling
+   loop. No AI provider has been selected. See
+   `docs/domain/document-processing-orchestration.md`.
 
-6. **No queue integration.** Supabase Queues is the approved design; nothing
+6. **No queue integration.** Supabase Queues remains the approved
+   long-term design; Sprint 1.2A deliberately chose direct database
+   polling instead (Mode A, ADR 0009) — correctness does not depend on a
+   queue, proven under real dual-process concurrency
+   (`supabase/tests/concurrency/verify_concurrent_claim.sh`). Nothing
    currently publishes or consumes a queue message.
 
 7. **Auth covers session/permission/password-reset, not full account
@@ -175,12 +186,16 @@ the same PR that resolves an item.
     file-reference column, per ADR 0007/0008's separation of the clinical
     publication lifecycle from the intake/processing lifecycles.
 
-21. **Document intake is registry/verification only — no processing
-    consumer exists yet.** A `document_processing_jobs` row reaches
-    `queued` and stays there; nothing claims, parses, or executes it
-    (Sprint 1.2, S1-C). No progress percentage is ever shown — the UI only
-    ever displays `Queued` for a new job, honestly, rather than fabricating
-    intermediate states.
+21. ~~Document intake is registry/verification only — no processing
+    consumer exists yet.~~ **Resolved (control plane only).** A
+    `document_processing_jobs` row is now claimed, leased, retried,
+    recovered, and completed by a real Worker polling loop (Sprint 1.2A,
+    S1-C1) — but the processor is a controlled no-op (item 5). No progress
+    percentage is ever shown — the UI displays only real, discrete
+    statuses (`Queued`/`Claimed`/`Processing`/`Retry Scheduled`/
+    `Succeeded`/`Failed`/`Cancelled`/`Dead-lettered`), never a fabricated
+    intermediate percentage, since the underlying job has no measurable
+    sub-progress to report honestly.
 
 22. **PDF-signature validation is not malware scanning.** Verifying the
     first 5 bytes equal `%PDF-` confirms the uploaded file *is a PDF*; it
@@ -213,3 +228,80 @@ the same PR that resolves an item.
     verification (only a small synthetic fixture was used) — worth a
     dedicated load check before Controlled Beta if real guideline PDFs
     regularly approach the limit.
+
+26. **Processing handler remains a controlled no-op (Sprint 1.2A, by
+    design).** See item 5. Real PDF page/text extraction is Sprint 1.2B.
+
+27. **Retry timing is a baseline policy, not production-tuned.**
+    30s/60s/120s/.../900s-cap backoff and `max_attempts=3` are reasonable
+    defaults, not derived from real extraction failure-mode data (which
+    doesn't exist yet, since extraction itself doesn't exist yet). Revisit
+    once Sprint 1.2B surfaces real, characteristic failure modes.
+
+28. **Lease-expiry recovery runs on every Worker poll tick, not a
+    dedicated schedule.** Safe under concurrent recovery calls (proven,
+    `supabase/tests/rls/006_processing_orchestration.sql` TEST 10) but
+    means recovery only happens while at least one Worker instance is
+    online and polling — if every Worker is down, a crashed job's lease
+    simply waits until one comes back. See
+    `docs/operations/job-recovery-and-dead-letter.md`.
+
+29. **`WORKER_MAX_CONCURRENT_JOBS` is declared but not enforced.** The
+    current loop always processes exactly one job at a time per Worker
+    process regardless of this setting's value.
+
+30. **No manual retry of a `dead_lettered` job through the application.**
+    Dead-lettered jobs are visible (permission-gated) but reactivating one
+    requires a direct database statement today — deliberately deferred
+    rather than shipping an undertested reactivation path. See
+    `docs/operations/job-recovery-and-dead-letter.md`.
+
+31. **No dedicated metrics/alerting pipeline for job processing.**
+    Observability today is Worker process logs, direct database queries,
+    and the Web UI's Job Status Card / Attempt History — no dashboards, no
+    paging on stuck/dead-lettered jobs.
+
+32. **`WORKER_INSTANCE_ID` uniqueness across a Worker fleet is not
+    enforced.** Auto-generated ids are randomized per process (collision
+    astronomically unlikely); an operator who pins `WORKER_INSTANCE_ID`
+    explicitly on two simultaneously-running processes could cause them to
+    interfere with each other's leases. Document as an operational
+    requirement — not validated in code.
+
+33. **`service_role` is shared by every Worker instance; there is no
+    per-instance database credential.** Lease-token hash verification
+    (`assert_lease_owner`), not the database role, is what prevents one
+    Worker instance from acting on another's claimed job. See
+    `docs/security/worker-orchestration-authorization.md`.
+
+34. **Streaming file verification (Sprint 1.1's remaining item, closed
+    this sprint):** the mandatory Sprint 1.2A review found
+    `completeGuidelineUploadAction` fully buffered the uploaded file into
+    memory (`.download()` → `arrayBuffer()`) before computing size/
+    signature/checksum. Refactored to genuine incremental streaming
+    (`apps/web/lib/documents/streamVerification.ts`, a raw authenticated
+    `fetch()` against the Storage REST endpoint + `ReadableStream`
+    processing) — same trust model, same 50 MB limit, now provably
+    early-aborts on an oversized stream rather than buffering the whole
+    file first. 5 new unit tests, including an explicit early-abort proof.
+
+35. **No genuine concurrent-Worker proof beyond the dedicated bash
+    harness.** `supabase/tests/rls/006_processing_orchestration.sql`
+    proves sequential exclusivity within one `psql` session; real
+    dual-process concurrency is proven separately
+    (`supabase/tests/concurrency/verify_concurrent_claim.sh`), but that
+    harness is a manual/CI-optional script, not wired into the automatic
+    `npm test`/`pytest` gates — run it explicitly when reviewing changes
+    to the claim function.
+
+36. **No browser-driven (Playwright) E2E of the Job Status Card / Attempt
+    History / cancel-job UI.** Consistent with the existing Playwright gap
+    (item 8) — verified via real Postgres assertions and (pending) hosted
+    PostgREST calls, not through a rendered browser page.
+
+37. **Job status/attempt history reads share the existing
+    `guideline_processing_jobs.read` permission — no separate
+    `.read_attempts` permission was introduced.** A deliberate
+    simplification (both tables carry an identical RLS predicate); revisit
+    if a future role ever needs job-status visibility without
+    attempt-history visibility or vice versa.

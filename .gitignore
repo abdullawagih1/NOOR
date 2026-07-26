@@ -49,3 +49,4 @@ supabase/.temp/
 
 # Claude Code local tooling state
 .claude/
+.tmp_verify/

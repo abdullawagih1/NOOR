@@ -63,6 +63,28 @@ exists.
   re-downloaded, and hashed — not simulated). See
   `docs/security/document-intake-authorization.md` and
   `docs/verification/sprint-1.1-document-intake-verification.md`.
+* **Durable processing orchestration (Sprint 1.2A): a stricter trust
+  boundary than any prior migration.** Migration
+  `0007_durable_processing_orchestration.sql` adds six functions
+  (claim/start/heartbeat/complete/fail/recover-expired) that are **never
+  granted to `authenticated` at all** — no signed-in user's session,
+  regardless of permissions their role holds, can call them; only the
+  Worker's `service_role` credential can. Job ownership within that shared
+  credential is enforced by a hashed lease token
+  (`lease_token_hash = sha256(lease_token)`), never a plaintext
+  comparison, verified by `assert_lease_owner()` before every state
+  change. A Worker that loses its lease (crashed, or reclaimed by
+  `recover_expired_document_processing_jobs()`) structurally cannot
+  subsequently complete or heartbeat that job — the hash comparison fails
+  and the function raises. Proven correct under real concurrency, not
+  just sequential-session inference:
+  `supabase/tests/concurrency/verify_concurrent_claim.sh` raced two
+  independent OS processes against 80 shared jobs — zero double-claims,
+  zero lost jobs. Processor exceptions are caught and reported with a
+  generic, safe message — never the raw exception text, which could
+  contain internals. See
+  `docs/security/worker-orchestration-authorization.md` and
+  `docs/domain/document-processing-orchestration.md`.
 * **G-12 closed this session:** a guideline-version creator who also holds
   `guidelines.approve` still cannot approve their own version — the one
   self-approval scenario the Sprint 1 guideline-registry test suite could
@@ -166,8 +188,19 @@ exists.
   Required before accepting externally-sourced documents at real scale.
   See `docs/security/document-intake-authorization.md`.
 * No prompt-injection or data-exfiltration test suite exists yet — there
-  is no generation pipeline to test against (PDF upload/registration now
-  exists and is verified; parsing/embeddings/retrieval/generation do not).
+  is no generation pipeline to test against (PDF upload/registration and
+  processing orchestration now exist and are verified;
+  parsing/embeddings/retrieval/generation do not).
+* `service_role` is shared by every Worker instance — there is no
+  per-instance database credential; lease-token hash verification, not
+  the database role, is what isolates one Worker instance's job from
+  another's (Sprint 1.2A). See
+  `docs/security/worker-orchestration-authorization.md`.
+* `WORKER_INSTANCE_ID` uniqueness across a Worker fleet is not enforced in
+  code — an operator who pins the same explicit value on two concurrently
+  running processes could cause them to interfere with each other's
+  leases. Auto-generated ids (the default) are randomized per process,
+  making this practically unreachable unless explicitly configured.
 * MFA, session/device management, and SSO are Supabase Auth features not
   yet configured on the hosted Development project.
 * Password-based login only; no magic-link or SSO flow wired to a UI yet

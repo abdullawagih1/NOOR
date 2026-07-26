@@ -5,11 +5,19 @@ intended to run on a platform that supports long-lived containers (Fly.io,
 Railway, Render, a VM, or similar) — not Vercel, which cannot run
 long-running processes (ADR 0001).
 
-## Status as of the Environment Variables session
+## Status as of Sprint 1.2A
 
-Not deployed anywhere yet — Sprint 1 scope, once real PDF-processing logic
-exists to justify standing up hosted infrastructure for it. This document
-describes the configuration required whenever that happens.
+Not deployed anywhere yet — no hosting platform chosen. Local and hosted
+*verification* both run the Worker as a local process pointed at real
+Supabase infrastructure (`SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`), not
+via any standing deployment. This document describes the configuration
+required whenever a hosting platform is chosen.
+
+Sprint 1.2A added a durable processing orchestration loop
+(`WORKER_PROCESSING_MODE=noop`) — see
+`docs/operations/worker-processing-runbook.md` for its configuration and
+operation. It runs a controlled no-op processor only; still no real
+PDF-processing logic (Sprint 1.2B).
 
 ## Required environment
 
@@ -82,9 +90,12 @@ docker run -p 8080:8080 --env-file apps/worker/.env noor-worker
 The `Dockerfile`'s `HEALTHCHECK` hits `/health` (unauthenticated, by
 design — see above).
 
-## Not yet done (Sprint 1)
+## Not yet done
 
 * No actual hosting platform chosen or configured.
-* No Supabase Queues consumer — `/jobs` validates and acknowledges a
-  contract only, doesn't process anything.
-* No real PDF parsing, chunking, or embedding logic.
+* No Supabase Queues consumer — `/jobs` still only validates and
+  acknowledges a contract, doesn't process anything (Sprint 1.2A's
+  claim/heartbeat/complete loop is a separate, DB-polling code path — see
+  `docs/operations/worker-processing-runbook.md` — not connected to this
+  endpoint).
+* No real PDF parsing, chunking, or embedding logic (Sprint 1.2B).

@@ -1,5 +1,111 @@
 # Changelog
 
+## [Unreleased] — Sprint 1.2A: Durable Processing Orchestration
+
+### Added
+
+* `supabase/migrations/0007_durable_processing_orchestration.sql` — 6 new
+  Worker-only functions (`claim_next_document_processing_job`,
+  `start_document_processing_job`, `heartbeat_document_processing_job`,
+  `complete_document_processing_job`, `fail_document_processing_job`,
+  `recover_expired_document_processing_jobs`), never granted to
+  `authenticated` (a stricter trust boundary than any prior migration —
+  only `service_role` can call them). Atomic claim via
+  `FOR UPDATE SKIP LOCKED`; hashed lease-token ownership; exponential
+  backoff retry (30s/60s/120s/.../900s cap, `max_attempts=3`, one
+  canonical `compute_retry_delay_seconds()` shared by both the
+  failure-reporting and crash-recovery code paths); lease-expiry crash
+  recovery; `cancel_processing_job` widened to allow `retry_scheduled` as
+  a cancellable source status alongside `queued`.
+* `docs/architecture/adr/0009-durable-processing-orchestration.md` — the
+  database-as-source-of-truth decision, Mode A (polling) over introducing
+  a queue this sprint, the hashed-lease design, the `authenticated`-vs-
+  `service_role` trust boundary, and the `out_`-prefix output-column
+  convention adopted to structurally eliminate the `RETURNS TABLE`
+  shadowing bug class hit twice in migration 0006.
+* `supabase/tests/rls/006_processing_orchestration.sql` — 27 real
+  assertions: atomic claim, sequential-claim distinctness, wrong-worker/
+  wrong-token denial for heartbeat/start/complete, idempotent replay of
+  completion and failure reporting, retry-exhaustion → dead-letter,
+  lease-expiry recovery (with stale-worker lockout), safe concurrent
+  recovery, cancellation (queued/retry_scheduled allowed,
+  dead_lettered/others rejected, idempotent repeat, unauthorized denied),
+  forbidden-transition rejection, and unchanged RLS read restriction.
+* `supabase/tests/concurrency/verify_concurrent_claim.sh` +
+  `setup_concurrent_claim_fixture.sql` — a genuine dual-OS-process
+  concurrency proof: two independent `psql` connections (separate
+  Postgres backends) race to drain a shared pool of queued jobs; verifies
+  zero overlap, zero lost jobs, and total claimed equals the actual
+  claimable count (robust to leftover state from earlier test suites in
+  the same database).
+* `apps/worker/app/{orchestration_client,worker_loop,processing}.py` — a
+  typed httpx PostgREST RPC client for the six new functions; a claim →
+  start → heartbeat-loop → complete/fail polling loop with graceful
+  shutdown (`WorkerLoop`); a controlled no-op processor
+  (`noop_processor`) that proves the lifecycle without parsing any real
+  document content. Wired into `app/main.py` via a FastAPI `lifespan`
+  handler, gated by `WORKER_PROCESSING_MODE` (`disabled` by default —
+  every existing deployment/test run unaffected until set to `noop`
+  explicitly).
+* `apps/worker/tests/{test_orchestration_client,test_worker_loop}.py` —
+  18 new assertions: PostgREST request/response shape and safe error
+  handling (`httpx.MockTransport`, no real network) and the full claim/
+  start/heartbeat/complete/fail cycle including processor-exception
+  containment, heartbeat-failure tolerance, and graceful shutdown
+  (a fake in-memory `OrchestrationClient` — no real Supabase project;
+  test-only failure-injection processors defined only in the test file).
+* `apps/web/lib/documents/streamVerification.ts` — genuine incremental
+  streaming file verification (size/PDF-signature/SHA-256 via
+  `ReadableStream`, early-abort on oversized files), replacing the
+  Sprint 1.1 full-buffer `.download().arrayBuffer()` approach found
+  during this sprint's mandatory review. 5 new unit tests, including an
+  explicit proof of early abort under a chunk-pull-count assertion.
+* `apps/web/lib/documents/{queries,ui}.ts` extended:
+  `listDocumentProcessingAttempts`, widened `ProcessingJobStatus`/new
+  `ProcessingAttemptStatus` types, `AttemptStatusBadge`,
+  `isJobCancellable`. Guideline detail page gained a Job Status Card
+  (attempt count, next-retry/dead-letter timestamps, safe error text,
+  result summary) and permission-gated Attempt History — no lease
+  tokens, secrets, stack traces, or signed URLs anywhere in the UI; no
+  fabricated progress percentages.
+* `docs/domain/{document-processing-orchestration,document-processing-lifecycle}.md`,
+  `docs/database/document-processing-orchestration-schema.md`,
+  `docs/security/worker-orchestration-authorization.md`,
+  `docs/operations/{worker-processing-runbook,job-recovery-and-dead-letter}.md`,
+  `docs/verification/sprint-1.2a-processing-orchestration-verification.md`.
+
+### Fixed
+
+* **Sprint 1.1's mandatory-review finding**: `completeGuidelineUploadAction`
+  fully buffered the uploaded file into memory before computing its
+  facts. Refactored to real streaming — same trust model, same 50 MB
+  limit, provably early-aborts on oversized input.
+* A real bug found by actually running the new orchestration test file,
+  not by reading it: the first draft's fixture pool was sized for fewer
+  fresh claims than the test sequence actually needed, and separately
+  asserted the shared Docker test database's claim queue would become
+  globally empty — both wrong once run against cumulative state left by
+  prior test suites. Fixed by sizing the fixture pool correctly and
+  scoping assertions to the file's own fixture ids/distinctness rather
+  than a global count.
+
+### Verified this session (not assumed)
+
+* Database: a fresh `postgres:16` Docker container had all 7 migrations +
+  seed + the full RLS suite (001–006) run against it — 100% green,
+  including the pre-existing 001–005 suites unmodified on top of
+  migration 0007's schema changes. A genuine two-process concurrency
+  race (80 jobs) — zero double-claims, zero lost jobs.
+* Web: lint/typecheck/build clean; new `documents-orchestration-ui.test.ts`
+  assertions added to the suite.
+* Worker: `python -m compileall` clean; 27/27 pytest assertions (9
+  pre-existing `/jobs`-contract + 18 new orchestration assertions).
+* Other workspaces unaffected: `clinical-schemas` (6/6), `ui` (typecheck)
+  re-verified clean.
+* Hosted "Noor Development" and Vercel Preview — see
+  `docs/verification/sprint-1.2a-processing-orchestration-verification.md`
+  for the full record.
+
 ## [Unreleased] — Sprint 1.1: Secure Guideline Source Document Intake
 
 ### Added
