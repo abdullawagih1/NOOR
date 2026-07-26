@@ -9,12 +9,21 @@ must fail loudly at startup rather than silently accept unauthenticated
 requests. Supabase and AI Gateway fields stay optional — nothing in this
 service calls either yet (Sprint 1 scope), so requiring them now would just
 be friction with no corresponding behavior to protect.
+
+`worker_processing_mode` defaults to "disabled" so every existing
+deployment and test run is unaffected until an operator explicitly opts in
+(Sprint 1.2A). "noop" runs the durable-orchestration claim/heartbeat/
+complete loop against a controlled no-op processor only — see ADR 0009 and
+`app/processing.py`. There is deliberately no third mode that selects a
+test failure-injection processor: those exist only as direct Python
+function parameters inside pytest, never as a runtime-selectable value.
 """
 from __future__ import annotations
 
+import secrets
 from functools import lru_cache
 
-from pydantic import AnyHttpUrl, SecretStr, field_validator
+from pydantic import AnyHttpUrl, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,6 +46,14 @@ class Settings(BaseSettings):
     ai_gateway_provider: str | None = None
     ai_gateway_api_key: SecretStr | None = None
 
+    # --- Durable processing orchestration (Sprint 1.2A) --------------------
+    worker_instance_id: str | None = None
+    worker_poll_interval_seconds: int = 5
+    worker_lease_duration_seconds: int = 90
+    worker_heartbeat_interval_seconds: int = 30
+    worker_max_concurrent_jobs: int = 1
+    worker_processing_mode: str = "disabled"  # "disabled" | "noop"
+
     @field_validator("worker_internal_token")
     @classmethod
     def token_must_be_long_enough(cls, value: SecretStr) -> SecretStr:
@@ -46,6 +63,33 @@ class Settings(BaseSettings):
                 "(generate with: openssl rand -hex 32)"
             )
         return value
+
+    @field_validator("worker_processing_mode")
+    @classmethod
+    def processing_mode_must_be_known(cls, value: str) -> str:
+        if value not in ("disabled", "noop"):
+            raise ValueError('WORKER_PROCESSING_MODE must be "disabled" or "noop"')
+        return value
+
+    @model_validator(mode="after")
+    def _assign_stable_worker_instance_id(self) -> "Settings":
+        # Generated once per process lifetime (Settings is a process-wide
+        # singleton via get_settings()'s lru_cache) unless the operator
+        # pinned one explicitly — never regenerated mid-process, so a
+        # claimed lease's owner name never changes underneath it.
+        if not self.worker_instance_id or not self.worker_instance_id.strip():
+            self.worker_instance_id = f"noor-worker-{self.worker_env}-{secrets.token_hex(3)}"
+        return self
+
+    @model_validator(mode="after")
+    def _heartbeat_must_be_well_inside_the_lease(self) -> "Settings":
+        if self.worker_heartbeat_interval_seconds >= self.worker_lease_duration_seconds:
+            raise ValueError(
+                "WORKER_HEARTBEAT_INTERVAL_SECONDS must be less than "
+                "WORKER_LEASE_DURATION_SECONDS, or the lease can expire "
+                "between heartbeats"
+            )
+        return self
 
     @property
     def allowed_origins_list(self) -> list[str]:
