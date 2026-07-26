@@ -1,17 +1,23 @@
-import { PageHeader, EmptyState, Badge } from "@noor/ui";
+import Link from "next/link";
+import { PageHeader, EmptyState, Badge, Button } from "@noor/ui";
 
 export default function AdminPage() {
   return (
     <main className="flex flex-col gap-lg">
       <PageHeader
-        eyebrow="Sprint 0.5 — content stub, real auth"
+        eyebrow="Sprint 1 — Guideline Registry"
         title="Admin Workspace"
-        description="Manage organization membership, roles, and guideline registration."
+        description="Manage organization membership, roles, and the guideline registry."
         actions={<Badge>Requires workspace.admin.access</Badge>}
       />
       <EmptyState
-        title="No content yet"
-        description="Session resolution, active-membership checks, and permission enforcement are real — you could not have reached this page without them. Real data (membership management, guideline registration) is Sprint 1 scope (MASTER_BACKLOG.md, E-14/E-09/E-21). Granted to organization_admin, knowledge_manager."
+        title="Guideline Registry is live"
+        description="The controlled guideline registry (domains, authorities, guidelines, versions, review/approval/activation lifecycle) is real — see Guideline Registry in the top nav, or the link below. Organization-membership management is still Sprint 1+ scope."
+        action={
+          <Link href="/knowledge/guidelines">
+            <Button variant="secondary">Open Guideline Registry</Button>
+          </Link>
+        }
       />
     </main>
   );

@@ -7,7 +7,9 @@ import { WorkspaceNav, Button, Badge, type WorkspaceNavItem } from "@noor/ui";
 
 const NAV_DEFINITIONS = [
   { label: "Ask Noor", href: "/clinician", permission: PERMISSIONS.WORKSPACE_CLINICIAN_ACCESS },
+  { label: "Clinical Knowledge", href: "/clinician/knowledge", permission: PERMISSIONS.GUIDELINES_READ_ACTIVE },
   { label: "Administration", href: "/admin", permission: PERMISSIONS.WORKSPACE_ADMIN_ACCESS },
+  { label: "Guideline Registry", href: "/knowledge/guidelines", permission: PERMISSIONS.GUIDELINES_READ_ALL },
   { label: "Review", href: "/reviewer", permission: PERMISSIONS.WORKSPACE_REVIEWER_ACCESS },
   { label: "Quality", href: "/quality", permission: PERMISSIONS.WORKSPACE_QUALITY_ACCESS },
 ] as const;
