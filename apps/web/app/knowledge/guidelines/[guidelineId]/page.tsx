@@ -17,7 +17,13 @@ import {
   supersedeGuidelineVersionAction,
   withdrawGuidelineVersionAction,
 } from "@/lib/guidelines/actions";
+import { listGuidelineSourceDocuments, listDocumentProcessingJobs } from "@/lib/documents/queries";
+import { quarantineGuidelineSourceDocumentAction, cancelProcessingJobAction } from "@/lib/documents/actions";
+import { DocumentStatusBadge, JobStatusBadge, formatBytes, shortSha } from "@/lib/documents/ui";
+import { UploadPanel } from "./UploadPanel";
 import { PageHeader, Card, Section, Badge, TextInput, Textarea, Select, Button, Alert } from "@noor/ui";
+
+const UPLOAD_ELIGIBLE_STATUSES = new Set(["draft", "ready_for_review", "approved"]);
 
 export const dynamic = "force-dynamic";
 
@@ -178,6 +184,99 @@ async function VersionHistory({ version }: { version: GuidelineVersionRow }) {
   );
 }
 
+async function SourceDocuments({
+  version,
+  guidelineId,
+  permissionKeys,
+}: {
+  version: GuidelineVersionRow;
+  guidelineId: string;
+  permissionKeys: string[];
+}) {
+  const has = (p: string) => permissionKeys.includes(p);
+  const documents = await listGuidelineSourceDocuments(version.id);
+  const activePrimary = documents.find((d) => d.document_role === "primary_guideline" && d.status !== "rejected" && d.status !== "quarantined");
+  const canUpload = has(PERMISSIONS.GUIDELINE_DOCUMENTS_UPLOAD) && UPLOAD_ELIGIBLE_STATUSES.has(version.lifecycle_status) && !activePrimary;
+
+  return (
+    <div className="mt-md flex flex-col gap-sm border-t border-border pt-md">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted">Source Documents</p>
+
+      {documents.length === 0 ? (
+        <p className="text-sm text-muted">No source document uploaded yet.</p>
+      ) : (
+        <div className="flex flex-col gap-sm">
+          {documents.map((doc) => (
+            <SourceDocumentRow key={doc.id} document={doc} guidelineId={guidelineId} canReject={has(PERMISSIONS.GUIDELINE_DOCUMENTS_REJECT)} canCancelJob={has(PERMISSIONS.GUIDELINE_PROCESSING_JOBS_CANCEL)} />
+          ))}
+        </div>
+      )}
+
+      {canUpload ? <UploadPanel guidelineVersionId={version.id} /> : null}
+    </div>
+  );
+}
+
+async function SourceDocumentRow({
+  document: doc,
+  guidelineId,
+  canReject,
+  canCancelJob,
+}: {
+  document: import("@/lib/documents/queries").GuidelineSourceDocumentRow;
+  guidelineId: string;
+  canReject: boolean;
+  canCancelJob: boolean;
+}) {
+  const jobs = await listDocumentProcessingJobs(doc.id);
+  const latestJob = jobs[0];
+
+  return (
+    <div className="rounded-sm border border-border p-sm">
+      <div className="flex flex-wrap items-center justify-between gap-xs">
+        <div>
+          <p className="text-sm font-medium text-ink">{doc.original_filename}</p>
+          <p className="text-xs text-muted">
+            {formatBytes(doc.size_bytes)} · sha256:{shortSha(doc.sha256)} · Uploaded {formatDate(doc.uploaded_at)}
+          </p>
+        </div>
+        <DocumentStatusBadge status={doc.status} />
+      </div>
+
+      {doc.status === "rejected" || doc.status === "quarantined" ? (
+        <p className="mt-xs text-xs text-muted">Reason: {doc.rejection_reason ?? "—"}</p>
+      ) : null}
+
+      {latestJob ? (
+        <div className="mt-xs flex items-center gap-xs text-xs text-muted">
+          <span>Processing job:</span>
+          <JobStatusBadge status={latestJob.status} />
+          {canCancelJob && latestJob.status === "queued" ? (
+            <form action={cancelProcessingJobAction} className="inline">
+              <input type="hidden" name="processingJobId" value={latestJob.id} />
+              <input type="hidden" name="guidelineId" value={guidelineId} />
+              <Button type="submit" size="sm" variant="text">
+                Cancel job
+              </Button>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+
+      {canReject && (doc.status === "verified" || doc.status === "registered") ? (
+        <form action={quarantineGuidelineSourceDocumentAction} className="mt-xs flex items-end gap-xs">
+          <input type="hidden" name="sourceDocumentId" value={doc.id} />
+          <input type="hidden" name="guidelineId" value={guidelineId} />
+          <TextInput label="Quarantine reason" name="reason" required hint="Required" />
+          <Button type="submit" size="sm" variant="danger">
+            Quarantine
+          </Button>
+        </form>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function GuidelineDetailPage({
   params,
   searchParams,
@@ -286,6 +385,8 @@ export default async function GuidelineDetailPage({
                 <div className="mt-md">
                   <VersionHistory version={v} />
                 </div>
+
+                <SourceDocuments version={v} guidelineId={guideline.id} permissionKeys={context.permissionKeys} />
               </Card>
             ))}
           </div>
