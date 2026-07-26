@@ -2,25 +2,48 @@
 
 ## Reporting
 
-This is a pre-release internal project (Sprint 0). Report concerns directly
-to the project owner rather than a public issue until a disclosure process
+This is a pre-release internal project. Report concerns directly to the
+project owner rather than a public issue until a disclosure process
 exists.
 
-## Controls implemented in Sprint 0
+## Controls implemented
 
 * Row-Level Security enabled on every table in `supabase/migrations/0001_*`
-  through `0004_*`, verified by 11 passing assertions across
+  through `0005_*`, verified by 15 Sprint-0/0.5 assertions across
   `supabase/tests/rls/001_tenant_isolation.sql` and
   `002_auth_hardening.sql` — covering same-tenant access, cross-tenant
   denial, suspended-membership denial, removed-membership denial, non-admin
   privileged-write denial, non-privileged audit-read denial, audit-log
   append-only enforcement, permission-mapping correctness, and cross-tenant
-  membership-reassignment denial. Verified against plain Postgres 16, a
-  real local Supabase stack, **and now the real hosted "Noor Development"
-  project** — 26 additional Auth/RLS/Authorization/Feature-flag/Audit
-  assertions + 8 Storage assertions, all with real GoTrue-issued JWTs
-  against `/rest/v1` and `/storage/v1`, all passed. See
-  `docs/verification/sprint-0.5-hosted-verification.md`.
+  membership-reassignment denial — **plus 26 Sprint-1 guideline-registry
+  assertions** (`003_guideline_registry.sql`) covering cross-tenant
+  guideline-creation denial, clinician read restricted to `active` versions
+  only, every legal/illegal lifecycle transition, self-review and
+  self-approval blocking, transactional supersession, released-version
+  immutability, append-only review/lifecycle history, and audit-event
+  creation. Verified against plain Postgres 16, a real local Supabase
+  stack, **and the real hosted "Noor Development" project** — 26 Sprint
+  0.5 Auth/RLS/Authorization/Feature-flag/Audit assertions + 8 Storage
+  assertions + **18 Sprint-1 guideline-registry assertions**, all with real
+  GoTrue-issued JWTs, all passed. See
+  `docs/verification/sprint-0.5-hosted-verification.md` and
+  `docs/verification/sprint-1-guideline-registry-verification.md`.
+* **Guideline registry: every write is mediated by a SECURITY DEFINER
+  function, never a table-level grant.** None of the 6 new tables
+  (`clinical_domains`, `guideline_authorities`, `guidelines`,
+  `guideline_versions`, `guideline_reviews`, `guideline_lifecycle_events`)
+  has an INSERT/UPDATE/DELETE RLS policy for `authenticated`, and
+  INSERT/UPDATE/DELETE table grants are explicitly revoked (Supabase's
+  platform default privileges would otherwise grant them — the same class
+  of finding migration 0004 closed for `anon`). A version's clinical
+  publication status can only ever change through
+  `transition_guideline_version()`, which independently re-derives
+  `auth.uid()` and the caller's organization-scoped permission — self-
+  review is blocked by a database trigger regardless of role, self-approval
+  is blocked by an explicit check independent of the reviewer/approver role
+  split, and released (`active`/`superseded`/`withdrawn`) version content
+  is immutable via any client write path. See
+  `docs/security/guideline-registry-authorization.md`.
 * **Hosted finding, fixed and re-verified same session:** the hosted
   project had inherited a legacy Supabase default granting `anon` full
   CRUD (SELECT/INSERT/UPDATE/DELETE/TRUNCATE) on every public table. RLS

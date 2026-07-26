@@ -1,4 +1,4 @@
-# Known Limitations — Sprint 0.5
+# Known Limitations — Sprint 1
 
 Honest accounting of what this build does and does not verify. Update in
 the same PR that resolves an item.
@@ -31,11 +31,18 @@ the same PR that resolves an item.
    before Controlled Beta if reset-email volume needs to exceed the
    default quota.
 
-4. **No guideline/document/RAG schema yet.** Only the identity/tenancy/audit
-   (0001), permission/hardening (0002), storage-foundation (0003), and
-   anon-grant hardening (0004) migrations exist. Document processing,
-   chunks, embeddings, retrieval, and generation tables are Sprint 1+
-   (MASTER_BACKLOG.md).
+4. ~~No guideline/document/RAG schema yet.~~ **Partially resolved.** The
+   guideline *registry* (clinical domains, authorities, guidelines,
+   versions, reviews, lifecycle) exists and is fully implemented and
+   hosted-verified — migration `0005_guideline_registry_and_lifecycle.sql`,
+   see `docs/domain/guideline-registry.md` and
+   `docs/verification/sprint-1-guideline-registry-verification.md`.
+   Document processing (upload, OCR, parsing, chunking, embeddings,
+   retrieval, generation) is still not built — `guideline_versions`
+   carries no file/document reference at all, by design (see ADR 0007,
+   which keeps the clinical publication lifecycle and the future
+   document-processing lifecycle as two separate state machines). Next
+   Sprint 1 task: "Secure Guideline Upload and Processing Job Foundation."
 
 5. **Worker does not process anything yet.** `POST /jobs` validates and
    acknowledges a job contract; it does not parse PDFs, chunk text, or call
@@ -122,3 +129,41 @@ the same PR that resolves an item.
     there's no automated secret-sync. Acceptable for Sprint 0.5 (no real
     call site exists yet between them); worth revisiting once Sprint 1
     wires an actual Web→Worker call.
+
+17. **No clinical domain has been confirmed or seeded.** Migration 0005
+    deliberately seeds zero clinical domains — the mission explicitly
+    requires human clinical confirmation before Noor commits to a starting
+    scope (e.g. Adult Hypertension). See `PROJECT_STATE.md` gap G-03. The
+    registry itself works with any domain once one is created through the
+    normal `guidelines.create`/`clinical_domains.manage` permission path.
+
+18. **Self-approval-by-a-creator-who-also-holds-`guidelines.approve` is
+    blocked by code, not exercised by a live test.** The check inside
+    `transition_guideline_version` (`auth.uid() <> guideline_versions.created_by`)
+    is independent of the reviewer/approver role split and was verified by
+    code review, but no seeded RLS or hosted test fixture combines "authored
+    this version" with "holds guidelines.approve" to hit that exact branch
+    end-to-end (the non-creator-approver and non-approver-denied paths are
+    both live-tested). Low risk — the same check pattern is already
+    live-tested for self-review (`prevent_self_review` trigger). See
+    `docs/security/guideline-registry-authorization.md`.
+
+19. **Guideline Registry UI is minimal, not final.** No bulk operations, no
+    real pagination (client filters only), no inline draft-content editing
+    UI for `update_guideline_draft`/`update_guideline_version_draft` (the
+    functions exist and are tested; only creation and lifecycle-transition
+    forms were built this session). A review's `changes_requested`/
+    `rejected` decision does not automatically transition the version back
+    to `draft` — that is a deliberate design decision (review feedback and
+    lifecycle transitions are separate, both append-only, event streams —
+    see `docs/domain/guideline-lifecycle.md`), not an oversight, but it
+    does mean a second explicit action is always required to act on
+    review feedback.
+
+20. **No document/file reference exists on `guideline_versions` at all.**
+    Not a gap so much as a boundary: ADR 0007 keeps the clinical
+    publication lifecycle (this sprint) and the document-processing
+    lifecycle (upload/OCR/parsing/chunking, not yet built) as two separate
+    concerns by design. A guideline version can be fully reviewed,
+    approved, and activated today purely as registry metadata, with no
+    underlying source file wired in yet.

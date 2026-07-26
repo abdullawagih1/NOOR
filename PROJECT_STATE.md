@@ -1,13 +1,102 @@
 # PROJECT_STATE.md
 
-**Last updated:** Sprint 0.5 final closure session (Claude Code, this
-environment)
-**Updated by:** Noor Delivery Council (Claude Code + user-executed
-protected smoke test)
+**Last updated:** Sprint 1 — Guideline Registry Schema and Lifecycle
+session (Claude Code, this environment)
+**Updated by:** Noor Delivery Council (Claude Code)
 
 ---
 
-## -3. This session: Sprint 0.5 final closure
+## -4. This session: Sprint 1 — Guideline Registry Schema and Lifecycle
+
+Implemented the first Sprint 1 vertical slice: an organization-scoped
+controlled registry for clinical guidelines (Clinical Domain → Guideline
+Authority → Guideline → Guideline Version → Clinical Review → Approval →
+Activation → Supersession → Withdrawal), deliberately stopping short of any
+PDF ingestion, embeddings, or retrieval/generation work.
+
+**Schema and lifecycle engine** (`supabase/migrations/0005_guideline_registry_and_lifecycle.sql`):
+6 new tables (`clinical_domains`, `guideline_authorities`, `guidelines`,
+`guideline_versions`, `guideline_reviews`, `guideline_lifecycle_events`),
+12 new permissions, 10 SECURITY DEFINER functions (every create/update/
+review/lifecycle-transition mutation goes through one, atomically pairing
+the write with an `audit_events` row — no table has an INSERT/UPDATE/DELETE
+RLS policy for `authenticated` at all), tenant integrity via composite
+foreign keys rather than triggers wherever declaratively possible, a
+partial unique index guaranteeing one active version per guideline, and
+append-only enforcement on review/lifecycle-history tables mirroring
+migration 0002's `audit_events` pattern. Full design rationale:
+`docs/database/guideline-registry-schema.md`,
+`docs/domain/guideline-lifecycle.md`. ADR 0007 records the decision to keep
+the clinical-publication lifecycle and the (not-yet-built)
+document-processing lifecycle as two separate state machines.
+
+**A real architecture correction made mid-session:** the Admin Guideline
+Registry pages were initially built under `/admin/knowledge/guidelines/*`,
+matching the mission's suggested routes literally — but `quality_manager`
+(who holds `guidelines.approve`/`activate`/`supersede`/`withdraw`) only has
+`workspace.quality.access`, not `workspace.admin.access`, so nesting under
+`/admin/*` would have made the entire approval/activation workflow
+unreachable by the one role meant to perform it. Moved to a neutral
+`/knowledge/guidelines/*` route, gated per-page by the specific
+`guidelines.*` permission rather than a workspace shell — reachable by
+`organization_admin`, `knowledge_manager`, `quality_manager`,
+`safety_officer`, `clinical_reviewer`, and `auditor` as their individual
+permissions warrant.
+
+**Application layer and UI:** `apps/web/lib/guidelines/{schemas,actions,
+queries,errors,ui}.ts` — Zod validation authoritative at the server
+boundary, Server Actions wrapping every RPC with `requirePermission` +
+correlation IDs + safe typed error mapping, RLS-trusting read queries.
+Minimal UI: Admin Guideline Registry (list/filter, new-guideline form with
+inline domain/authority quick-add, detail page with permission-aware
+lifecycle action buttons and inline review/status history), Reviewer Queue
+(`/reviewer/guidelines`), and a read-only Clinician Active Knowledge view
+(`/clinician/knowledge`) that can structurally only ever display `active`
+versions (RLS-enforced, not UI-filtered).
+
+**Verification, real not assumed:** web lint/typecheck/build all clean;
+34/34 `npm run test --workspace=apps/web` assertions (2 new suites this
+session: schema validation, error-code mapping); a real `postgres:16`
+Docker container (matching CI's `database` job exactly) had all 5
+migrations + seed + the full RLS suite (11 + 4 + **26** new guideline
+registry assertions) run against it — 41/41 passed. **A real bug was found
+and fixed by actually running the test file**: psql's `:'var'` fixture
+substitution silently fails to interpolate inside dollar-quoted `DO $$...$$`
+blocks (where nearly every assertion lives), producing a bare syntax error
+on first run; fixed by threading fixture IDs through a temp table + two
+`SECURITY DEFINER` helper functions instead. Full record:
+`docs/verification/sprint-1-guideline-registry-verification.md`.
+
+**Hosted Development verification, real not assumed:** migration 0005
+applied to the hosted "Noor Development" project
+(`supabase db push --linked`, confirmed `local==remote` before/after).
+Schema landed correctly (6 tables/RLS enabled, 12 permissions, 24 role
+mappings, all functions, the one-active-version index — verified via direct
+Management API queries). **18/18 real GoTrue-JWT hosted assertions
+passed**: 4 synthetic users (admin/clinician/reviewer/quality) created via
+the Auth Admin API, signed in for real access tokens, and exercised
+entirely over HTTP (`/rest/v1/rpc/*`) — domain/authority/guideline/version
+creation, clinician denied draft access, illegal transition rejected,
+approval-without-review rejected, self-approval blocked, non-creator
+approve+activate succeeds, clinician then sees the active version, raw
+PATCH against an active version rejected, withdrawal-without-reason
+rejected, withdrawal-with-reason succeeds and clears
+`current_active_version_id`, audit events recorded, cross-tenant creation
+denied. All synthetic test data (2 orgs, 4 users) deleted and confirmed via
+a zero-count query. Vercel Preview redeployed with the new code
+(`target: preview`, `status: Ready`), stable alias re-pointed, Deployment
+Protection re-confirmed enabled and correctly enforced (unprotected smoke
+test correctly detects and reports the protection wall, not a false pass —
+unchanged from Sprint 0.5, since no protection config changed this
+session). Full record:
+`docs/verification/sprint-1-guideline-registry-verification.md`.
+
+**Sprint 1 (Guideline Registry Schema and Lifecycle): Complete and
+Hosted-Verified.**
+
+---
+
+## -3. Prior session: Sprint 0.5 final closure
 
 The one remaining gap from the prior session — Vercel's "Protection Bypass
 for Automation" secret, which required a dashboard action no CLI/API path
@@ -104,15 +193,20 @@ across every affected table.
 
 ## 0. Current phase
 
-**Sprint 0.5 — Hosted Infrastructure & Design System Activation.**
-Sprint 0 (platform foundation) was completed and remediated in a prior
-session — see §1 for that history. **Status: Complete and
-Hosted-Verified.** Every check required by the mission passed against real
-hosted infrastructure with real credentials: Auth, RLS, Authorization,
-Feature Flags, Audit, and Storage (all with real GoTrue-issued JWTs, prior
-session), and the fully authenticated Vercel Preview HTTP smoke test (this
-session, user-executed with the Protection Bypass secret, 10/10 passed,
-body-content-verified). Sprint 1 may begin.
+**Sprint 1 — Guideline Registry Schema and Lifecycle.**
+Sprint 0.5 (hosted infrastructure & design system) is **Complete and
+Hosted-Verified** — see §-3/§1 for that history; it is not reopened here.
+
+**Sprint 1's first vertical slice — Guideline Registry Schema and
+Lifecycle — status: Complete and Hosted-Verified.** Schema, lifecycle
+engine, RLS, permissions, application layer, and minimal UI are
+implemented and verified against three independent environments: plain
+Postgres 16 (41/41 real assertions), the real hosted "Noor Development"
+Supabase project with real GoTrue JWTs (18/18 real assertions), and the
+Vercel Preview deployment (redeployed, healthy, Deployment Protection
+intact). Web lint/typecheck/build/test (34/34) all clean. Full record:
+§-4 above and
+`docs/verification/sprint-1-guideline-registry-verification.md`.
 
 ---
 
@@ -282,46 +376,50 @@ owner, not something applied unilaterally here.
 
 ---
 
-## 5. Gap report (Sprint 0.5)
+## 5. Gap report
 
 | Gap | Impact | Dependency | Risk | Owner | Next task |
 |---|---|---|---|---|---|
-| G-03: Clinical domain not confirmed | Blocks guideline sourcing | Clinical partner decision | Medium | Product/Clinical | Confirm or accept hypertension default |
-| G-04: No AI provider selected | Blocks generation-side work | Provider spike | Medium | AI/RAG | Sprint 1 |
+| G-03: Clinical domain not confirmed | No default clinical domain is seeded anywhere (deliberately — migration 0005 seeds none); blocks choosing *which* guideline content to actually register first | Clinical partner decision | Medium | Product/Clinical | Confirm a domain (e.g. hypertension) or another starting scope |
+| G-04: No AI provider selected | Blocks generation-side work | Provider spike | Medium | AI/RAG | Sprint 1 (S1-07) |
 | G-07: Auth covers session/permission layer, not full account lifecycle | No signup, no admin member-management screen | None — incremental | Low | Frontend/Backend | Sprint 1 |
 | G-09: No Playwright/browser E2E | Login/reset form submission unverified end-to-end via a real browser (the HTTP smoke test proves route protection and page delivery, not form interaction) | None — can start anytime | Low | Frontend/QA | **Pre-Controlled-Beta requirement, not a Sprint 1 blocker** |
 | G-10: No custom SMTP on hosted Development project | Default GoTrue email-send rate limit is low; can affect real password-reset email volume | Configure custom SMTP in Supabase dashboard | Low | DevOps | Before Controlled Beta, not blocking Sprint 1 |
+| G-11: No document-processing pipeline | Guideline versions carry no file reference; nothing to review/approve beyond registry metadata yet | None — the registry (this sprint) is the prerequisite | Medium | Backend/AI-RAG | Sprint 1 — "Secure Guideline Upload and Processing Job Foundation" (see §6) |
+| G-12: Self-approval-by-a-permission-holding-creator not exercised by a live test | The block is real (explicit code check + verified via a *different* path — non-approver denial), but no seeded test fixture combines "authored this version" with "holds guidelines.approve" to hit that exact branch live | None — would need a dedicated fixture | Low | QA | Add when convenient; not blocking |
 
-**Closed this session:** G-08 (Vercel Protection Bypass secret — configured
-by the user; protected Preview smoke test run, 10/10 passed, body-content
-verified — see §-3 above and `docs/verification/sprint-0.5-hosted-verification.md`).
+**Closed this session:** none of the pre-existing gaps close outright, but
+the Guideline Registry Schema and Lifecycle vertical slice itself
+(the Sprint 1 task this session executed) is Complete and Hosted-Verified
+— see §-4.
 
-**Closed prior session:** G-01 (hosted Supabase — connected, migrated,
-fully verified with real JWTs), plus an unlisted gap discovered and fixed
-along the way: unnecessary `anon` table grants (migration 0004).
+**Closed prior sessions:** G-01 (hosted Supabase), G-08 (Vercel Protection
+Bypass), G-02/G-05/G-06 (Sprint 0 items) — see git history for the
+session-by-session record; not repeated here.
 
-Superseded from Sprint 0: G-02 (git push — done), G-05 (Next.js advisory —
-resolved via 15.5.21 upgrade, ADR 0006), G-06 (CI execution evidence — done,
-four times now).
-
-None of the remaining gaps (G-03, G-04, G-07, G-09, G-10) block Sprint 0.5
-closure or the start of Sprint 1 — each is either a product/clinical
-decision independent of this build, or explicitly scoped to a later
-milestone (Sprint 1 incremental work, or pre-Controlled-Beta hardening).
+None of the remaining gaps (G-03, G-04, G-07, G-09, G-10, G-11, G-12) block
+this task's closure — each is either a product/clinical decision, later
+Sprint 1 work explicitly out of this task's scope (PDF ingestion, AI
+provider selection), or a documented pre-Controlled-Beta requirement.
 
 ---
 
 ## 6. Recommended next task
 
-Sprint 0.5 is closed. Every hosted-infrastructure requirement passed with
-real credentials: hosted Supabase (Auth, RLS, Authorization, Feature
-Flags, Audit, Storage — all real JWTs) and the fully authenticated Vercel
-Preview HTTP smoke test (10/10, body-content-verified, this session).
+The Guideline Registry Schema and Lifecycle vertical slice is closed.
+Schema, lifecycle engine, RLS, permissions, application layer, and minimal
+UI are implemented and verified against plain Postgres, the real hosted
+Development project (real JWTs), and Vercel Preview.
 
 ```text
-Begin Sprint 1 — Guideline Registry Schema and Lifecycle
+Begin Sprint 1 — Secure Guideline Upload and Processing Job Foundation
 ```
 
-Playwright browser-driven E2E (G-09) stays on the backlog as a documented
-pre-Controlled-Beta requirement — it does not gate Sprint 1's data-model
-work.
+This is the document-processing lifecycle ADR 0007 deliberately kept
+separate from the clinical publication lifecycle just implemented — PDF
+upload, private-storage wiring, and a `document_processing_jobs` queue
+contract, still not PDF parsing/chunking/embeddings itself (later tasks).
+G-03 (clinical domain confirmation) should ideally be resolved before or
+alongside that task, since it determines what real content gets uploaded
+first. Playwright browser-driven E2E (G-09) stays a documented
+pre-Controlled-Beta requirement, not a blocker.

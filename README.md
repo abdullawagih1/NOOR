@@ -6,22 +6,32 @@ retrieves and cites only approved, versioned guideline text, and refuses to
 answer when evidence is insufficient. Noor is not an autonomous diagnostician
 — the clinician always retains final clinical authority.
 
-This repository is at **Sprint 0.5** (**Complete and Hosted-Verified**):
-the identity/tenancy/RLS foundation, real Supabase Auth (SSR clients,
-session refresh, login/logout/password-reset, permission-gated workspace
-routes), the Noor Design System (`packages/ui`), the worker service
-scaffold, and the shared clinical schema contract exist and are verified —
-against plain Postgres, a real local Supabase stack, **a real hosted
-Supabase Development project** (Auth, RLS, Storage, and Audit all verified
-with real JWTs), and **a protected Vercel Preview deployment** (HTTP
-smoke test run through Vercel's Deployment Protection, 10/10 passed with
-body-content verification — see
-`docs/verification/sprint-0.5-hosted-verification.md`). The repository is
-pushed to GitHub with CI passing on real GitHub Actions runs. See
-`PROJECT_STATE.md` for the authoritative current status and open gaps
-(Playwright browser-driven E2E remains a pre-Controlled-Beta requirement,
-not a Sprint 1 blocker). No guideline ingestion pipeline or LLM integration
-exists yet.
+This repository is at **Sprint 1 — Guideline Registry Schema and
+Lifecycle** (**Complete and Hosted-Verified**). Sprint 0.5's hosted
+infrastructure foundation (identity/tenancy/RLS, real Supabase Auth, the
+Noor Design System, the worker scaffold, the shared clinical schema
+contract) is unchanged and remains verified — against plain Postgres, a
+real local Supabase stack, a real hosted Supabase Development project, and
+a protected Vercel Preview deployment (see
+`docs/verification/sprint-0.5-hosted-verification.md`).
+
+This sprint adds the **controlled guideline registry**: clinical domains,
+guideline authorities, guidelines, and guideline versions moving through a
+database-enforced clinical publication lifecycle (draft →
+ready_for_review → approved → active → superseded → withdrawn), with
+review/approval separation, self-review/self-approval blocking,
+transactional supersession, released-version immutability, and full audit
+logging — implemented and verified against plain Postgres (41/41 real
+assertions), the real hosted Development project with real GoTrue JWTs
+(18/18), and the redeployed Vercel Preview. See
+`docs/verification/sprint-1-guideline-registry-verification.md` and
+`docs/domain/guideline-lifecycle.md`. Document upload/parsing/embeddings/
+retrieval/generation do not exist yet — see
+`docs/architecture/adr/0007-separate-clinical-and-processing-lifecycles.md`
+and `KNOWN_LIMITATIONS.md`. The repository is pushed to GitHub with CI
+passing on real GitHub Actions runs. See `PROJECT_STATE.md` for the
+authoritative current status and open gaps (Playwright browser-driven E2E
+remains a pre-Controlled-Beta requirement, not a blocker).
 
 ## Architecture
 
@@ -43,11 +53,11 @@ packages/clinical-schemas/   Shared structured-answer contract (zod)
 packages/ui/           Noor Design System — tokens + 32 components (packages/ui)
 supabase/config.toml   Supabase CLI project config (local dev stack)
 supabase/migrations/   Versioned SQL migrations
-supabase/tests/rls/    RLS test suite (same-tenant / cross-tenant / auth-hardening)
+supabase/tests/rls/    RLS test suite (tenant isolation / auth-hardening / guideline registry)
 supabase/seed.sql      Synthetic seed data — no real patient data, ever
 scripts/               Reproducible verification scripts (HTTP smoke test)
 clinical/              Intended Use, risk register, evaluation sets
-docs/                  Architecture, database, design-system, operations documentation
+docs/                  Architecture, domain, database, design-system, security, operations documentation
 ```
 
 This is an **npm workspaces** monorepo (root `package.json`:
@@ -156,9 +166,12 @@ false-passing.
 * `clinical/intended-use/INTENDED_USE.md`
 * `clinical/risk-management/RISK_REGISTER.md`
 * `docs/architecture/DECISIONS.md`
+* `docs/domain/{guideline-registry,guideline-lifecycle}.md`
+* `docs/database/guideline-registry-schema.md`
+* `docs/security/guideline-registry-authorization.md`
 * `docs/design-system/NOOR_DESIGN_SYSTEM.md`
 * `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci,environment-variables,worker-deployment}.md`
-* `docs/verification/sprint-0.5-hosted-verification.md`
+* `docs/verification/{sprint-0.5-hosted-verification,sprint-1-guideline-registry-verification}.md`
 * `SECURITY.md`
 * `KNOWN_LIMITATIONS.md`
 

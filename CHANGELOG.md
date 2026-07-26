@@ -1,5 +1,106 @@
 # Changelog
 
+## [Unreleased] — Sprint 1: Guideline Registry Schema and Lifecycle
+
+### Added
+
+* `supabase/migrations/0005_guideline_registry_and_lifecycle.sql` — the
+  controlled clinical guideline registry: 6 tables (`clinical_domains`,
+  `guideline_authorities`, `guidelines`, `guideline_versions`,
+  `guideline_reviews`, `guideline_lifecycle_events`), 12 permissions, 10
+  SECURITY DEFINER functions mediating every write (create/update/review/
+  transition, each atomically paired with an `audit_events` row), a single
+  canonical `transition_guideline_version()` lifecycle engine enforcing
+  draft → ready_for_review → approved → active → superseded → withdrawn,
+  a partial unique index guaranteeing one active version per guideline,
+  composite foreign keys enforcing tenant/guideline integrity declaratively,
+  and append-only enforcement on review/lifecycle-history tables mirroring
+  the `audit_events` pattern from migration 0002.
+* `docs/architecture/adr/0007-separate-clinical-and-processing-lifecycles.md`
+  — the clinical publication lifecycle (this migration) and the future
+  document-processing lifecycle (upload/OCR/parsing/chunking) are two
+  separate state machines, never merged.
+* `supabase/tests/rls/003_guideline_registry.sql` — 26 real assertions
+  covering uniqueness constraints, date-ordering, cross-tenant denial,
+  clinician visibility (active-only), every legal/illegal lifecycle
+  transition, self-review/self-approval blocking, transactional
+  supersession, released-version immutability, append-only history, and
+  audit-event creation.
+* `apps/web/lib/guidelines/{schemas,actions,queries,errors,ui}.ts` — Zod
+  validation authoritative at the server boundary, Server Actions wrapping
+  every RPC with `requirePermission` + correlation IDs + safe error
+  mapping (raw Postgres error text never reaches the client), RLS-trusting
+  read queries.
+* Minimal UI: `/knowledge/guidelines` (Admin Registry: list/filter, new
+  guideline with inline domain/authority quick-add, detail page with
+  permission-aware lifecycle action buttons and inline review/status
+  history), `/reviewer/guidelines` (Reviewer Queue), `/clinician/knowledge`
+  (read-only, structurally can only ever show `active` versions).
+* `apps/web/tests/{guidelines-schemas,guidelines-errors}.test.ts` — 21 new
+  assertions (Zod validation edge cases; Postgres-error → safe-message
+  mapping).
+* `docs/domain/{guideline-registry,guideline-lifecycle}.md`,
+  `docs/database/guideline-registry-schema.md`,
+  `docs/security/guideline-registry-authorization.md`,
+  `docs/verification/sprint-1-guideline-registry-verification.md`.
+
+### Changed
+
+* `apps/web/tests/permissions.test.ts` — was hardcoded to check permission
+  seeding against migration 0002 only; now scans every
+  `supabase/migrations/*.sql` file, since permissions now legitimately span
+  0002 and 0005 (and will span future migrations too).
+* Admin/Reviewer/Quality/Clinician workspace stub pages
+  (`apps/web/app/{admin,reviewer,quality,clinician}/page.tsx`) updated to
+  link into the now-real guideline registry, and `WorkspaceHeader`'s nav
+  gained two permission-gated items ("Guideline Registry",
+  "Clinical Knowledge").
+
+### Fixed
+
+* A real, non-hypothetical bug found by actually running the new RLS test
+  file against a fresh Postgres 16 Docker container (not just reading the
+  SQL): psql's `:'var'` fixture-substitution silently does not interpolate
+  inside dollar-quoted `DO $$ ... $$` PL/pgSQL blocks — which is where
+  nearly every assertion lives — producing a bare syntax error on first
+  run. Fixed by threading fixture IDs through a session-scoped temp table
+  plus two `SECURITY DEFINER` SQL helper functions instead, which work
+  identically inside and outside `DO` blocks.
+
+### Architecture decision made mid-session
+
+* The Admin Guideline Registry pages were initially built under
+  `/admin/knowledge/guidelines/*`, matching the mission's literal suggested
+  routes — but `quality_manager` (who holds `guidelines.approve`/
+  `activate`/`supersede`/`withdraw`) only has `workspace.quality.access`,
+  not `workspace.admin.access`, so nesting under `/admin/*` would have made
+  the entire approval/activation workflow unreachable by the one role meant
+  to perform it. Moved to a neutral `/knowledge/guidelines/*` route
+  (its own minimal layout resolving only the session, not a specific
+  workspace), with each page gating itself by the specific `guidelines.*`
+  permission it needs.
+
+### Verified this session (not assumed)
+
+* Web: lint/typecheck/build clean; 34/34 test assertions.
+* Database: 41/41 real assertions (11 Sprint-0 RLS + 4 auth-hardening + 26
+  new guideline-registry) against a real, freshly created `postgres:16`
+  Docker container matching CI's `database` job exactly.
+* Hosted "Noor Development": migration 0005 applied
+  (`supabase db push --linked`, confirmed `local==remote`); schema
+  confirmed via Management API queries (RLS enabled on all 6 tables, 12
+  permissions, 24 role mappings, all functions, the one-active-version
+  index); **18/18 real GoTrue-JWT assertions** exercising the registry
+  entirely over HTTP with 4 synthetic users; all synthetic test data (2
+  orgs, 4 users) deleted and confirmed via a zero-count query.
+* Vercel Preview redeployed with the new code (`target: preview`,
+  `status: Ready`), stable alias re-pointed, Deployment Protection
+  re-confirmed enabled and correctly enforced (unprotected smoke test
+  correctly detects and reports the protection wall, unchanged from
+  Sprint 0.5).
+* Other workspaces unaffected: `clinical-schemas` (6/6), `ui` (typecheck),
+  `worker` (9/9) all re-verified clean.
+
 ## [Unreleased] — Sprint 0.5 final closure
 
 ### Closed
