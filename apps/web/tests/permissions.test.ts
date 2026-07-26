@@ -76,6 +76,23 @@ check("each guideline registry permission is mapped to at least one role", () =>
   }
 });
 
+check("each document-intake permission is mapped to at least one role", () => {
+  const documentIntakePermissions = [
+    PERMISSIONS.GUIDELINE_DOCUMENTS_READ,
+    PERMISSIONS.GUIDELINE_DOCUMENTS_UPLOAD,
+    PERMISSIONS.GUIDELINE_DOCUMENTS_VERIFY,
+    PERMISSIONS.GUIDELINE_DOCUMENTS_REJECT,
+    PERMISSIONS.GUIDELINE_DOCUMENTS_REGISTER,
+    PERMISSIONS.GUIDELINE_PROCESSING_JOBS_READ,
+    PERMISSIONS.GUIDELINE_PROCESSING_JOBS_CREATE,
+    PERMISSIONS.GUIDELINE_PROCESSING_JOBS_CANCEL,
+  ];
+  for (const key of documentIntakePermissions) {
+    const mappingCount = (migrationSql.match(new RegExp(`'${key}'`, "g")) ?? []).length;
+    assert.ok(mappingCount >= 2, `"${key}" is seeded but never mapped to a role in any (role_key, permission_key) VALUES list`);
+  }
+});
+
 if (failures > 0) {
   console.log(`\n${failures} test(s) failed.`);
   process.exit(1);
