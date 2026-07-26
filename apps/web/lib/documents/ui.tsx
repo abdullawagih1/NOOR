@@ -1,5 +1,5 @@
 import { SemanticStatusBadge, type SemanticStateKey } from "@noor/ui";
-import type { DocumentStatus, ProcessingJobStatus } from "@/lib/documents/queries";
+import type { DocumentStatus, ProcessingJobStatus, ProcessingAttemptStatus } from "@/lib/documents/queries";
 
 const DOCUMENT_STATUS_DISPLAY: Record<DocumentStatus, { state: SemanticStateKey; label: string }> = {
   pending_upload: { state: "inactive", label: "Pending Upload" },
@@ -19,6 +19,7 @@ const JOB_STATUS_DISPLAY: Record<ProcessingJobStatus, { state: SemanticStateKey;
   queued: { state: "inactive", label: "Queued" },
   claimed: { state: "underReview", label: "Claimed" },
   processing: { state: "processing", label: "Processing" },
+  retry_scheduled: { state: "underReview", label: "Retry Scheduled" },
   succeeded: { state: "verified", label: "Succeeded" },
   failed: { state: "critical", label: "Failed" },
   cancelled: { state: "withdrawn", label: "Cancelled" },
@@ -28,6 +29,26 @@ const JOB_STATUS_DISPLAY: Record<ProcessingJobStatus, { state: SemanticStateKey;
 export function JobStatusBadge({ status, className }: { status: ProcessingJobStatus; className?: string }) {
   const display = JOB_STATUS_DISPLAY[status];
   return <SemanticStatusBadge state={display.state} labelOverride={display.label} className={className} />;
+}
+
+const ATTEMPT_STATUS_DISPLAY: Record<ProcessingAttemptStatus, { state: SemanticStateKey; label: string }> = {
+  started: { state: "processing", label: "Started" },
+  succeeded: { state: "verified", label: "Succeeded" },
+  retryable_failure: { state: "underReview", label: "Retryable Failure" },
+  terminal_failure: { state: "critical", label: "Terminal Failure" },
+  lease_expired: { state: "critical", label: "Lease Expired" },
+  cancelled: { state: "withdrawn", label: "Cancelled" },
+  abandoned: { state: "withdrawn", label: "Abandoned" },
+};
+
+export function AttemptStatusBadge({ status, className }: { status: ProcessingAttemptStatus; className?: string }) {
+  const display = ATTEMPT_STATUS_DISPLAY[status];
+  return <SemanticStatusBadge state={display.state} labelOverride={display.label} className={className} />;
+}
+
+/** Jobs are cancellable only while queued or waiting for their next retry (mirrors the DB-enforced allowed source statuses in cancel_processing_job). */
+export function isJobCancellable(status: ProcessingJobStatus): boolean {
+  return status === "queued" || status === "retry_scheduled";
 }
 
 export function formatBytes(bytes: number | null | undefined): string {

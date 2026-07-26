@@ -17,9 +17,14 @@ import {
   supersedeGuidelineVersionAction,
   withdrawGuidelineVersionAction,
 } from "@/lib/guidelines/actions";
-import { listGuidelineSourceDocuments, listDocumentProcessingJobs } from "@/lib/documents/queries";
+import {
+  listGuidelineSourceDocuments,
+  listDocumentProcessingJobs,
+  listDocumentProcessingAttempts,
+  type DocumentProcessingJobRow,
+} from "@/lib/documents/queries";
 import { quarantineGuidelineSourceDocumentAction, cancelProcessingJobAction } from "@/lib/documents/actions";
-import { DocumentStatusBadge, JobStatusBadge, formatBytes, shortSha } from "@/lib/documents/ui";
+import { DocumentStatusBadge, JobStatusBadge, AttemptStatusBadge, isJobCancellable, formatBytes, shortSha } from "@/lib/documents/ui";
 import { UploadPanel } from "./UploadPanel";
 import { PageHeader, Card, Section, Badge, TextInput, Textarea, Select, Button, Alert } from "@noor/ui";
 
@@ -217,6 +222,83 @@ async function SourceDocuments({
   );
 }
 
+/**
+ * Job Status Card + Attempt History. No lease tokens, secrets, stack
+ * traces, or signed URLs ever appear here — only the sanitized fields the
+ * orchestration functions expose (error_code/error_class/error_message_safe,
+ * result_summary, timestamps). No fake progress percentages: "processing"
+ * is a status, not a bar, since the underlying job has no measurable
+ * sub-progress to report.
+ */
+async function JobStatusCard({
+  job,
+  guidelineId,
+  canCancelJob,
+}: {
+  job: DocumentProcessingJobRow;
+  guidelineId: string;
+  canCancelJob: boolean;
+}) {
+  const attempts = await listDocumentProcessingAttempts(job.id);
+  const resultStatus = job.result_summary && typeof job.result_summary.status === "string" ? job.result_summary.status : null;
+
+  return (
+    <div className="mt-xs rounded-sm border border-border bg-surface p-xs">
+      <div className="flex flex-wrap items-center gap-xs text-xs">
+        <span className="text-muted">Processing job:</span>
+        <JobStatusBadge status={job.status} />
+        <span className="text-muted">
+          Attempt {job.attempt_count} of {job.max_attempts}
+        </span>
+        {canCancelJob && isJobCancellable(job.status) ? (
+          <form action={cancelProcessingJobAction} className="inline">
+            <input type="hidden" name="processingJobId" value={job.id} />
+            <input type="hidden" name="guidelineId" value={guidelineId} />
+            <Button type="submit" size="sm" variant="text">
+              Cancel job
+            </Button>
+          </form>
+        ) : null}
+      </div>
+
+      {job.status === "retry_scheduled" && job.next_attempt_at ? (
+        <p className="mt-xxs text-xs text-muted">Next retry: {formatDate(job.next_attempt_at)}</p>
+      ) : null}
+      {job.status === "dead_lettered" && job.dead_lettered_at ? (
+        <p className="mt-xxs text-xs text-muted">Dead-lettered: {formatDate(job.dead_lettered_at)}</p>
+      ) : null}
+      {job.error_message_safe && (job.status === "failed" || job.status === "dead_lettered" || job.status === "retry_scheduled") ? (
+        <p className="mt-xxs text-xs" style={{ color: "var(--noor-state-critical-fg)" }}>
+          {job.error_code ? `${job.error_code}: ` : ""}
+          {job.error_message_safe}
+        </p>
+      ) : null}
+      {job.status === "succeeded" && resultStatus ? (
+        <p className="mt-xxs text-xs text-muted">{resultStatus.replace(/_/g, " ")}</p>
+      ) : null}
+
+      {attempts.length > 0 ? (
+        <div className="mt-xs border-t border-border pt-xs">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Attempt history</p>
+          <ul className="mt-xxs flex flex-col gap-xxs">
+            {attempts.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center gap-xs text-xs text-muted">
+                <span>#{a.attempt_number}</span>
+                <AttemptStatusBadge status={a.status} />
+                <span>{formatDate(a.started_at)}</span>
+                {a.worker_id ? <span>· {a.worker_id}</span> : null}
+                {a.error_message_safe ? (
+                  <span style={{ color: "var(--noor-state-critical-fg)" }}>· {a.error_message_safe}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 async function SourceDocumentRow({
   document: doc,
   guidelineId,
@@ -247,21 +329,7 @@ async function SourceDocumentRow({
         <p className="mt-xs text-xs text-muted">Reason: {doc.rejection_reason ?? "—"}</p>
       ) : null}
 
-      {latestJob ? (
-        <div className="mt-xs flex items-center gap-xs text-xs text-muted">
-          <span>Processing job:</span>
-          <JobStatusBadge status={latestJob.status} />
-          {canCancelJob && latestJob.status === "queued" ? (
-            <form action={cancelProcessingJobAction} className="inline">
-              <input type="hidden" name="processingJobId" value={latestJob.id} />
-              <input type="hidden" name="guidelineId" value={guidelineId} />
-              <Button type="submit" size="sm" variant="text">
-                Cancel job
-              </Button>
-            </form>
-          ) : null}
-        </div>
-      ) : null}
+      {latestJob ? <JobStatusCard job={latestJob} guidelineId={guidelineId} canCancelJob={canCancelJob} /> : null}
 
       {canReject && (doc.status === "verified" || doc.status === "registered") ? (
         <form action={quarantineGuidelineSourceDocumentAction} className="mt-xs flex items-end gap-xs">
