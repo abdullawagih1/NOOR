@@ -44,6 +44,33 @@ exists.
   split, and released (`active`/`superseded`/`withdrawn`) version content
   is immutable via any client write path. See
   `docs/security/guideline-registry-authorization.md`.
+* **Secure document intake (Sprint 1.1): every write mediated the same
+  way, plus server-side file verification the browser cannot forge.**
+  Migration `0006_secure_guideline_document_intake.sql` adds 5 tables,
+  all following the same SECURITY DEFINER-only write model. No arbitrary
+  Storage bucket or path is ever client-selectable — paths are generated
+  server-side from server-verified identifiers, with the only
+  client-influenced segment (the filename) sanitized to strip any
+  directory-traversal character. File facts the app must not trust from
+  the browser — size, PDF signature, SHA-256 — are computed by the
+  Next.js server after it independently re-downloads the object from
+  Storage using the same RLS-scoped session that uploaded it (no
+  service-role key anywhere in this flow); see ADR 0008. Verified: 19/19
+  real assertions against plain Postgres 16
+  (`supabase/tests/rls/005_document_intake.sql`) + **16/16 real hosted
+  assertions including an actual Supabase Storage upload/download round
+  trip** (a synthetic `%PDF-`-signed fixture file genuinely uploaded,
+  re-downloaded, and hashed — not simulated). See
+  `docs/security/document-intake-authorization.md` and
+  `docs/verification/sprint-1.1-document-intake-verification.md`.
+* **G-12 closed this session:** a guideline-version creator who also holds
+  `guidelines.approve` still cannot approve their own version — the one
+  self-approval scenario the Sprint 1 guideline-registry test suite could
+  not exercise (no seeded role combined both permissions). A dedicated
+  regression test (`supabase/tests/rls/004_g12_self_approval_regression.sql`)
+  closes this, verified against plain Postgres 16 and hosted Development
+  with a real JWT: request denied, lifecycle status unchanged, no
+  falsely-claiming lifecycle or audit event.
 * **Hosted finding, fixed and re-verified same session:** the hosted
   project had inherited a legacy Supabase default granting `anon` full
   CRUD (SELECT/INSERT/UPDATE/DELETE/TRUNCATE) on every public table. RLS
@@ -132,8 +159,15 @@ exists.
   pipeline), carries its own disclosed advisory. `apps/web` doesn't use
   `next/image` anywhere, so this is currently inert — re-check before ever
   adopting it.
-* No prompt-injection, malicious-PDF, or data-exfiltration test suite exists
-  yet — there is no ingestion or generation pipeline to test against.
+* No malware/antivirus scanning on uploaded PDFs — Sprint 1.1's intake
+  flow validates the `%PDF-` file signature (confirms file *type*, not
+  safety) and computes SHA-256, but no scanning provider is integrated
+  (deliberately out of scope — no provider is available to wire in yet).
+  Required before accepting externally-sourced documents at real scale.
+  See `docs/security/document-intake-authorization.md`.
+* No prompt-injection or data-exfiltration test suite exists yet — there
+  is no generation pipeline to test against (PDF upload/registration now
+  exists and is verified; parsing/embeddings/retrieval/generation do not).
 * MFA, session/device management, and SSO are Supabase Auth features not
   yet configured on the hosted Development project.
 * Password-based login only; no magic-link or SSO flow wired to a UI yet

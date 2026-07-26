@@ -1,4 +1,4 @@
-# Known Limitations — Sprint 1
+# Known Limitations — Sprint 1.1
 
 Honest accounting of what this build does and does not verify. Update in
 the same PR that resolves an item.
@@ -31,18 +31,24 @@ the same PR that resolves an item.
    before Controlled Beta if reset-email volume needs to exceed the
    default quota.
 
-4. ~~No guideline/document/RAG schema yet.~~ **Partially resolved.** The
+4. ~~No guideline/document/RAG schema yet.~~ **Further resolved.** The
    guideline *registry* (clinical domains, authorities, guidelines,
-   versions, reviews, lifecycle) exists and is fully implemented and
-   hosted-verified — migration `0005_guideline_registry_and_lifecycle.sql`,
-   see `docs/domain/guideline-registry.md` and
-   `docs/verification/sprint-1-guideline-registry-verification.md`.
-   Document processing (upload, OCR, parsing, chunking, embeddings,
-   retrieval, generation) is still not built — `guideline_versions`
-   carries no file/document reference at all, by design (see ADR 0007,
-   which keeps the clinical publication lifecycle and the future
-   document-processing lifecycle as two separate state machines). Next
-   Sprint 1 task: "Secure Guideline Upload and Processing Job Foundation."
+   versions, reviews, lifecycle) exists — migration
+   `0005_guideline_registry_and_lifecycle.sql`. **Secure source-document
+   intake now also exists and is hosted-verified**: upload sessions,
+   server-verified object registration (size/PDF-signature/SHA-256),
+   duplicate detection, and idempotent `queued` processing-job creation —
+   migration `0006_secure_guideline_document_intake.sql`, see
+   `docs/domain/{guideline-source-documents,document-intake-lifecycle}.md`
+   and `docs/verification/sprint-1.1-document-intake-verification.md`.
+   Document *processing* (claiming a queued job, OCR, parsing, chunking,
+   embeddings, retrieval, generation) is still not built — `guideline_versions`
+   carries no file/document reference at all, by design (ADR 0007 keeps
+   the clinical publication lifecycle and the document-processing
+   lifecycle as two separate state machines; ADR 0008 further separates
+   the upload-session and processing-job lifecycles from each other). Next
+   task: "Processing Worker Claim, Retry, and Extraction Foundation"
+   (Sprint 1.2, S1-C).
 
 5. **Worker does not process anything yet.** `POST /jobs` validates and
    acknowledges a job contract; it does not parse PDFs, chunk text, or call
@@ -137,16 +143,15 @@ the same PR that resolves an item.
     registry itself works with any domain once one is created through the
     normal `guidelines.create`/`clinical_domains.manage` permission path.
 
-18. **Self-approval-by-a-creator-who-also-holds-`guidelines.approve` is
-    blocked by code, not exercised by a live test.** The check inside
-    `transition_guideline_version` (`auth.uid() <> guideline_versions.created_by`)
-    is independent of the reviewer/approver role split and was verified by
-    code review, but no seeded RLS or hosted test fixture combines "authored
-    this version" with "holds guidelines.approve" to hit that exact branch
-    end-to-end (the non-creator-approver and non-approver-denied paths are
-    both live-tested). Low risk — the same check pattern is already
-    live-tested for self-review (`prevent_self_review` trigger). See
-    `docs/security/guideline-registry-authorization.md`.
+18. ~~Self-approval-by-a-creator-who-also-holds-`guidelines.approve` is
+    blocked by code, not exercised by a live test.~~ **Resolved (G-12).**
+    A dedicated regression test
+    (`supabase/tests/rls/004_g12_self_approval_regression.sql`) creates a
+    synthetic role holding both `guidelines.create` and
+    `guidelines.approve` on one user and proves the exact scenario is
+    denied — passed against plain Postgres 16 and hosted Development with
+    a real GoTrue JWT. See
+    `docs/verification/sprint-1.1-document-intake-verification.md`.
 
 19. **Guideline Registry UI is minimal, not final.** No bulk operations, no
     real pagination (client filters only), no inline draft-content editing
@@ -160,10 +165,51 @@ the same PR that resolves an item.
     does mean a second explicit action is always required to act on
     review feedback.
 
-20. **No document/file reference exists on `guideline_versions` at all.**
-    Not a gap so much as a boundary: ADR 0007 keeps the clinical
-    publication lifecycle (this sprint) and the document-processing
-    lifecycle (upload/OCR/parsing/chunking, not yet built) as two separate
-    concerns by design. A guideline version can be fully reviewed,
-    approved, and activated today purely as registry metadata, with no
-    underlying source file wired in yet.
+20. **`guideline_versions` itself still has no file/document column — by
+    design, not by omission.** A guideline version can be fully reviewed,
+    approved, and activated purely as registry metadata, with or without a
+    source document. What changed this sprint: a version *may* now have an
+    associated `guideline_source_documents` row (a separate table, linked
+    by `guideline_version_id`) once one is uploaded and verified — see
+    item 4 above. `guideline_versions` deliberately does not gain a direct
+    file-reference column, per ADR 0007/0008's separation of the clinical
+    publication lifecycle from the intake/processing lifecycles.
+
+21. **Document intake is registry/verification only — no processing
+    consumer exists yet.** A `document_processing_jobs` row reaches
+    `queued` and stays there; nothing claims, parses, or executes it
+    (Sprint 1.2, S1-C). No progress percentage is ever shown — the UI only
+    ever displays `Queued` for a new job, honestly, rather than fabricating
+    intermediate states.
+
+22. **PDF-signature validation is not malware scanning.** Verifying the
+    first 5 bytes equal `%PDF-` confirms the uploaded file *is a PDF*; it
+    proves nothing about whether the file is safe to open or clinically
+    valid. No antivirus/malware-scanning provider is integrated in this
+    sprint (mission explicitly scoped this out: "prepare a future hook...
+    without implementing an unavailable provider"). Required before
+    accepting externally-sourced documents at any real scale — see
+    `docs/security/document-intake-authorization.md`.
+
+23. **Only PDF is supported; no OCR.** `.pdf`/`application/pdf` is the only
+    accepted file type this sprint — no DOCX, HTML, images, or
+    scanned-image archives, and no OCR pipeline exists to make a
+    scanned/image-only PDF's content extractable later.
+
+24. **No browser-driven (Playwright) E2E of the upload flow.** The
+    signed-upload-URL + direct-to-Storage-PUT sequence
+    (`apps/web/app/knowledge/guidelines/[guidelineId]/UploadPanel.tsx`) is
+    verified via real Postgres 16 assertions and a real hosted
+    Storage-upload/download round trip driven directly over HTTP (not
+    through a rendered browser page) — see
+    `docs/verification/sprint-1.1-document-intake-verification.md`. Actual
+    browser file-input + upload-progress UI interaction remains
+    unverified, consistent with the existing Playwright gap (item 8),
+    which already covers this as a pre-Controlled-Beta requirement.
+
+25. **Large-file upload performance is not production-tested.** The 50 MB
+    limit (`MAX_UPLOAD_SIZE_BYTES`) is enforced but has not been exercised
+    with a real large file against hosted Storage under this sprint's
+    verification (only a small synthetic fixture was used) — worth a
+    dedicated load check before Controlled Beta if real guideline PDFs
+    regularly approach the limit.

@@ -1,12 +1,81 @@
 # PROJECT_STATE.md
 
-**Last updated:** Sprint 1 — Guideline Registry Schema and Lifecycle
+**Last updated:** Sprint 1.1 — Secure Guideline Source Document Intake
 session (Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code)
 
 ---
 
-## -4. This session: Sprint 1 — Guideline Registry Schema and Lifecycle
+## -5. This session: Sprint 1.1 — Secure Guideline Source Document Intake
+
+Implemented workstream `S1-B`: a trusted, tenant-safe, auditable path from
+an approved guideline version to a verified private source document and a
+durable, idempotently-created processing job (`queued` only — no claim or
+execution). Migration `0006_secure_guideline_document_intake.sql`.
+
+**Two mandatory corrections completed first, per the mission:**
+
+1. **G-12 closed** — the one gap the prior Sprint 1 report left open
+   (self-approval by a creator who *also* holds `guidelines.approve` was
+   blocked by code but never exercised by a live test, since no seeded
+   role combined both). A dedicated regression test
+   (`supabase/tests/rls/004_g12_self_approval_regression.sql`) creates a
+   synthetic role holding `guidelines.create` + `guidelines.approve` on
+   one user, has that user author and submit a version, gets a genuine
+   recommending review from a different user, then attempts self-approval
+   — denied, with confirmed-unchanged lifecycle status, no approval
+   lifecycle event, and no falsely-claiming audit event. Passed against
+   plain Postgres 16 **and** hosted Development with a real GoTrue JWT
+   (the synthetic role was cleaned up on hosted afterward).
+2. **Backlog reconciled** — the prior report undercounted what the S1-A
+   vertical slice actually delivered (application layer, UI, hosted
+   verification, not just schema). `MASTER_BACKLOG.md` restructured from
+   the original flat `S1-NN` guess into coherent workstreams: `S1-A`
+   (Guideline Registry, done), `S1-B` (this sprint's Secure Document
+   Intake, now also done), `S1-C`/`S1-D`/`S1-E` (future — processing,
+   extraction, retrieval).
+
+**Architecture (ADR 0008):** three state machines kept deliberately
+separate — clinical publication (unchanged), upload session (`created →
+authorized → completed/expired/rejected/cancelled`), and processing job
+(`queued` only this sprint). A second, load-bearing decision: unlike
+Sprint 1's guideline registry, this migration cannot keep 100% of its
+logic in SQL — Postgres cannot read Storage object bytes. File facts
+(size, PDF signature, SHA-256) are computed by the Next.js server, which
+independently re-downloads the uploaded object using the same RLS-scoped
+session that uploaded it (no service-role key anywhere in this flow), and
+passes those computed facts as *inputs* to `complete_guideline_upload()` —
+the browser is trusted for nothing beyond "which file did the user pick."
+
+**A real, two-part bug found by actually running the migration**, not by
+reading the SQL: both `create_guideline_upload_session()` and
+`complete_guideline_upload()` use `RETURNS TABLE`, which creates an
+implicit PL/pgSQL variable per output column; two of those names (`status`,
+`source_document_id`) collided with real table columns queried later in
+the same function body, producing `column reference "..." is ambiguous"`
+only when actually executed against Postgres 16 — not at migration-apply
+time. Fixed by table-qualifying both references. See
+`docs/database/secure-document-intake-schema.md`.
+
+**Verification, real not assumed:** local — web lint/typecheck/build
+clean, 63/63 `npm run test --workspace=apps/web` assertions (3 new
+suites); a real `postgres:16` Docker container had migrations 0001-0006 +
+seed + the full RLS suite (7+4+26+4+**19** = 60 assertions) run against it,
+60/60 passed. Hosted — migration applied and confirmed
+(`local==remote`), **16/16 real assertions including actual Supabase
+Storage upload/download I/O** (a synthetic `%PDF-`-signed fixture file
+really uploaded, really re-downloaded, really hashed) plus the hosted G-12
+run, all synthetic data and both Storage objects cleaned up and confirmed
+deleted. Vercel Preview redeployed, healthy, Deployment Protection
+unchanged and correctly enforced. Full record:
+`docs/verification/sprint-1.1-document-intake-verification.md`.
+
+**Sprint 1.1 (Secure Guideline Source Document Intake): Complete and
+Hosted-Verified.**
+
+---
+
+## -4. Prior session: Sprint 1 — Guideline Registry Schema and Lifecycle
 
 Implemented the first Sprint 1 vertical slice: an organization-scoped
 controlled registry for clinical guidelines (Clinical Domain → Guideline
@@ -193,20 +262,28 @@ across every affected table.
 
 ## 0. Current phase
 
-**Sprint 1 — Guideline Registry Schema and Lifecycle.**
-Sprint 0.5 (hosted infrastructure & design system) is **Complete and
-Hosted-Verified** — see §-3/§1 for that history; it is not reopened here.
+**Sprint 1 — workstream S1-B, Secure Guideline Source Document Intake,
+just closed.** Sprint 0.5 (hosted infrastructure & design system) is
+**Complete and Hosted-Verified** — see §-3/§1 for that history; it is not
+reopened here. See `MASTER_BACKLOG.md` for the reconciled Sprint 1
+workstream breakdown (S1-A through S1-E) — Sprint 1 is no longer tracked
+as a single flat task list.
 
-**Sprint 1's first vertical slice — Guideline Registry Schema and
-Lifecycle — status: Complete and Hosted-Verified.** Schema, lifecycle
-engine, RLS, permissions, application layer, and minimal UI are
-implemented and verified against three independent environments: plain
-Postgres 16 (41/41 real assertions), the real hosted "Noor Development"
-Supabase project with real GoTrue JWTs (18/18 real assertions), and the
-Vercel Preview deployment (redeployed, healthy, Deployment Protection
-intact). Web lint/typecheck/build/test (34/34) all clean. Full record:
-§-4 above and
-`docs/verification/sprint-1-guideline-registry-verification.md`.
+**S1-A (Guideline Registry Schema and Lifecycle) — Complete and
+Hosted-Verified** (prior session): schema, lifecycle engine, RLS,
+permissions, application layer, minimal UI — 41/41 Postgres 16 assertions,
+18/18 hosted real-JWT assertions.
+
+**S1-B (Secure Guideline Source Document Intake) — Complete and
+Hosted-Verified** (this session): upload sessions, server-verified object
+intake (size/PDF-signature/SHA-256), duplicate detection, idempotent
+registration and job creation — 60/60 Postgres 16 assertions (cumulative,
+all suites), 16/16 hosted assertions including real Supabase Storage
+upload/download I/O. **G-12 also closed** this session, on both
+environments. Web lint/typecheck/build/test (63/63) all clean. Vercel
+Preview redeployed, healthy, Deployment Protection intact. Full record:
+§-5 above and
+`docs/verification/sprint-1.1-document-intake-verification.md`.
 
 ---
 
@@ -385,41 +462,45 @@ owner, not something applied unilaterally here.
 | G-07: Auth covers session/permission layer, not full account lifecycle | No signup, no admin member-management screen | None — incremental | Low | Frontend/Backend | Sprint 1 |
 | G-09: No Playwright/browser E2E | Login/reset form submission unverified end-to-end via a real browser (the HTTP smoke test proves route protection and page delivery, not form interaction) | None — can start anytime | Low | Frontend/QA | **Pre-Controlled-Beta requirement, not a Sprint 1 blocker** |
 | G-10: No custom SMTP on hosted Development project | Default GoTrue email-send rate limit is low; can affect real password-reset email volume | Configure custom SMTP in Supabase dashboard | Low | DevOps | Before Controlled Beta, not blocking Sprint 1 |
-| G-11: No document-processing pipeline | Guideline versions carry no file reference; nothing to review/approve beyond registry metadata yet | None — the registry (this sprint) is the prerequisite | Medium | Backend/AI-RAG | Sprint 1 — "Secure Guideline Upload and Processing Job Foundation" (see §6) |
-| G-12: Self-approval-by-a-permission-holding-creator not exercised by a live test | The block is real (explicit code check + verified via a *different* path — non-approver denial), but no seeded test fixture combines "authored this version" with "holds guidelines.approve" to hit that exact branch live | None — would need a dedicated fixture | Low | QA | Add when convenient; not blocking |
+| G-13: No processing-worker claim/retry implementation | `document_processing_jobs` rows exist and reach `queued`, but nothing claims, processes, or requeues them yet | S1-B (done) | Medium | Backend/AI-RAG | Sprint 1.2 (S1-C, see §6) |
 
-**Closed this session:** none of the pre-existing gaps close outright, but
-the Guideline Registry Schema and Lifecycle vertical slice itself
-(the Sprint 1 task this session executed) is Complete and Hosted-Verified
-— see §-4.
+**Closed this session:** G-11 (no document-processing... pipeline — the
+*intake* half is now real: source documents, upload sessions, verification,
+and queued jobs all exist and are hosted-verified; the *processing* half
+remains G-13, tracked separately now that intake and processing are
+properly split per ADR 0008) and **G-12** (self-approval regression — see
+§-5 for the full evidence). The Secure Guideline Source Document Intake
+workstream (S1-B) itself is Complete and Hosted-Verified.
 
 **Closed prior sessions:** G-01 (hosted Supabase), G-08 (Vercel Protection
 Bypass), G-02/G-05/G-06 (Sprint 0 items) — see git history for the
 session-by-session record; not repeated here.
 
-None of the remaining gaps (G-03, G-04, G-07, G-09, G-10, G-11, G-12) block
-this task's closure — each is either a product/clinical decision, later
-Sprint 1 work explicitly out of this task's scope (PDF ingestion, AI
+None of the remaining gaps (G-03, G-04, G-07, G-09, G-10, G-13) block this
+task's closure — each is either a product/clinical decision, later Sprint
+1 work explicitly out of this task's scope (processing/parsing, AI
 provider selection), or a documented pre-Controlled-Beta requirement.
 
 ---
 
 ## 6. Recommended next task
 
-The Guideline Registry Schema and Lifecycle vertical slice is closed.
-Schema, lifecycle engine, RLS, permissions, application layer, and minimal
-UI are implemented and verified against plain Postgres, the real hosted
-Development project (real JWTs), and Vercel Preview.
+Workstream S1-B (Secure Guideline Source Document Intake) is closed.
+Schema, upload sessions, server-side object verification, duplicate
+detection, idempotent registration and job creation, application layer,
+and minimal UI are implemented and verified against plain Postgres, the
+real hosted Development project (real JWTs, real Storage I/O), and Vercel
+Preview. G-12 is closed on both environments.
 
 ```text
-Begin Sprint 1 — Secure Guideline Upload and Processing Job Foundation
+Begin Sprint 1.2 — Processing Worker Claim, Retry, and Extraction Foundation
 ```
 
-This is the document-processing lifecycle ADR 0007 deliberately kept
-separate from the clinical publication lifecycle just implemented — PDF
-upload, private-storage wiring, and a `document_processing_jobs` queue
-contract, still not PDF parsing/chunking/embeddings itself (later tasks).
-G-03 (clinical domain confirmation) should ideally be resolved before or
-alongside that task, since it determines what real content gets uploaded
-first. Playwright browser-driven E2E (G-09) stays a documented
+This is workstream S1-C (`MASTER_BACKLOG.md`): the Worker claims a
+`queued` job, heartbeat/lease semantics, retry with attempt limits, and
+`dead_lettered` handling — publishing to Supabase Queues using the
+existing `apps/worker/app/main.py::JobMessage` contract. Still not PDF
+parsing/chunking/embeddings itself (S1-D). G-03 (clinical domain
+confirmation) should ideally be resolved before or alongside real content
+work. Playwright browser-driven E2E (G-09) stays a documented
 pre-Controlled-Beta requirement, not a blocker.

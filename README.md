@@ -6,32 +6,48 @@ retrieves and cites only approved, versioned guideline text, and refuses to
 answer when evidence is insufficient. Noor is not an autonomous diagnostician
 — the clinician always retains final clinical authority.
 
-This repository is at **Sprint 1 — Guideline Registry Schema and
-Lifecycle** (**Complete and Hosted-Verified**). Sprint 0.5's hosted
-infrastructure foundation (identity/tenancy/RLS, real Supabase Auth, the
-Noor Design System, the worker scaffold, the shared clinical schema
-contract) is unchanged and remains verified — against plain Postgres, a
-real local Supabase stack, a real hosted Supabase Development project, and
-a protected Vercel Preview deployment (see
-`docs/verification/sprint-0.5-hosted-verification.md`).
+This repository is at **Sprint 1, workstream S1-B — Secure Guideline
+Source Document Intake** (**Complete and Hosted-Verified**). Sprint 0.5's
+hosted infrastructure foundation (identity/tenancy/RLS, real Supabase
+Auth, the Noor Design System, the worker scaffold, the shared clinical
+schema contract) is unchanged and remains verified — against plain
+Postgres, a real local Supabase stack, a real hosted Supabase Development
+project, and a protected Vercel Preview deployment (see
+`docs/verification/sprint-0.5-hosted-verification.md`). See
+`MASTER_BACKLOG.md` for how Sprint 1 is now organized into workstreams
+(S1-A through S1-E) rather than a flat task list.
 
-This sprint adds the **controlled guideline registry**: clinical domains,
-guideline authorities, guidelines, and guideline versions moving through a
+**S1-A — the controlled guideline registry:** clinical domains, guideline
+authorities, guidelines, and guideline versions moving through a
 database-enforced clinical publication lifecycle (draft →
 ready_for_review → approved → active → superseded → withdrawn), with
-review/approval separation, self-review/self-approval blocking,
-transactional supersession, released-version immutability, and full audit
-logging — implemented and verified against plain Postgres (41/41 real
-assertions), the real hosted Development project with real GoTrue JWTs
-(18/18), and the redeployed Vercel Preview. See
+review/approval separation, self-review/self-approval blocking (**G-12
+closed** — this exact scenario is now live-tested against plain Postgres
+and hosted, with a real GoTrue JWT), transactional supersession,
+released-version immutability, and full audit logging. See
 `docs/verification/sprint-1-guideline-registry-verification.md` and
-`docs/domain/guideline-lifecycle.md`. Document upload/parsing/embeddings/
-retrieval/generation do not exist yet — see
-`docs/architecture/adr/0007-separate-clinical-and-processing-lifecycles.md`
-and `KNOWN_LIMITATIONS.md`. The repository is pushed to GitHub with CI
-passing on real GitHub Actions runs. See `PROJECT_STATE.md` for the
-authoritative current status and open gaps (Playwright browser-driven E2E
-remains a pre-Controlled-Beta requirement, not a blocker).
+`docs/domain/guideline-lifecycle.md`.
+
+**S1-B — secure source-document intake:** upload sessions authorizing a
+direct, private, tenant-scoped upload to Supabase Storage; server-side
+object verification (existence, size, PDF signature, SHA-256 — computed
+by the Next.js server after independently re-downloading the object,
+never trusted from the browser); duplicate detection; idempotent
+registration and `queued` processing-job creation. Verified against plain
+Postgres (60/60 cumulative real assertions) and hosted Development
+**including an actual Supabase Storage upload/download round trip**
+(16/16 real assertions), not simulated. See
+`docs/verification/sprint-1.1-document-intake-verification.md`,
+`docs/domain/document-intake-lifecycle.md`, and ADR 0008. Document
+*processing* (claiming a queued job, parsing, chunking, embeddings,
+retrieval, generation) do not exist yet — see
+`docs/architecture/adr/0007-separate-clinical-and-processing-lifecycles.md`,
+ADR 0008, and `KNOWN_LIMITATIONS.md`.
+
+The repository is pushed to GitHub with CI passing on real GitHub Actions
+runs. See `PROJECT_STATE.md` for the authoritative current status and open
+gaps (Playwright browser-driven E2E remains a pre-Controlled-Beta
+requirement, not a blocker).
 
 ## Architecture
 
@@ -166,12 +182,12 @@ false-passing.
 * `clinical/intended-use/INTENDED_USE.md`
 * `clinical/risk-management/RISK_REGISTER.md`
 * `docs/architecture/DECISIONS.md`
-* `docs/domain/{guideline-registry,guideline-lifecycle}.md`
-* `docs/database/guideline-registry-schema.md`
-* `docs/security/guideline-registry-authorization.md`
+* `docs/domain/{guideline-registry,guideline-lifecycle,guideline-source-documents,document-intake-lifecycle}.md`
+* `docs/database/{guideline-registry-schema,secure-document-intake-schema}.md`
+* `docs/security/{guideline-registry-authorization,document-intake-authorization}.md`
+* `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci,environment-variables,worker-deployment,guideline-document-upload}.md`
 * `docs/design-system/NOOR_DESIGN_SYSTEM.md`
-* `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci,environment-variables,worker-deployment}.md`
-* `docs/verification/{sprint-0.5-hosted-verification,sprint-1-guideline-registry-verification}.md`
+* `docs/verification/{sprint-0.5-hosted-verification,sprint-1-guideline-registry-verification,sprint-1.1-document-intake-verification}.md`
 * `SECURITY.md`
 * `KNOWN_LIMITATIONS.md`
 

@@ -1,5 +1,103 @@
 # Changelog
 
+## [Unreleased] — Sprint 1.1: Secure Guideline Source Document Intake
+
+### Added
+
+* `supabase/migrations/0006_secure_guideline_document_intake.sql` — 5 new
+  tables (`guideline_source_documents`, `document_upload_sessions`,
+  `document_processing_jobs`, `document_processing_attempts`,
+  `document_intake_events`), 8 permissions, 5 SECURITY DEFINER functions.
+  Server-generated tenant-scoped Storage paths, signed direct upload
+  authorization, post-upload object verification (existence, size, PDF
+  signature, SHA-256 — computed server-side, never trusted from the
+  browser), duplicate detection (same-version rejected, same-org
+  other-version allowed and recorded, cross-org non-leaking), idempotent
+  upload-session/completion/job-creation, released-version source
+  immutability, and a manual quarantine override that cascades to cancel
+  any active processing job.
+* `docs/architecture/adr/0008-secure-document-intake-and-processing-boundary.md`
+  — three separate state machines (clinical publication, upload session,
+  processing job), and why file-identity facts are computed by the
+  Next.js server (which cannot avoid it — Postgres cannot read Storage
+  object bytes) rather than by SQL.
+* `supabase/tests/rls/005_document_intake.sql` — 19 real assertions:
+  eligibility, one-primary-per-version, cross-tenant denial, idempotent
+  session/completion/job creation, duplicate detection (both allowed and
+  rejected paths), RLS read restriction (clinicians see nothing),
+  suspended/removed denial, verified-document immutability, quarantine
+  cascade, retry-after-rejection, cancel-session, unauthorized
+  job-cancellation denial, append-only intake events, audit trail.
+* `supabase/tests/rls/004_g12_self_approval_regression.sql` — closes G-12
+  (see "Fixed" below).
+* `apps/web/lib/documents/{config,schemas,errors,queries,actions,ui}.ts` —
+  canonical upload-size constant (kept in sync with the SQL-side guard via
+  a dedicated test), Zod validation, safe error mapping, RLS-trusting
+  reads, and the real upload orchestration: create session (RPC + signed
+  Storage authorization) → direct browser-to-Storage PUT → complete
+  (server re-downloads the object, computes size/signature/checksum,
+  calls the RPC that atomically records the decision and queues a job).
+  No service-role key or arbitrary Storage path/bucket ever reaches the
+  browser.
+* Minimal UI: an interactive upload panel
+  (`apps/web/app/knowledge/guidelines/[guidelineId]/UploadPanel.tsx`,
+  "use client") and a Source Documents section on the guideline detail
+  page showing status, size, checksum fingerprint, and processing-job
+  status, with permission-aware quarantine/cancel-job actions.
+* `apps/web/tests/{documents-schemas,documents-errors,documents-config}.test.ts`
+  — 22 new assertions. `tests/permissions.test.ts` extended with an
+  8-permission document-intake role-mapping check.
+* `docs/domain/{guideline-source-documents,document-intake-lifecycle}.md`,
+  `docs/database/secure-document-intake-schema.md`,
+  `docs/security/document-intake-authorization.md`,
+  `docs/operations/guideline-document-upload.md`,
+  `docs/verification/sprint-1.1-document-intake-verification.md`.
+
+### Fixed
+
+* **G-12 closed**: a guideline-version creator who also holds
+  `guidelines.approve` still cannot approve their own version — the one
+  gap the prior Sprint 1 report left open (blocked by real code, but never
+  exercised end-to-end since no seeded role combined both). A dedicated
+  regression test (a synthetic role holding `guidelines.create` +
+  `guidelines.approve` on one user) passes against plain Postgres 16
+  **and** hosted Development with a real GoTrue JWT.
+* A real, two-part bug found by actually running migration 0006, not by
+  reading it: `create_guideline_upload_session()` and
+  `complete_guideline_upload()` both use `RETURNS TABLE`, whose output
+  column names (`status`, `source_document_id`) silently shadowed real
+  table columns referenced later in the same function bodies, producing
+  `column reference "..." is ambiguous` only when actually executed.
+  Fixed by table-qualifying both references.
+
+### Backlog reconciliation
+
+* `MASTER_BACKLOG.md`'s Sprint 1 section restructured from the original
+  flat `S1-NN` guess into coherent workstreams (`S1-A` Guideline Registry
+  — done, `S1-B` Secure Document Intake — now also done, `S1-C`/`S1-D`/
+  `S1-E` — future) — the prior report undercounted what the S1-A vertical
+  slice had actually delivered (application layer, UI, hosted
+  verification), not just the schema migration.
+
+### Verified this session (not assumed)
+
+* Web: lint/typecheck/build clean; 63/63 test assertions.
+* Database: 60/60 real assertions (cumulative across all 5 RLS/regression
+  suites) against a real, freshly created `postgres:16` Docker container.
+* Hosted "Noor Development": migration 0006 applied
+  (`supabase db push --linked`, confirmed `local==remote`); **16/16 real
+  assertions including actual Supabase Storage upload/download I/O** — a
+  synthetic `%PDF-`-signed fixture file was really uploaded via an
+  RLS-authorized (non-service-role) request, really re-downloaded, really
+  hashed; plus the hosted G-12 run. All synthetic data (2 orgs, 6 users,
+  the temporary G-12 test role, both uploaded Storage objects) deleted and
+  confirmed via a zero-count query.
+* Vercel Preview redeployed with the new code (`target: preview`,
+  `status: Ready`), stable alias re-pointed, Deployment Protection
+  re-confirmed enabled and correctly enforced (unchanged from Sprint 1).
+* Other workspaces unaffected: `clinical-schemas` (6/6), `ui` (typecheck),
+  `worker` (9/9 + compileall) all re-verified clean.
+
 ## [Unreleased] — Sprint 1: Guideline Registry Schema and Lifecycle
 
 ### Added
