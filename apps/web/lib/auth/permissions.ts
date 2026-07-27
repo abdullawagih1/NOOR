@@ -35,6 +35,21 @@ export const PERMISSIONS = {
   GUIDELINE_EXTRACTIONS_READ_ARTIFACTS: "guideline_extractions.read_artifacts",
   GUIDELINE_EXTRACTIONS_INVALIDATE: "guideline_extractions.invalidate",
   GUIDELINE_EXTRACTIONS_RETRY: "guideline_extractions.retry",
+
+  // Extraction review and technical quality gate (Sprint 1-D1) — see
+  // docs/domain/extraction-review-lifecycle.md. Deliberately a separate
+  // namespace from guideline_extractions.* above (execution/read-only) —
+  // this permission model enforces the review/execution architecture
+  // boundary from the outside too, not just inside the schema (ADR 0011).
+  GUIDELINE_EXTRACTION_REVIEWS_READ: "guideline_extraction_reviews.read",
+  GUIDELINE_EXTRACTION_REVIEWS_CREATE: "guideline_extraction_reviews.create",
+  GUIDELINE_EXTRACTION_REVIEWS_ASSIGN: "guideline_extraction_reviews.assign",
+  GUIDELINE_EXTRACTION_REVIEWS_REVIEW: "guideline_extraction_reviews.review",
+  GUIDELINE_EXTRACTION_REVIEWS_SUBMIT: "guideline_extraction_reviews.submit",
+  GUIDELINE_EXTRACTION_REVIEWS_REOPEN: "guideline_extraction_reviews.reopen",
+  GUIDELINE_EXTRACTION_FINDINGS_CREATE: "guideline_extraction_findings.create",
+  GUIDELINE_EXTRACTION_FINDINGS_RESOLVE: "guideline_extraction_findings.resolve",
+  GUIDELINE_EXTRACTION_SOURCE_READ: "guideline_extraction_source.read",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
