@@ -1,4 +1,4 @@
-# Known Limitations — Sprint 1.2B
+# Known Limitations — Sprint 1-D1
 
 Honest accounting of what this build does and does not verify. Update in
 the same PR that resolves an item.
@@ -371,3 +371,62 @@ the same PR that resolves an item.
     evidence quality, recommendation validity, or medical completeness
     (mission §2.4). No extraction result implies or grants any clinical
     status.
+
+49. **Extraction review is a technical quality gate, not a clinical
+    review.** Sprint 1-D1's review decisions (accepted, accepted with
+    warnings, OCR required, reprocessing required, rejected) judge
+    whether extracted *text* is technically usable — reading order,
+    encoding, completeness. They say nothing about clinical accuracy,
+    guideline approval, or evidence quality, and are entirely separate
+    from `guideline_reviews`' clinical review workflow.
+
+50. **Self-review blocking has no "unless no other reviewer exists"
+    exception.** `start_document_extraction_review()` unconditionally
+    blocks a reviewer from reviewing a document they personally uploaded
+    or registered — even in a small organization with only one eligible
+    reviewer, where this could stall a review indefinitely until an
+    admin manually reassigns it. A live "does another eligible reviewer
+    exist" check was deliberately not implemented in V1 (see ADR 0011
+    §3.6) to avoid adding untested runtime complexity for an edge case.
+
+51. **`storage.objects` RLS remains organization-scoped, not
+    permission-scoped** (a pre-existing Sprint 1.1 characteristic, not
+    introduced by this sprint). Noor's own UI and server actions gate
+    signed source-PDF access behind `guideline_extraction_source.read`,
+    but a user who already holds *any* active membership in the
+    organization could, by constructing the exact Storage object path
+    and calling Supabase's Storage API directly (bypassing Noor's UI
+    entirely), still obtain their own signed URL. See
+    `docs/security/extraction-review-authorization.md`.
+
+52. **Reopening a review discards prior findings rather than copying them
+    forward.** A reopened round starts with zero findings and zero pages
+    marked reviewed — a deliberate simplicity choice (ADR 0011), but it
+    means a reviewer re-establishes every finding from scratch even if
+    most of the prior round's findings were still valid.
+
+53. **The review workspace's PDF panel uses browser-native rendering**
+    (an `<iframe>` with the `#page=N` URL fragment), not a bundled PDF.js
+    viewer. Page-jump support via `#page=N` varies by browser; some
+    browsers ignore it and always open at page 1. No dependency review
+    or license audit was needed since nothing was added, but the
+    trade-off is real and untested across the full browser matrix.
+
+54. **The side-by-side review layout is a single responsive CSS grid**
+    (stacks vertically below the `lg` breakpoint), not the mission's
+    suggested tabbed mobile interface. This avoids adding client-side
+    tab-state JavaScript for a first version; a real mobile usability
+    pass for large multi-page documents has not been done.
+
+55. **"100% of pages reviewed" is enforced uniformly across all five
+    terminal decisions, including `rejected`.** A reviewer who
+    identifies the wrong document on page 1 must still mark every
+    remaining page reviewed (even trivially) before submitting a
+    rejection — see ADR 0011's "Consequences" section for the reasoning.
+    No sampling or partial-coverage policy exists yet for very large
+    documents.
+
+56. **No formal double-review or quorum requirement.** A single
+    reviewer's decision is final (subject to reopening/invalidation by
+    an admin or quality manager) — there is no built-in "two independent
+    reviewers must agree" workflow.

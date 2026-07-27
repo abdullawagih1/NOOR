@@ -22,6 +22,7 @@ executable breakdown requested in the Sprint 0 mission (§18.E).
 | E-31 *(new)* | Noor Design System foundation | **Implemented and verified** — `packages/ui`: tokens, 32 components, `/design-system` showcase, ADR 0005, accessibility contrast audit. See `docs/design-system/` |
 | E-32 *(new)* | Durable processing orchestration (claim/lease/retry/dead-letter) | **Implemented and verified** — see S1-C1 below |
 | E-33 *(new)* | Deterministic extraction artifacts and provenance (checksums, canonical JSON, idempotent identity) | **Implemented and verified** — see S1-C2 below |
+| E-34 *(new)* | Extraction review and technical quality gate (review lifecycle, findings, downstream eligibility) | **Implemented and verified** — see S1-D1 below |
 | E-04, E-05, E-08, E-10–E-14, E-16–E-20, E-22, E-24–E-26, E-28–E-30 | All other epics | **Not started** |
 
 ## Sprint 1 workstreams
@@ -72,17 +73,31 @@ more complete design once actually implemented (`S1-B`).
 - **Verification:** Postgres 16 assertions across the full cumulative suite (001–008, all green, 117/117) including a new 19-assertion extraction schema/lifecycle suite (`supabase/tests/rls/008_pdf_extraction.sql`) and a permanent security-hardening regression (`007_security_hardening_review.sql`); two genuine dual-OS-process concurrency proofs (`verify_concurrent_claim.sh`, unchanged, and the new `verify_concurrent_extraction_identity.sh` — 5 consecutive runs, all 4 possible race outcomes observed, zero unexpected errors); 91 Worker pytest assertions (59 pre-existing + 32 new: fixture behavior against 11 synthetic PDFs, determinism, source-integrity revalidation, end-to-end processor orchestration). **Hosted Development**: migration applied, the corrected 007+008 suite green against real Postgres 17, and a real end-to-end flow — real GoTrue JWT, real RLS-authorized Storage upload, the actual unmodified Worker code claiming/extracting/uploading/finalizing a real PDF (5/5 pages), independent artifact re-download/re-hash, idempotent reprocessing, trust boundary and RLS confirmed for both an org_admin and a clinician JWT — all synthetic data cleaned up and confirmed zero-residual. Vercel Preview redeployed and healthy. Full record: `docs/verification/sprint-1.2b-pdf-extraction-verification.md`.
 - **Real bugs found and fixed by actually running the concurrency tests** (not by reading the SQL): (1) `finalize_document_extraction_run()` raised a raw `unique_violation` when two genuinely simultaneous extraction attempts at the same identity both tried to mark themselves `succeeded` — fixed with an exception handler that gracefully adopts the winning run instead. (2) A second, related race then surfaced immediately: a job superseded mid-flight (after its own `create` call committed but before it reached `finalize`) raised a raw "not running" error instead of a classifiable one — fixed by explicitly detecting the supersession case and either adopting an already-succeeded winner or raising a clear, named, retryable error. See `docs/database/deterministic-pdf-extraction-schema.md`.
 
-### S1-D — Extraction Review (structure-aware chunking, reviewer extraction queue) — Next
-- **Description:** Structure-aware chunking of S1-C2's extracted text, and a real Reviewer extraction-review queue (approve/reject `document_chunks`). An OCR decision (whether/how to handle `suspected_scanned`/`no_text_layer` pages) is also in this workstream's scope. Absorbs the remainder of the old `S1-04`/`S1-05`/`S1-06`.
-- **Team:** AI/RAG + Frontend + Backend
-- **Dependencies:** S1-C2 (done — deterministic page-level text and artifacts now exist to chunk/review)
+### S1-D1 — Extraction Review and Technical Quality Gate — **DONE**
+- **Description:** A real Reviewer extraction-review queue and side-by-side (original PDF vs. extracted text) review workspace. Page-level and document-level technical findings, a controlled 8-status review lifecycle (`pending_review`/`in_review`/`accepted`/`accepted_with_warnings`/`ocr_required`/`reprocessing_required`/`rejected`/`invalidated`) fully separate from S1-C2's execution status, and server-derived downstream eligibility (`eligible_for_ocr`/`eligible_for_chunking`/`eligible_for_retrieval`). Deliberately does not implement OCR execution, chunking, or any mutation of the deterministic extraction artifact — see ADR 0011.
+- **Team:** Clinical Safety + Database + Security + Backend + Frontend
+- **Dependencies:** S1-C2 (done — deterministic page-level text and artifacts now exist to review)
+- **Status:** Closed this session. Complete and Hosted-Verified. Migration `0009_extraction_review_quality_gate.sql`.
+- **Verification:** Postgres 16 assertions across the full cumulative suite (001–009) including a new 39-assertion review lifecycle/eligibility/RLS suite (`supabase/tests/rls/009_extraction_review.sql`), verified against multiple genuinely fresh `postgres:16` containers (the exact discipline Sprint 1.2B's CI-only bug taught); Web build/lint/typecheck/test all clean, including new review-queue and side-by-side review workspace routes. **Hosted Development**: migration applied, the full 007+008+009 suite (63 assertions) green against real Postgres 17, and a real end-to-end flow — the actual unmodified Worker code producing a real succeeded extraction, then real GoTrue JWTs (clinical_reviewer, quality_manager, clinician) exercising the full review lifecycle through real PostgREST RPC calls, real signed-Storage-access verification, all synthetic data cleaned up and confirmed zero-residual. A real bug (an append-only trigger with no maintenance-override escape hatch, found only while cleaning up test data) was fixed the same session. Vercel Preview redeployed and healthy. Full record: `docs/verification/sprint-1-d1-extraction-review-verification.md`.
+
+### S1-D2 — Controlled OCR Pipeline — Next
+- **Description:** OCR-provider selection and a controlled OCR execution pipeline for extraction runs/pages an S1-D1 review marked `ocr_required`. Produces its own separately-provenanced OCR text artifact — never a mutation of S1-C2's deterministic extraction or S1-D1's review records.
+- **Team:** AI/RAG + Backend
+- **Dependencies:** S1-D1 (done — `eligible_for_ocr` is now a real, server-derived signal)
 - **Priority:** P0
-- **Risk:** Medium — malformed/malicious PDFs must fail safely, not crash (Red-Team Agent test required before this is called done)
+- **Risk:** Medium — OCR provider selection carries the same "don't pick blindly" scrutiny as S1-C2's extractor choice; malformed/malicious inputs must fail safely, not crash
+
+### S1-D3 — Deterministic Page-Aware Chunking — Future
+- **Description:** Structure-aware chunking of accepted (or accepted-with-warnings) extracted text into `document_chunks`, gated on `eligible_for_chunking` from S1-D1.
+- **Team:** AI/RAG + Backend
+- **Dependencies:** S1-D1 (done); S1-D2 for OCR-sourced pages
+- **Priority:** P0
+- **Risk:** Medium — chunk boundaries must preserve clinical meaning (table/list/section integrity)
 
 ### S1-E — Retrieval Preparation (embeddings, pgvector, AI provider) — Future
 - **Description:** AI provider spike/selection (embedding/reranker/LLM, data-residency constraints in scope) and adapter interfaces, pgvector indexing, hybrid retrieval foundation. Absorbs the old `S1-07`.
 - **Team:** AI/RAG + DevOps
-- **Dependencies:** None to start the provider spike; S1-D for real embeddings content
+- **Dependencies:** None to start the provider spike; S1-D3 for real embeddings content
 - **Risk:** Medium — blocking for all downstream generation work
 
 ---

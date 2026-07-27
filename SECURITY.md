@@ -105,6 +105,25 @@ exists.
   error when a job's run was superseded mid-flight — both now resolved
   gracefully, never a raw database error surfaced to the Worker. See
   `docs/security/pdf-extraction-security.md`.
+* **Extraction review and technical quality gate (Sprint 1-D1): a
+  separate permission namespace enforces the review/execution boundary
+  from outside the schema too.** `guideline_extraction_reviews.*` /
+  `guideline_extraction_findings.*` / `guideline_extraction_source.*` are
+  deliberately not part of migration 0008's `guideline_extractions.*`
+  namespace. Clinicians hold none of them, verified with both a
+  simulated role-switch and a real hosted GoTrue JWT. Self-review is
+  blocked at the database level (a reviewer cannot start a review of a
+  document they personally uploaded or registered). Signed source-PDF
+  access is minted server-side, per-request, short-lived (5 minutes),
+  and never persisted or logged — the session's own client is used, no
+  service-role key anywhere in that path. Submitted review decisions are
+  immutable (one legal exception: an accepted decision may later be
+  administratively invalidated); findings' core content is immutable
+  from creation and can never be deleted. `009_extraction_review.sql`'s
+  own explicit `grant select`/`grant execute` block was written at the
+  top of the file from the start, applying Sprint 1.2B's real CI-only
+  grant-timing lesson proactively rather than rediscovering it. See
+  `docs/security/extraction-review-authorization.md`.
 * **G-12 closed this session:** a guideline-version creator who also holds
   `guidelines.approve` still cannot approve their own version — the one
   self-approval scenario the Sprint 1 guideline-registry test suite could
@@ -209,6 +228,15 @@ exists.
   pipeline), carries its own disclosed advisory. `apps/web` doesn't use
   `next/image` anywhere, so this is currently inert — re-check before ever
   adopting it.
+* `storage.objects` RLS (migration 0003) remains organization-scoped, not
+  permission-scoped — a pre-existing Sprint 1.1 characteristic that
+  Sprint 1-D1's signed source-PDF access inherits rather than fixes. Any
+  active member of an organization who constructs the exact Storage
+  object path could, in principle, call Supabase's Storage API directly
+  and obtain their own signed URL, bypassing the
+  `guideline_extraction_source.read` permission gate that Noor's own UI
+  and server actions enforce. See
+  `docs/security/extraction-review-authorization.md`.
 * No malware/antivirus scanning on uploaded PDFs — Sprint 1.1's intake
   flow validates the `%PDF-` file signature (confirms file *type*, not
   safety) and computes SHA-256, but no scanning provider is integrated

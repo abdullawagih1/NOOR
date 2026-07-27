@@ -1,122 +1,109 @@
-# Sprint Current: Sprint 1.2B — Deterministic PDF Page and Text Extraction
+# Sprint Current: Sprint 1-D1 — Extraction Review and Technical Quality Gate
 
 **Status:** Complete and Hosted-Verified. Local verification (Postgres 16
-full suite, two genuine dual-process concurrency proofs, 91/91 Worker
-pytest assertions, full web build/lint/test) and hosted Development
-verification (real GoTrue JWT, real Storage, the actual unmodified Worker
-code processing a real PDF end-to-end, idempotent reprocessing, trust
-boundary, RLS, full synthetic-data cleanup) both green, and Vercel
-Preview redeployed and healthy — see
-`docs/verification/sprint-1.2b-pdf-extraction-verification.md` for the
-full record.
+full suite across multiple genuinely fresh containers, full web
+build/lint/typecheck/test) and hosted Development verification (real
+GoTrue JWTs, the actual unmodified Worker code producing the underlying
+extraction, real PostgREST RPC calls exercising the full review
+lifecycle, real signed-Storage-access verification, full synthetic-data
+cleanup) both green, and Vercel Preview redeployed and healthy — see
+`docs/verification/sprint-1-d1-extraction-review-verification.md` for
+the full record.
 
-Workstreams `S1-A`/`S1-B`/`S1-C1` closed in prior sessions. This sprint is
-workstream `S1-C2` — see `MASTER_BACKLOG.md` for the reconciled
-`S1-A`/`S1-B`/`S1-C1`/`S1-C2`/`S1-D`/`S1-E` breakdown.
+Workstreams `S1-A`/`S1-B`/`S1-C1`/`S1-C2` closed in prior sessions. This
+sprint is workstream `S1-D1` — see `MASTER_BACKLOG.md` for the reconciled
+`S1-A`/`S1-B`/`S1-C1`/`S1-C2`/`S1-D1`/`S1-D2`/`S1-D3`/`S1-E` breakdown.
 
-## Mandatory first review completed
+## Governing principle
 
-- [x] **Security-definer schema-resolution hardening (mission §5)** —
-      verified `PUBLIC`/`authenticated`/`anon` cannot `CREATE` in `public`
-      (and, where it exists, `extensions`) on both environments; confirmed
-      every migration-0007 orchestration function's `search_path` is
-      exactly `public` or `public, extensions`, never broader; confirmed
-      (again) the six Worker-only functions carry no
-      `authenticated`/`anon` EXECUTE grant. Turned into a **permanent**
-      regression suite (`supabase/tests/rls/007_security_hardening_review.sql`)
-      rather than a one-off check, so the exact hosted-only bug found in
-      Sprint 1.2A can never silently regress unnoticed.
+"Extraction execution succeeded" and "extraction quality is accepted" are
+two independent facts. This sprint adds the second: a human, auditable,
+page-aware technical quality decision that gates future OCR and chunking
+eligibility, without ever mutating the deterministic extraction artifact
+itself.
 
 ## Objectives
 
-- [x] Extractor selection documented — ADR 0010: `pypdf` (BSD-3-Clause)
-      over the mission's suggested `PyMuPDF` (AGPL-3.0 since v1.24.1 — a
-      real licensing risk for a commercial SaaS, not a capability gap)
-- [x] Source integrity revalidated twice, independently — Worker-side
-      streaming checksum/size/signature check, and again by
-      `create_document_extraction_run()` against the registered document
-      row — before any extraction begins; a mismatch produces zero
-      artifact
-- [x] Secure, unpredictable temp-file handling with guaranteed cleanup
-      (`finally`-equivalent, verified even on early-abort paths)
-- [x] Deterministic page-level extraction, text normalization, page and
-      artifact checksums, technical quality metrics, conservative
-      suspected-scanned detection (image-XObject-based, never OCR)
-- [x] Canonical, deterministic JSON artifact — proven byte-identical
-      across repeated runs of the same fixture; no timestamps in hashed
-      content
-- [x] Artifact uploaded privately, independently re-downloaded and
-      re-hashed before being trusted as the finalized result
-- [x] Atomic finalization with idempotent identity-based reuse — one
-      succeeded run per `(org, source_sha256, pipeline_version,
-      configuration_version, extractor_name, extractor_version)`
-- [x] Extraction integrated into the existing, unchanged Sprint 1.2A
-      `WorkerLoop` — `WORKER_PROCESSING_MODE=extraction`, reusing
-      `document_parsing` as the job_type (not a new
-      `document_extraction` value — see
-      `docs/domain/document-extraction-lifecycle.md`)
-- [x] Minimal UI: Extraction Summary Card, permission-gated page list,
-      read-only page-detail route — no editing, no fabricated progress
-- [x] Local Postgres 16 verification — full 001–008 suite green,
-      including the pre-existing 001–007 suites unmodified on top of
-      migration 0008
-- [x] Two genuine dual-OS-process concurrency proofs — the unchanged
-      1.2A claim-race proof, and a new extraction-identity race proof (5
-      consecutive runs, all 4 possible race outcomes observed, zero
-      unexpected errors)
-- [x] Worker verification — 91/91 pytest assertions (59 pre-existing +
-      32 new), `python -m compileall` clean
+- [x] Review lifecycle fully separate from execution status — new
+      `document_extraction_reviews.review_status` (8 values), migration
+      `0009_extraction_review_quality_gate.sql`
+- [x] Review rounds, not edits — at most one active round per run
+      (partial unique index), submitted rounds immutable except the one
+      legal `accepted(-with-warnings) -> invalidated` transition
+- [x] One generalized findings table (page-level and document-level),
+      23-value controlled taxonomy, 4 severities, immutable core content,
+      no deletion ever
+- [x] Explicit per-page review coverage — opening a page is never
+      inferred as review; 100% coverage required before any of the 5
+      terminal decisions
+- [x] All 5 decisions (`accepted`, `accepted_with_warnings`,
+      `ocr_required`, `reprocessing_required`, `rejected`)
+      database-enforced inside one transactional
+      `submit_document_extraction_review()` function, re-validated under
+      lock regardless of client state
+- [x] Downstream eligibility (`eligible_for_ocr`/`eligible_for_chunking`/
+      `eligible_for_retrieval`) server-derived, never a client-writable
+      column
+- [x] Self-review blocked at the database level (uploader/registerer of
+      the source document cannot review its own extraction) — documented
+      V1 policy, not a full quorum system
+- [x] Reviewer assignment, self-claim, and reassignment, each verifying
+      the target actually holds review permission
+- [x] Short-lived signed original-PDF access — no service-role key, same
+      principle as the Sprint 1.1 upload flow
+- [x] Review queue + side-by-side review workspace UI (PDF panel,
+      extracted-text panel, page navigation, findings panel, decision
+      form) — permission-gated throughout
+- [x] Separate permission namespace
+      (`guideline_extraction_reviews.*`/`guideline_extraction_findings.*`/
+      `guideline_extraction_source.*`) reinforcing the architecture
+      boundary from outside the schema too
+- [x] Local Postgres 16 verification — full 001–009 suite green, run
+      against **multiple genuinely fresh containers** (not a reused one)
+      from the start
+- [x] Web build/lint/typecheck/test all clean, including new routes
 - [x] Hosted Development verification — migration applied, real
-      end-to-end extraction with real JWTs/`service_role`, failure
-      fixtures, deterministic reprocessing, tenant isolation, synthetic
-      data cleaned up
+      end-to-end review with real JWTs, cross-tenant/clinician denial,
+      synthetic data cleaned up
 - [x] Vercel Preview redeployed and confirmed healthy
 
-## Real bugs found locally (by actually running the concurrency tests, not by reading the SQL)
+## Applying Sprint 1.2B's lesson from the start, not rediscovering it
 
-1. **`finalize_document_extraction_run()` raised a raw `unique_violation`**
-   when two genuinely simultaneous extraction attempts at the same
-   identity both tried to mark themselves `succeeded`. Fixed with an
-   exception handler that gracefully adopts the winning run instead of
-   surfacing a raw constraint-violation error.
-2. **A second, related race surfaced immediately after fixing the
-   first**: a job superseded mid-flight (its own `create` call committed,
-   but it was superseded by a different job's attempt before it reached
-   `finalize`) raised a raw "not running" error. Fixed by explicitly
-   detecting the supersession case and either adopting an
-   already-succeeded winner or raising a clear, named, retryable error —
-   never a raw, unclassified exception. Both fixes re-verified together
-   across 5 consecutive concurrency-script runs.
+Sprint 1.2B found — via an actual CI failure on a genuinely fresh
+Postgres container, not by reading the SQL — that a migration's own
+guarded `grant ... to authenticated` block is a documented no-op at CI's
+migration-apply time (the role doesn't exist yet), and that the
+corresponding RLS test file must issue its own explicit grant. That exact
+grant was written at the top of `009_extraction_review.sql` from the
+start, and the full suite was verified against multiple genuinely fresh
+`postgres:16` containers (not the same reused container across
+iterations) before being trusted — the discipline that lesson was
+supposed to produce.
 
-See `docs/database/deterministic-pdf-extraction-schema.md` for the full
-technical account.
+## A real bug found only while cleaning up synthetic hosted data
 
-## A real hosted-only test-execution finding (not a product bug)
-
-Running the SQL test suite against hosted required the Supabase
-Management API's SQL query endpoint (no direct Postgres connection string
-held for the hosted project), which batches an entire multi-statement
-submission differently than `psql -f`'s per-statement autocommit — a
-`begin/rollback` block not preceded by its own fresh commit can unwind
-earlier, otherwise-successful statements in the same batch. This surfaced
-as a false failure in `008_pdf_extraction.sql`'s original TEST 15/15b.
-Fixed in the committed test file by switching to the same bare-`DO`-block
-role-switch pattern already proven safe by TEST 16 in the same file — no
-product/RLS defect involved; re-verified locally with zero regression.
-See `docs/verification/sprint-1.2b-pdf-extraction-verification.md`.
+`prevent_extraction_finding_delete()`'s first version had no
+maintenance-override escape hatch at all — inconsistent with every other
+append-only table in this codebase, and it meant synthetic finding rows
+could never be removed again, not even as the connecting superuser.
+Fixed by adding the same `noor.allow_audit_maintenance` override GUC
+check used everywhere else; hotfixed directly on hosted, corrected in
+the migration file, re-verified locally. See
+`docs/verification/sprint-1-d1-extraction-review-verification.md`.
 
 ## Explicitly out of scope this task (per the mission)
 
-OCR, table reconstruction, image extraction, clinical section
-classification, semantic/fixed-size chunking, embeddings, retrieval,
-reranking, LLM calls, human correction UI, knowledge activation based on
-extraction. The pipeline stops at immutable, deterministic, page-level
-extraction artifacts and technical metrics.
+OCR execution, OCR-provider selection, chunk generation, embeddings,
+retrieval, reranking, LLM calls, manual text editing/correction, a
+human-corrected-text artifact, clinical interpretation or evidence
+grading, and any mutation of `document_extraction_runs` /
+`document_extraction_pages` (both remain exactly as immutable as Sprint
+1.2B left them).
 
 ## Next sprint
 
 ```text
-Begin Sprint 1-D — Extraction Review, OCR Decision, and Deterministic Chunking
+Begin Sprint 1-D2 — Controlled OCR Eligibility and OCR Processing Foundation
 ```
 
-See `MASTER_BACKLOG.md` (S1-D).
+See `MASTER_BACKLOG.md` (S1-D2).

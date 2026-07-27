@@ -1,5 +1,83 @@
 # Changelog
 
+## [Unreleased] — Sprint 1-D1: Extraction Review and Technical Quality Gate
+
+### Added
+
+* `supabase/migrations/0009_extraction_review_quality_gate.sql` — four new
+  tables (`document_extraction_reviews`, `document_extraction_review_findings`,
+  `document_extraction_page_reviews`, `document_extraction_review_events`),
+  a separate 8-status review lifecycle
+  (`pending_review/in_review/accepted/accepted_with_warnings/ocr_required/
+  reprocessing_required/rejected/invalidated`) fully independent from
+  migration 0008's execution status, a partial unique index guaranteeing
+  at most one active review round per extraction run, a controlled
+  23-value finding taxonomy with 4 severities, and eleven Worker-agnostic
+  client-facing `SECURITY DEFINER` functions (`create_document_extraction_review`,
+  `assign_extraction_reviewer`, `claim_extraction_review`,
+  `start_document_extraction_review`, `mark_extraction_page_reviewed`,
+  `create_extraction_finding`, `update_extraction_finding_status`,
+  `submit_document_extraction_review`, `reopen_extraction_review`,
+  `invalidate_extraction_review`, `get_document_extraction_review_eligibility`).
+* `docs/architecture/adr/0011-extraction-review-quality-gate.md` — the
+  review/execution architecture-boundary decision and the full
+  repository-pattern audit that produced it.
+* 9 new permissions in a deliberately separate namespace
+  (`guideline_extraction_reviews.*`, `guideline_extraction_findings.*`,
+  `guideline_extraction_source.*`) — never `guideline_extractions.*`
+  (execution-read-only), reinforcing the architecture boundary from the
+  permission model too.
+* `supabase/tests/rls/009_extraction_review.sql` — 39 real assertions
+  covering the full review lifecycle, all 5 terminal decision rules,
+  self-review blocking, reopening, invalidation, eligibility, findings
+  CRUD/immutability, append-only events, and RLS/trust-boundary
+  denial — verified against multiple genuinely fresh `postgres:16`
+  containers from the start (applying Sprint 1.2B's real CI-only
+  grant-timing lesson proactively).
+* `apps/web/lib/extraction-review/{queries,actions,schemas,errors,ui}.tsx` —
+  the full application layer: explicit-column queries, server actions for
+  every lifecycle operation, a signed-source-PDF-access action (no
+  service-role key, session-bound client, same principle as the Sprint
+  1.1 upload flow), zod validation, and status/severity badges.
+* Review queue (`/reviewer/extractions`) and side-by-side review
+  workspace (`/reviewer/extractions/[reviewId]`) — original PDF panel
+  (browser-native rendering, signed URL, auto-refreshed before expiry),
+  extracted-text panel, page navigation, findings panel, and the decision
+  submission form. An "Open review" / "Start technical review" link was
+  added to the guideline detail page's Extraction Summary Card.
+* `docs/domain/{extraction-review-lifecycle,extraction-quality-findings}.md`,
+  `docs/database/extraction-review-schema.md`,
+  `docs/security/extraction-review-authorization.md`,
+  `docs/operations/{extraction-review-runbook,extraction-review-reopening-and-invalidation}.md`,
+  `docs/verification/sprint-1-d1-extraction-review-verification.md`.
+
+### Fixed
+
+* **A real bug, found only while cleaning up synthetic hosted test
+  data**: `prevent_extraction_finding_delete()` raised unconditionally,
+  with no maintenance-override escape hatch — inconsistent with every
+  other append-only table in this codebase, and it meant synthetic test
+  findings could never be removed again, not even by the connecting
+  superuser. Fixed by adding the same `noor.allow_audit_maintenance`
+  override GUC every other append-only table already honors; hotfixed
+  directly on hosted (idempotent `CREATE OR REPLACE FUNCTION`) so cleanup
+  could proceed, then corrected in the migration file and re-verified
+  against a fresh local container.
+
+### Verified this session (not assumed)
+
+* Database: multiple genuinely fresh `postgres:16` Docker containers (not
+  a reused one — Sprint 1.2B's CI-only bug was masked by exactly that
+  mistake) had all 9 migrations + seed + the full RLS suite (001–009)
+  run against them, 100% green.
+* Web: lint/typecheck/build/test all clean, including the new review
+  queue and side-by-side review workspace routes.
+* Other workspaces unaffected: Worker (`python -m compileall`, pytest),
+  `clinical-schemas`, `ui` re-verified clean.
+* Hosted "Noor Development" and Vercel Preview — see
+  `docs/verification/sprint-1-d1-extraction-review-verification.md` for
+  the full record.
+
 ## [Unreleased] — Sprint 1.2B: Deterministic PDF Page and Text Extraction
 
 ### Added

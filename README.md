@@ -6,8 +6,8 @@ retrieves and cites only approved, versioned guideline text, and refuses to
 answer when evidence is insufficient. Noor is not an autonomous diagnostician
 — the clinician always retains final clinical authority.
 
-This repository is at **Sprint 1, workstream S1-C2 — Deterministic PDF
-Page and Text Extraction**. Sprint 0.5's
+This repository is at **Sprint 1, workstream S1-D1 — Extraction Review
+and Technical Quality Gate**. Sprint 0.5's
 hosted infrastructure foundation (identity/tenancy/RLS, real Supabase
 Auth, the Noor Design System, the worker scaffold, the shared clinical
 schema contract) is unchanged and remains verified — against plain
@@ -76,9 +76,26 @@ end against the real hosted Development project — real GoTrue JWT, real
 Storage upload, the actual unmodified Worker code claiming and extracting
 a real PDF, idempotent reprocessing, and the trust boundary confirmed
 denied for both an org_admin and a clinician JWT. No OCR, no chunking, no
-embeddings, no retrieval — deliberately out of scope (that's S1-D/S1-E).
+embeddings, no retrieval — deliberately out of scope (that's S1-D1+).
 See `docs/domain/document-extraction-lifecycle.md`, ADR 0010, and
 `docs/verification/sprint-1.2b-pdf-extraction-verification.md`.
+
+**S1-D1 — extraction review and technical quality gate:** "extraction
+execution succeeded" and "extraction quality is accepted" are two
+independent, database-enforced facts (ADR 0011). A permission-gated
+reviewer workspace compares the original PDF against extracted text
+page-by-page, records page-level and document-level technical findings
+against a controlled 23-value taxonomy, and reaches one of five
+database-validated decisions (accepted, accepted with warnings, OCR
+required, reprocessing required, rejected) through a single transactional
+function that re-checks every rule under lock. Downstream eligibility for
+OCR and chunking is server-derived, never a client-writable flag; a
+submitted decision is immutable except the one legal
+accepted-to-invalidated transition; self-review is blocked at the
+database level. No OCR execution, no chunking, no mutation of the
+deterministic extraction artifact — deliberately out of scope (that's
+S1-D2/S1-D3). See `docs/domain/extraction-review-lifecycle.md`, ADR 0011,
+and `docs/verification/sprint-1-d1-extraction-review-verification.md`.
 
 The repository is pushed to GitHub with CI passing on real GitHub Actions
 runs. See `PROJECT_STATE.md` for the authoritative current status and open
@@ -218,12 +235,12 @@ false-passing.
 * `clinical/intended-use/INTENDED_USE.md`
 * `clinical/risk-management/RISK_REGISTER.md`
 * `docs/architecture/DECISIONS.md`
-* `docs/domain/{guideline-registry,guideline-lifecycle,guideline-source-documents,document-intake-lifecycle,document-processing-orchestration,document-processing-lifecycle,document-extraction-lifecycle,document-extraction-artifacts}.md`
-* `docs/database/{guideline-registry-schema,secure-document-intake-schema,document-processing-orchestration-schema,deterministic-pdf-extraction-schema}.md`
-* `docs/security/{guideline-registry-authorization,document-intake-authorization,worker-orchestration-authorization,pdf-extraction-security}.md`
-* `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci,environment-variables,worker-deployment,worker-processing-runbook,job-recovery-and-dead-letter,guideline-document-upload,pdf-extraction-worker-runbook,extraction-failure-recovery}.md`
+* `docs/domain/{guideline-registry,guideline-lifecycle,guideline-source-documents,document-intake-lifecycle,document-processing-orchestration,document-processing-lifecycle,document-extraction-lifecycle,document-extraction-artifacts,extraction-review-lifecycle,extraction-quality-findings}.md`
+* `docs/database/{guideline-registry-schema,secure-document-intake-schema,document-processing-orchestration-schema,deterministic-pdf-extraction-schema,extraction-review-schema}.md`
+* `docs/security/{guideline-registry-authorization,document-intake-authorization,worker-orchestration-authorization,pdf-extraction-security,extraction-review-authorization}.md`
+* `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci,environment-variables,worker-deployment,worker-processing-runbook,job-recovery-and-dead-letter,guideline-document-upload,pdf-extraction-worker-runbook,extraction-failure-recovery,extraction-review-runbook,extraction-review-reopening-and-invalidation}.md`
 * `docs/design-system/NOOR_DESIGN_SYSTEM.md`
-* `docs/verification/{sprint-0.5-hosted-verification,sprint-1-guideline-registry-verification,sprint-1.1-document-intake-verification,sprint-1.2a-processing-orchestration-verification,sprint-1.2b-pdf-extraction-verification}.md`
+* `docs/verification/{sprint-0.5-hosted-verification,sprint-1-guideline-registry-verification,sprint-1.1-document-intake-verification,sprint-1.2a-processing-orchestration-verification,sprint-1.2b-pdf-extraction-verification,sprint-1-d1-extraction-review-verification}.md`
 * `SECURITY.md`
 * `KNOWN_LIMITATIONS.md`
 

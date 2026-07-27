@@ -1,12 +1,94 @@
 # PROJECT_STATE.md
 
-**Last updated:** Sprint 1.2B — Deterministic PDF Page and Text
-Extraction session (Claude Code, this environment)
+**Last updated:** Sprint 1-D1 — Extraction Review and Technical Quality
+Gate session (Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code)
 
 ---
 
-## -7. This session: Sprint 1.2B — Deterministic PDF Page and Text Extraction
+## -8. This session: Sprint 1-D1 — Extraction Review and Technical Quality Gate
+
+Implemented workstream `S1-D1`: a technical quality gate over Sprint
+1.2B's deterministic extraction, structurally separate from execution
+status (ADR 0011). Migration `0009_extraction_review_quality_gate.sql`
+adds review rounds, a controlled 23-value/4-severity finding taxonomy,
+explicit per-page review coverage, a single transactional
+`submit_document_extraction_review()` function enforcing all five
+terminal decision rules under lock, server-derived downstream eligibility
+(`eligible_for_ocr`/`eligible_for_chunking`/`eligible_for_retrieval`),
+database-level self-review blocking, and a new, deliberately separate
+permission namespace (`guideline_extraction_reviews.*`/
+`guideline_extraction_findings.*`/`guideline_extraction_source.*`).
+
+**Repository audit before writing any code** (full table in ADR 0011):
+`guideline_reviews`' submission-function skeleton and self-review trigger
+were reused; its unlimited-accumulation review model was **not** — this
+sprint needed reviewer assignment and one active round per run instead.
+`document_extraction_runs`/`document_extraction_pages` (migration 0008)
+remain untouched and exactly as immutable as before; every new table only
+ever reads them. No existing signed-download pattern existed anywhere in
+the codebase (only signed-*upload* did) — built fresh, following the
+established "session-bound client, RLS is the real gate, no service-role
+key" principle.
+
+**Applying Sprint 1.2B's real CI-only lesson from the start, not
+rediscovering it:** the prior sprint found — via an actual CI failure on
+a genuinely fresh Postgres container, not by reading the SQL — that a
+migration's own guarded `grant ... to authenticated` block is a
+documented no-op at CI's migration-apply time, and that the RLS test file
+itself must issue its own explicit grant. `009_extraction_review.sql`'s
+grants were written at the very top of the file from the start, and the
+full suite was verified against **multiple genuinely fresh
+`postgres:16` containers** (not the same reused container across
+iterations) before being trusted — no repeat of that bug this sprint.
+
+**Verification, real not assumed:** local — the full cumulative RLS suite
+(001–009) was run against several fresh Docker containers, 100% green,
+including a new 39-assertion review lifecycle/eligibility/RLS suite
+(`supabase/tests/rls/009_extraction_review.sql`) covering every legal and
+illegal review-state transition, all 5 terminal decision rules (each with
+both a rejection case and a success case), self-review blocking, reopen/
+invalidate semantics, findings CRUD/immutability, append-only events, and
+RLS/trust-boundary denial (clinician, cross-tenant); Web —
+lint/typecheck/build all clean, including the new review-queue and
+side-by-side review workspace routes, plus 27 new unit assertions
+(`extraction-review-schemas.test.ts`, `extraction-review-errors.test.ts`,
+and an extended `permissions.test.ts` check); Worker/`clinical-schemas`/
+`ui` re-verified unaffected.
+
+**Hosted Development — verified.** Migration 0009 applied
+(`local==remote` confirmed). The full 007+008+009 SQL suite (63
+assertions) ran clean against real hosted Postgres 17, run as three
+separate requests after finding a real test-execution quirk (concatenating
+multiple files into one batched submission collides on temp-table names —
+fixed by submitting each file as its own session). A real end-to-end flow
+built on the **actual unmodified Worker code**: a real GoTrue user
+uploaded a real PDF, the real Worker claimed and extracted it
+(`succeeded`, 1 page), and three more real GoTrue users (clinical_reviewer,
+quality_manager, clinician) exercised the full review lifecycle through
+real PostgREST RPC calls — create, assign, start, mark-page-reviewed,
+submit `accepted`, real-RPC eligibility (chunking eligible/OCR
+ineligible), reopen by quality_manager, and eligibility correctly
+reverting to ineligible afterward. The signed-source-PDF-access mechanism
+was verified directly against real Storage (sign + download, `200`,
+`application/pdf`). A real bug was found and fixed while cleaning up:
+`prevent_extraction_finding_delete()` had no maintenance-override escape
+hatch (inconsistent with every other append-only table in this codebase),
+making synthetic findings permanently undeletable — hotfixed on hosted,
+corrected in the migration, re-verified locally. All synthetic hosted
+data (4 real GoTrue users, seed.sql's 5 placeholders, all DB rows, both
+Storage objects) was cleaned up and confirmed zero-residual. Vercel
+Preview redeployed, `Ready`, the new review-queue and side-by-side
+review workspace routes present in the build, Deployment Protection
+intact. Full record:
+`docs/verification/sprint-1-d1-extraction-review-verification.md`.
+
+**Sprint 1-D1 (Extraction Review and Technical Quality Gate): Complete
+and Hosted-Verified.**
+
+---
+
+## -7. Prior session: Sprint 1.2B — Deterministic PDF Page and Text Extraction
 
 Implemented workstream `S1-C2`: the Worker's controlled no-op processor
 (Sprint 1.2A) is replaced with a real, deterministic PDF extraction
@@ -454,13 +536,13 @@ across every affected table.
 
 ## 0. Current phase
 
-**Sprint 1 — workstream S1-C2, Deterministic PDF Page and Text
-Extraction, just closed locally (hosted verification in progress).**
+**Sprint 1 — workstream S1-D1, Extraction Review and Technical Quality
+Gate, just closed locally (hosted verification in progress).**
 Sprint 0.5 (hosted infrastructure & design system) is **Complete and
 Hosted-Verified** — see §-3/§1 for that history; it is not reopened here.
 See `MASTER_BACKLOG.md` for the reconciled Sprint 1 workstream breakdown
-(S1-A/S1-B/S1-C1/S1-C2/S1-D/S1-E) — Sprint 1 is no longer tracked as a
-single flat task list.
+(S1-A/S1-B/S1-C1/S1-C2/S1-D1/S1-D2/S1-D3/S1-E) — Sprint 1 is no longer
+tracked as a single flat task list.
 
 **S1-A (Guideline Registry Schema and Lifecycle) — Complete and
 Hosted-Verified** (prior session): schema, lifecycle engine, RLS,
@@ -490,23 +572,36 @@ migration's core trust-boundary claim false (see §-6 above for the full
 account). Full record:
 `docs/verification/sprint-1.2a-processing-orchestration-verification.md`.
 
-**S1-C2 (Deterministic PDF Page and Text Extraction) — locally complete,
-hosted verification in progress** (this session): the Worker's controlled
-no-op processor is replaced with a real, deterministic `pypdf`-based
-extraction pipeline (ADR 0010) — source integrity revalidated twice
-independently, page-level text extraction/normalization, page/artifact
-checksums, technical metrics, conservative suspected-scanned detection, a
-canonical JSON artifact independently re-verified after upload, atomic
-finalization with idempotent identity-based reuse. Full 001–008 Postgres
-16 suite green; two genuine dual-OS-process concurrency proofs (the
-unchanged S1-C1 claim-race script, and a new extraction-identity-race
-script — 5 consecutive runs, all 4 possible race outcomes observed, zero
-unexpected errors); 91/91 Worker pytest assertions. **Two real
-concurrency bugs found and fixed this session** by actually racing two
-independent processes at the same extraction identity — see §-7 above for
-the full account. Web lint/typecheck/build/test all clean. Full record:
-§-7 above and
+**S1-C2 (Deterministic PDF Page and Text Extraction) — Complete and
+Hosted-Verified** (prior session): the Worker's controlled no-op
+processor is replaced with a real, deterministic `pypdf`-based extraction
+pipeline (ADR 0010) — source integrity revalidated twice independently,
+page-level text extraction/normalization, page/artifact checksums,
+technical metrics, conservative suspected-scanned detection, a canonical
+JSON artifact independently re-verified after upload, atomic finalization
+with idempotent identity-based reuse. Full 001–008 Postgres 16 suite
+green; two genuine dual-OS-process concurrency proofs; 91/91 Worker
+pytest assertions; a real hosted end-to-end flow (real GoTrue JWT, real
+Storage, the actual unmodified Worker code). **Two real concurrency bugs
+and a real CI-only grant-timing bug found and fixed that session** — see
+§-7 for the full account. Full record: §-7 and
 `docs/verification/sprint-1.2b-pdf-extraction-verification.md`.
+
+**S1-D1 (Extraction Review and Technical Quality Gate) — locally
+complete, hosted verification in progress** (this session): a technical
+quality gate structurally separate from S1-C2's execution status (ADR
+0011) — review rounds, page/document-level findings against a controlled
+23-value taxonomy, explicit per-page review coverage, all 5 terminal
+decisions enforced inside one transactional function under lock,
+server-derived downstream OCR/chunking eligibility, database-level
+self-review blocking, and a deliberately separate permission namespace.
+Full 001–009 Postgres 16 suite green across multiple genuinely fresh
+containers (applying S1-C2's real CI-only grant-timing lesson from the
+start); 39/39 new review-lifecycle/eligibility/RLS assertions; Web
+lint/typecheck/build/test all clean including the new review-queue and
+side-by-side review workspace routes. See §-8 above for the full account
+and `docs/verification/sprint-1-d1-extraction-review-verification.md`
+(hosted section pending as of this writing).
 
 ---
 
@@ -685,6 +780,7 @@ owner, not something applied unilaterally here.
 | G-07: Auth covers session/permission layer, not full account lifecycle | No signup, no admin member-management screen | None — incremental | Low | Frontend/Backend | Sprint 1 |
 | G-09: No Playwright/browser E2E | Login/reset form submission unverified end-to-end via a real browser (the HTTP smoke test proves route protection and page delivery, not form interaction) | None — can start anytime | Low | Frontend/QA | **Pre-Controlled-Beta requirement, not a Sprint 1 blocker** |
 | G-10: No custom SMTP on hosted Development project | Default GoTrue email-send rate limit is low; can affect real password-reset email volume | Configure custom SMTP in Supabase dashboard | Low | DevOps | Before Controlled Beta, not blocking Sprint 1 |
+
 **Closed this session:** G-13 (no processing-worker claim/retry
 implementation — the orchestration control plane is now real: atomic
 claim, hashed-lease ownership, heartbeat renewal, exponential-backoff
@@ -711,12 +807,19 @@ boundary, RLS) — see §-7 and
 Deterministic PDF Extraction workstream (S1-C2) itself is Complete and
 Hosted-Verified.
 
+**Closed this session:** the extraction-review hosted-verification gap —
+migration 0009 applied, the full 007+008+009 SQL suite (63 assertions)
+and a real end-to-end GoTrue-JWT flow (including the real, unmodified
+Worker code producing the underlying extraction, then real review
+lifecycle RPC calls) both verified against real hosted Postgres 17. See
+§-8 for the full account.
+
 **Closed prior sessions:** G-01 (hosted Supabase), G-08 (Vercel Protection
 Bypass), G-11/G-12 (Sprint 1.1 items), G-02/G-05/G-06 (Sprint 0 items) —
 see git history for the session-by-session record; not repeated here.
 
 None of the remaining gaps (G-03, G-04, G-07, G-09, G-10) block starting
-Sprint 1-D — each is either a product/clinical decision, later Sprint 1
+Sprint 1-D2 — each is either a product/clinical decision, later Sprint 1
 work explicitly out of scope (AI provider selection), or a documented
 pre-Controlled-Beta requirement.
 
@@ -724,28 +827,30 @@ pre-Controlled-Beta requirement.
 
 ## 6. Recommended next task
 
-Workstream S1-C2 (Deterministic PDF Page and Text Extraction) is Complete
-and Hosted-Verified: a real, deterministic `pypdf`-based extractor (ADR
-0010, selected over the mission's suggested PyMuPDF specifically for its
-AGPL-3.0 licensing) plugs into the unchanged S1-C1 claim/lease/retry/
-complete lifecycle. Source-integrity double-revalidation, deterministic
-normalization, canonical JSON artifacts, atomic idempotent finalization,
-minimal Admin/Reviewer UI, and two real concurrency bugs found and fixed
-via genuine dual-process racing are all implemented and verified against
-plain Postgres 16, the Worker's own pytest suite (91/91), and the real
-hosted Development project end-to-end (real GoTrue JWT, real Storage,
-the actual unmodified Worker code). See §-7 for the full account and
-`docs/verification/sprint-1.2b-pdf-extraction-verification.md` for the
+Workstream S1-D1 (Extraction Review and Technical Quality Gate) is
+Complete and Hosted-Verified: review rounds, page/document-level
+findings, explicit per-page coverage, all five terminal decisions
+enforced inside one transactional function, server-derived downstream
+eligibility, database-level self-review blocking, and a deliberately
+separate permission namespace (ADR 0011) are all implemented and verified
+against plain Postgres 16 (39/39 new assertions, across multiple
+genuinely fresh containers), the full Web build/lint/typecheck/test
+suite, and the real hosted Development project end-to-end (real GoTrue
+JWTs, the actual unmodified Worker code, real PostgREST RPC calls for the
+full review lifecycle, real signed-Storage-access verification). See §-8
+for the full account and
+`docs/verification/sprint-1-d1-extraction-review-verification.md` for the
 complete verification record.
 
 ```text
-Begin Sprint 1-D — Extraction Review, OCR Decision, and Deterministic Chunking
+Begin Sprint 1-D2 — Controlled OCR Eligibility and OCR Processing Foundation
 ```
 
-This is workstream S1-D (`MASTER_BACKLOG.md`): a reviewer queue over
-extraction results, a real decision on OCR for suspected-scanned pages,
-and deterministic chunking — none of which are implemented in S1-C2 by
-design (see `docs/domain/document-extraction-lifecycle.md`). G-03
-(clinical domain confirmation) should ideally be resolved before or
-alongside real content work. Playwright browser-driven E2E (G-09) stays a
-documented pre-Controlled-Beta requirement, not a blocker.
+This is workstream S1-D2 (`MASTER_BACKLOG.md`): OCR-provider selection and
+a controlled OCR execution pipeline for extraction runs/pages a review
+marked `ocr_required` — producing its own separately-provenanced OCR
+artifact, never a mutation of S1-C2's deterministic extraction or S1-D1's
+review records. G-03 (clinical domain confirmation) should ideally be
+resolved before or alongside real content work. Playwright browser-driven
+E2E (G-09) stays a documented pre-Controlled-Beta requirement, not a
+blocker.
