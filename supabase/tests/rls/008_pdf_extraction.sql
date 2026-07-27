@@ -16,6 +16,19 @@
 
 \set ON_ERROR_STOP on
 
+-- Same reasoning as 003/005: on CI's plain-Postgres container the
+-- `authenticated` role doesn't exist until 001_tenant_isolation.sql
+-- creates it, so migration 0008's own guarded `grant select ... to
+-- authenticated` (section 3) is a documented no-op there — this file must
+-- grant SELECT on its two new tables explicitly itself, mirroring
+-- production. Missing this line is exactly what caused TEST 15/15b to
+-- fail with a raw "permission denied for table document_extraction_runs"
+-- on a genuinely fresh container (found by actually running this file
+-- against a fresh `postgres:16` container multiple times, not by reading
+-- the SQL — a passing run against a long-lived, previously-migrated local
+-- container had been silently masking this).
+grant select on document_extraction_runs, document_extraction_pages to authenticated;
+
 grant execute on function
   create_clinical_domain(uuid, text, text, text),
   create_guideline_authority(uuid, text, text, text, text, text, boolean, text),

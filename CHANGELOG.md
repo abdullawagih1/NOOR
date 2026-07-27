@@ -88,6 +88,15 @@
   fixture: the first draft drew a vector rectangle (no image XObject),
   which never triggers the image-XObject-based heuristic being tested —
   fixed to embed an actual raster image.
+* **A real CI failure, found only against a genuinely fresh container**:
+  `008_pdf_extraction.sql` was missing its own explicit
+  `grant select on document_extraction_runs, document_extraction_pages to
+  authenticated` — on CI's plain-Postgres container the `authenticated`
+  role doesn't exist until the RLS suite's first file creates it, so
+  migration 0008's own guarded grant is a documented no-op there, exactly
+  like migrations 0005/0006, whose test files already carry this same
+  explicit grant. A reused local container had been silently masking this.
+  Fixed and re-verified against multiple fresh `postgres:16` containers.
 
 ### Verified this session (not assumed)
 

@@ -82,6 +82,27 @@ simultaneous-insert/`unique_violation`, supersession-then-winner-found,
 and supersession-with-no-winner-yet), zero unexpected errors across all
 five.
 
+## A third real bug found via CI, not by reading the SQL: a missing test-file grant
+
+`supabase/tests/rls/008_pdf_extraction.sql`'s TEST 15/15b initially failed
+intermittently — passing against a local Docker container that had
+already been migrated at least once, but failing deterministically
+against a genuinely fresh `postgres:16` container (exactly what GitHub
+Actions' `database` job always starts) with a raw `permission denied for
+table document_extraction_runs`. Root cause: on CI's plain-Postgres
+container the `authenticated` role does not exist until
+`001_tenant_isolation.sql` creates it — so migration 0008's own guarded
+`grant select ... to authenticated` (section 3) is a documented no-op
+there, exactly like the equivalent guarded blocks in migrations 0005 and
+0006. Both of those migrations' RLS test files (`003_guideline_registry.sql`,
+`005_document_intake.sql`) already carry their own explicit
+`grant select on <new tables> to authenticated` near the top, mirroring
+what the migration grants on hosted — `008_pdf_extraction.sql` was
+written without one. Fixed by adding the same explicit grant for
+`document_extraction_runs`/`document_extraction_pages`. Re-verified
+against multiple genuinely fresh `postgres:16` containers (not a reused
+one) before re-pushing.
+
 ## Trust boundary: same hardened pattern as migration 0007, applied from the start
 
 All three new functions (`create_document_extraction_run`,
