@@ -21,10 +21,21 @@ import {
   listGuidelineSourceDocuments,
   listDocumentProcessingJobs,
   listDocumentProcessingAttempts,
+  listDocumentExtractionRuns,
+  listDocumentExtractionPages,
   type DocumentProcessingJobRow,
 } from "@/lib/documents/queries";
 import { quarantineGuidelineSourceDocumentAction, cancelProcessingJobAction } from "@/lib/documents/actions";
-import { DocumentStatusBadge, JobStatusBadge, AttemptStatusBadge, isJobCancellable, formatBytes, shortSha } from "@/lib/documents/ui";
+import {
+  DocumentStatusBadge,
+  JobStatusBadge,
+  AttemptStatusBadge,
+  ExtractionRunStatusBadge,
+  ExtractionPageStatusBadge,
+  isJobCancellable,
+  formatBytes,
+  shortSha,
+} from "@/lib/documents/ui";
 import { UploadPanel } from "./UploadPanel";
 import { PageHeader, Card, Section, Badge, TextInput, Textarea, Select, Button, Alert } from "@noor/ui";
 
@@ -212,7 +223,16 @@ async function SourceDocuments({
       ) : (
         <div className="flex flex-col gap-sm">
           {documents.map((doc) => (
-            <SourceDocumentRow key={doc.id} document={doc} guidelineId={guidelineId} canReject={has(PERMISSIONS.GUIDELINE_DOCUMENTS_REJECT)} canCancelJob={has(PERMISSIONS.GUIDELINE_PROCESSING_JOBS_CANCEL)} />
+            <SourceDocumentRow
+              key={doc.id}
+              document={doc}
+              guidelineId={guidelineId}
+              canReject={has(PERMISSIONS.GUIDELINE_DOCUMENTS_REJECT)}
+              canCancelJob={has(PERMISSIONS.GUIDELINE_PROCESSING_JOBS_CANCEL)}
+              canReadExtractions={has(PERMISSIONS.GUIDELINE_EXTRACTIONS_READ)}
+              canReadExtractionPages={has(PERMISSIONS.GUIDELINE_EXTRACTIONS_READ_PAGES)}
+              canReadExtractionArtifacts={has(PERMISSIONS.GUIDELINE_EXTRACTIONS_READ_ARTIFACTS)}
+            />
           ))}
         </div>
       )}
@@ -299,16 +319,153 @@ async function JobStatusCard({
   );
 }
 
+/**
+ * Extraction Summary Card + Page List (Sprint 1.2B, mission §30.1-30.2).
+ * Shows only the latest extraction run for this document — deterministic
+ * reprocessing reuses the same succeeded run rather than creating visible
+ * duplicates, so "latest" and "canonical" are normally the same thing.
+ * Artifact checksum is shown only to holders of
+ * guideline_extractions.read_artifacts; the Storage bucket/path never
+ * reach this component at all (queries.ts excludes those columns
+ * entirely). No fake progress percentage — a `running` extraction shows
+ * only its status badge, since there is no measurable sub-progress to
+ * report honestly.
+ */
+async function ExtractionSummaryCard({
+  sourceDocumentId,
+  guidelineId,
+  canReadPages,
+  canReadArtifacts,
+}: {
+  sourceDocumentId: string;
+  guidelineId: string;
+  canReadPages: boolean;
+  canReadArtifacts: boolean;
+}) {
+  const runs = await listDocumentExtractionRuns(sourceDocumentId);
+  const run = runs[0];
+  if (!run) return null;
+
+  const pages = canReadPages && run.status === "succeeded" ? await listDocumentExtractionPages(run.id) : [];
+
+  return (
+    <div className="mt-xs rounded-sm border border-border bg-surface p-xs">
+      <div className="flex flex-wrap items-center gap-xs text-xs">
+        <span className="text-muted">Extraction:</span>
+        <ExtractionRunStatusBadge status={run.status} />
+        <span className="text-muted">
+          {run.extractor_name} {run.extractor_version} · pipeline {run.pipeline_version}
+        </span>
+        <span className="font-mono text-muted">source:{shortSha(run.source_sha256)}</span>
+        {canReadArtifacts && run.artifact_sha256 ? (
+          <span className="font-mono text-muted">artifact:{shortSha(run.artifact_sha256)}</span>
+        ) : null}
+      </div>
+
+      {run.status === "succeeded" ? (
+        <dl className="mt-xs grid grid-cols-2 gap-x-md gap-y-xxs text-xs text-muted sm:grid-cols-4">
+          <div>
+            <dt className="uppercase tracking-wide">Pages</dt>
+            <dd className="text-ink">{run.page_count ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="uppercase tracking-wide">With text</dt>
+            <dd className="text-ink">{run.pages_with_text ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="uppercase tracking-wide">Blank</dt>
+            <dd className="text-ink">{run.blank_page_count ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="uppercase tracking-wide">Suspected scanned</dt>
+            <dd className="text-ink">{run.suspected_scanned_page_count ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="uppercase tracking-wide">Characters</dt>
+            <dd className="text-ink">{run.total_character_count?.toLocaleString() ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="uppercase tracking-wide">Warnings</dt>
+            <dd className="text-ink">{run.warning_count}</dd>
+          </div>
+          <div>
+            <dt className="uppercase tracking-wide">Started</dt>
+            <dd className="text-ink">{formatDate(run.started_at)}</dd>
+          </div>
+          <div>
+            <dt className="uppercase tracking-wide">Completed</dt>
+            <dd className="text-ink">{formatDate(run.completed_at)}</dd>
+          </div>
+        </dl>
+      ) : null}
+
+      {run.status === "failed" && run.error_message_safe ? (
+        <div className="mt-xs" role="alert">
+          <p className="text-xs" style={{ color: "var(--noor-state-critical-fg)" }}>
+            {run.error_code ? `${run.error_code}: ` : ""}
+            {run.error_message_safe}
+          </p>
+        </div>
+      ) : null}
+
+      {pages.length > 0 ? (
+        <div className="mt-xs border-t border-border pt-xs">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Pages</p>
+          <table className="mt-xxs w-full text-xs">
+            <caption className="sr-only">Extracted page list with status, character count, word count, and rotation</caption>
+            <thead>
+              <tr className="text-left text-muted">
+                <th scope="col" className="pr-sm font-medium">Page</th>
+                <th scope="col" className="pr-sm font-medium">Status</th>
+                <th scope="col" className="pr-sm font-medium">Characters</th>
+                <th scope="col" className="pr-sm font-medium">Words</th>
+                <th scope="col" className="pr-sm font-medium">Rotation</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pages.map((p) => (
+                <tr key={p.id} className="border-t border-border/50">
+                  <td className="py-xxs pr-sm text-ink">
+                    <a
+                      className="underline"
+                      href={`/knowledge/guidelines/${guidelineId}/extractions/${run.id}/pages/${p.page_number}`}
+                    >
+                      {p.page_number}
+                    </a>
+                  </td>
+                  <td className="py-xxs pr-sm">
+                    <ExtractionPageStatusBadge status={p.extraction_status} />
+                    {p.suspected_scanned ? <span className="ml-xxs text-muted">(suspected scanned)</span> : null}
+                  </td>
+                  <td className="py-xxs pr-sm text-ink">{p.character_count}</td>
+                  <td className="py-xxs pr-sm text-ink">{p.word_count}</td>
+                  <td className="py-xxs pr-sm text-ink">{p.rotation_degrees}°</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 async function SourceDocumentRow({
   document: doc,
   guidelineId,
   canReject,
   canCancelJob,
+  canReadExtractions,
+  canReadExtractionPages,
+  canReadExtractionArtifacts,
 }: {
   document: import("@/lib/documents/queries").GuidelineSourceDocumentRow;
   guidelineId: string;
   canReject: boolean;
   canCancelJob: boolean;
+  canReadExtractions: boolean;
+  canReadExtractionPages: boolean;
+  canReadExtractionArtifacts: boolean;
 }) {
   const jobs = await listDocumentProcessingJobs(doc.id);
   const latestJob = jobs[0];
@@ -330,6 +487,15 @@ async function SourceDocumentRow({
       ) : null}
 
       {latestJob ? <JobStatusCard job={latestJob} guidelineId={guidelineId} canCancelJob={canCancelJob} /> : null}
+
+      {canReadExtractions ? (
+        <ExtractionSummaryCard
+          sourceDocumentId={doc.id}
+          guidelineId={guidelineId}
+          canReadPages={canReadExtractionPages}
+          canReadArtifacts={canReadExtractionArtifacts}
+        />
+      ) : null}
 
       {canReject && (doc.status === "verified" || doc.status === "registered") ? (
         <form action={quarantineGuidelineSourceDocumentAction} className="mt-xs flex items-end gap-xs">

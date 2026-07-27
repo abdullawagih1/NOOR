@@ -160,3 +160,133 @@ export async function listDocumentProcessingAttempts(processingJobId: string): P
   if (error) throw error;
   return (data as unknown as DocumentProcessingAttemptRow[]) ?? [];
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 1.2B — Deterministic PDF extraction (migration 0008)
+// ---------------------------------------------------------------------------
+
+export type ExtractionRunStatus = "running" | "succeeded" | "failed" | "invalidated";
+export type ExtractionPageStatus =
+  | "text_extracted"
+  | "blank_page"
+  | "no_text_layer"
+  | "partial_text"
+  | "extraction_warning"
+  | "failed";
+
+export interface DocumentExtractionRunRow {
+  id: string;
+  organization_id: string;
+  source_document_id: string;
+  processing_job_id: string;
+  status: ExtractionRunStatus;
+  source_sha256: string;
+  source_size_bytes: number;
+  pipeline_version: string;
+  configuration_version: string;
+  extractor_name: string;
+  extractor_version: string;
+  started_at: string;
+  completed_at: string | null;
+  failed_at: string | null;
+  page_count: number | null;
+  pages_with_text: number | null;
+  blank_page_count: number | null;
+  suspected_scanned_page_count: number | null;
+  total_character_count: number | null;
+  total_word_count: number | null;
+  warning_count: number;
+  warnings: string[];
+  error_code: string | null;
+  error_class: string | null;
+  error_message_safe: string | null;
+  artifact_sha256: string | null;
+  created_at: string;
+}
+
+export interface DocumentExtractionPageRow {
+  id: string;
+  organization_id: string;
+  extraction_run_id: string;
+  source_document_id: string;
+  page_number: number;
+  width_points: number | null;
+  height_points: number | null;
+  rotation_degrees: number;
+  normalized_text: string;
+  character_count: number;
+  word_count: number;
+  is_blank: boolean;
+  suspected_scanned: boolean;
+  extraction_status: ExtractionPageStatus;
+  warnings: string[];
+  page_checksum: string;
+}
+
+// Explicit column lists, matching the same reasoning as
+// PROCESSING_JOB_COLUMNS above: document_extraction_runs carries
+// artifact_bucket/artifact_path (internal Storage location) that must
+// never reach a Client Component even unused — the UI only ever needs the
+// artifact checksum prefix, never the path. raw_text is deliberately
+// excluded from the page column list too — only normalized_text is ever
+// shown, matching the "no raw dump" spirit of the mission's page-detail
+// view.
+const EXTRACTION_RUN_COLUMNS =
+  "id, organization_id, source_document_id, processing_job_id, status, source_sha256, source_size_bytes, " +
+  "pipeline_version, configuration_version, extractor_name, extractor_version, started_at, completed_at, " +
+  "failed_at, page_count, pages_with_text, blank_page_count, suspected_scanned_page_count, " +
+  "total_character_count, total_word_count, warning_count, warnings, error_code, error_class, " +
+  "error_message_safe, artifact_sha256, created_at";
+
+const EXTRACTION_PAGE_COLUMNS =
+  "id, organization_id, extraction_run_id, source_document_id, page_number, width_points, height_points, " +
+  "rotation_degrees, normalized_text, character_count, word_count, is_blank, suspected_scanned, " +
+  "extraction_status, warnings, page_checksum";
+
+export async function listDocumentExtractionRuns(sourceDocumentId: string): Promise<DocumentExtractionRunRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("document_extraction_runs")
+    .select(EXTRACTION_RUN_COLUMNS)
+    .eq("source_document_id", sourceDocumentId)
+    .order("started_at", { ascending: false });
+  if (error) throw error;
+  return (data as unknown as DocumentExtractionRunRow[]) ?? [];
+}
+
+export async function getDocumentExtractionRun(id: string): Promise<DocumentExtractionRunRow | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("document_extraction_runs")
+    .select(EXTRACTION_RUN_COLUMNS)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data as unknown as DocumentExtractionRunRow | null;
+}
+
+export async function listDocumentExtractionPages(extractionRunId: string): Promise<DocumentExtractionPageRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("document_extraction_pages")
+    .select(EXTRACTION_PAGE_COLUMNS)
+    .eq("extraction_run_id", extractionRunId)
+    .order("page_number", { ascending: true });
+  if (error) throw error;
+  return (data as unknown as DocumentExtractionPageRow[]) ?? [];
+}
+
+export async function getDocumentExtractionPage(
+  extractionRunId: string,
+  pageNumber: number
+): Promise<DocumentExtractionPageRow | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("document_extraction_pages")
+    .select(EXTRACTION_PAGE_COLUMNS)
+    .eq("extraction_run_id", extractionRunId)
+    .eq("page_number", pageNumber)
+    .maybeSingle();
+  if (error) throw error;
+  return data as unknown as DocumentExtractionPageRow | null;
+}

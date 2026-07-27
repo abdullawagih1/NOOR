@@ -30,6 +30,11 @@ export const PERMISSIONS = {
   GUIDELINE_PROCESSING_JOBS_READ: "guideline_processing_jobs.read",
   GUIDELINE_PROCESSING_JOBS_CREATE: "guideline_processing_jobs.create",
   GUIDELINE_PROCESSING_JOBS_CANCEL: "guideline_processing_jobs.cancel",
+  GUIDELINE_EXTRACTIONS_READ: "guideline_extractions.read",
+  GUIDELINE_EXTRACTIONS_READ_PAGES: "guideline_extractions.read_pages",
+  GUIDELINE_EXTRACTIONS_READ_ARTIFACTS: "guideline_extractions.read_artifacts",
+  GUIDELINE_EXTRACTIONS_INVALIDATE: "guideline_extractions.invalidate",
+  GUIDELINE_EXTRACTIONS_RETRY: "guideline_extractions.retry",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
