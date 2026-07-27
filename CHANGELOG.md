@@ -1,5 +1,120 @@
 # Changelog
 
+## [Unreleased] — Sprint 1.2B: Deterministic PDF Page and Text Extraction
+
+### Added
+
+* `supabase/migrations/0008_deterministic_pdf_extraction.sql` — two new
+  tables (`document_extraction_runs`, `document_extraction_pages`), 5
+  permissions, 3 Worker-only functions
+  (`create_document_extraction_run`/`finalize_document_extraction_run`/
+  `fail_document_extraction_run`), a partial unique index guaranteeing at
+  most one succeeded extraction run per deterministic identity
+  (`organization_id + source_sha256 + pipeline_version +
+  configuration_version + extractor_name + extractor_version`),
+  conditional immutability on succeeded runs, unconditional immutability
+  on page rows. All three new functions hardened from their first version
+  (never granted to `authenticated`/`anon`) rather than needing a
+  follow-up fix like migration 0007 did.
+* `docs/architecture/adr/0010-deterministic-pdf-extractor.md` — `pypdf`
+  (BSD-3-Clause) selected over the mission's suggested `PyMuPDF`
+  (AGPL-3.0 since v1.24.1 — a real licensing risk for a commercial SaaS,
+  rejected specifically for that reason, not capability).
+* `apps/worker/app/pdf_extraction/` — the full extraction pipeline:
+  `extractor.py` (the `PdfExtractor` protocol + `PyPdfExtractor`),
+  `normalization.py` (deterministic text normalization), `checksums.py`
+  (canonical JSON serialization + page/artifact SHA-256),
+  `artifact.py` (canonical artifact construction), `source_download.py`
+  (streaming source revalidation into a secure temp file),
+  `artifact_storage.py` (upload + independent re-download-and-verify),
+  `errors.py` (17 named failure codes with retryable/terminal
+  classification), `processor.py` (the real `Processor` wired into the
+  existing, unchanged Sprint 1.2A `WorkerLoop`), `config.py` (pinned
+  version constants + a startup assertion that the installed `pypdf`
+  matches).
+* `apps/worker/tests/fixtures/pdf/` — 11 synthetic, programmatically
+  generated PDF fixtures (one-page, multi-page, Arabic+English Unicode,
+  empty page, rotated page, mixed blank/text, image-only/no-text-layer,
+  corrupt, encrypted, invalid-signature, unusual-metadata) plus the
+  generator script that produced them.
+* `apps/worker/tests/test_pdf_extraction_{fixtures,determinism,
+  source_integrity,processor}.py` — 32 new assertions: extractor
+  behavior against every fixture; same-input-twice byte-identical
+  artifacts/checksums/metrics; source checksum/size/signature
+  revalidation via `httpx.MockTransport`; end-to-end processor
+  orchestration (reuse, failure classification, idempotent replay,
+  lease-loss tolerance) against a fake in-memory `OrchestrationClient`
+  and mocked Storage HTTP layer.
+* `supabase/tests/rls/007_security_hardening_review.sql` — a permanent
+  regression suite for the exact hosted-only bug found and fixed in
+  Sprint 1.2A (schema `CREATE` privileges, narrow `search_path`, and the
+  `authenticated`/`anon` EXECUTE-grant gap on all six migration-0007
+  Worker-only functions).
+* `supabase/tests/rls/008_pdf_extraction.sql` — 19 real assertions
+  covering the full extraction lifecycle, idempotent identity reuse,
+  stale-attempt supersession, immutability, RLS, and the
+  `authenticated`/`anon` trust boundary for the three new functions.
+* `supabase/tests/concurrency/verify_concurrent_extraction_identity.sh` —
+  a genuine dual-OS-process proof that two independent Postgres backends
+  racing the exact same deterministic extraction identity always resolve
+  to exactly one succeeded run, never a raw/unclassified database error.
+* Minimal extraction UI: an Extraction Summary Card (status, versions,
+  checksums, technical metrics) and a permission-gated page list on the
+  guideline detail page, plus a minimal read-only page-detail route
+  (`/knowledge/guidelines/[guidelineId]/extractions/[runId]/pages/[pageNumber]`)
+  — no editing, no clinical-approval controls, no fabricated progress
+  percentages.
+* `docs/domain/{document-extraction-lifecycle,document-extraction-artifacts}.md`,
+  `docs/database/deterministic-pdf-extraction-schema.md`,
+  `docs/security/pdf-extraction-security.md`,
+  `docs/operations/{pdf-extraction-worker-runbook,extraction-failure-recovery}.md`,
+  `docs/verification/sprint-1.2b-pdf-extraction-verification.md`.
+
+### Fixed
+
+* **Two real concurrency bugs found by actually racing two independent
+  processes at the same extraction identity, not by reading the SQL**:
+  (1) `finalize_document_extraction_run()` raised a raw `unique_violation`
+  when two genuinely simultaneous attempts both tried to succeed at the
+  same identity — fixed with an exception handler that gracefully adopts
+  the winning run. (2) A second race then surfaced: a job superseded
+  mid-flight (between its own `create` call and reaching `finalize`)
+  raised a raw "not running" error — fixed by explicitly detecting
+  supersession and either adopting an already-succeeded winner or raising
+  a clear, retryable, classifiable error. Both re-verified together: 5
+  consecutive concurrency-script runs, all 4 possible race outcomes
+  observed, zero unexpected errors.
+* A test-fixture bug in the extractor's own "suspected scanned"
+  fixture: the first draft drew a vector rectangle (no image XObject),
+  which never triggers the image-XObject-based heuristic being tested —
+  fixed to embed an actual raster image.
+
+### Verified this session (not assumed)
+
+* Database: a fresh `postgres:16` Docker container had all 8 migrations +
+  seed + the full RLS suite (001–008) run against it — 100% green,
+  including 001–007 unmodified on top of migration 0008's schema. Two
+  genuine dual-process concurrency proofs (claim-race, unchanged from
+  1.2A; extraction-identity-race, new) both passing.
+* Web: lint/typecheck/build clean; extraction UI route compiles and
+  renders in the production build.
+* Worker: `python -m compileall` clean; 91/91 pytest assertions (59
+  pre-existing + 32 new).
+* Other workspaces unaffected: `clinical-schemas`, `ui` re-verified clean.
+* Hosted "Noor Development": migration 0008 applied; the corrected
+  007+008 SQL suite (24 assertions) green against real Postgres 17; a
+  real end-to-end flow exercised the unmodified production Worker code
+  (real GoTrue JWT, real RLS-authorized Storage upload, real
+  `service_role` claim/extract/upload/finalize) — 5/5 pages extracted
+  from a real PDF, artifact independently re-downloaded and re-hashed,
+  idempotent reprocessing proven, trust boundary and RLS confirmed for
+  both an org_admin and a clinician JWT, a genuine
+  `source_object_missing` failure correctly classified; all synthetic
+  data cleaned up and confirmed zero-residual. Vercel Preview redeployed
+  and healthy. See
+  `docs/verification/sprint-1.2b-pdf-extraction-verification.md` for the
+  full record.
+
 ## [Unreleased] — Sprint 1.2A: Durable Processing Orchestration
 
 ### Added

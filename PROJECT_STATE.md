@@ -1,12 +1,113 @@
 # PROJECT_STATE.md
 
-**Last updated:** Sprint 1.2A — Durable Processing Orchestration session
-(Claude Code, this environment)
+**Last updated:** Sprint 1.2B — Deterministic PDF Page and Text
+Extraction session (Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code)
 
 ---
 
-## -6. This session: Sprint 1.2A — Durable Processing Orchestration
+## -7. This session: Sprint 1.2B — Deterministic PDF Page and Text Extraction
+
+Implemented workstream `S1-C2`: the Worker's controlled no-op processor
+(Sprint 1.2A) is replaced with a real, deterministic PDF extraction
+pipeline — source integrity revalidated twice independently, page-level
+text extraction and normalization, page/artifact checksums, technical
+quality metrics, conservative suspected-scanned detection, a canonical
+JSON artifact uploaded privately and independently re-verified, and
+atomic finalization with idempotent identity-based reuse. Migration
+`0008_deterministic_pdf_extraction.sql`.
+
+**Mandatory first review completed**: re-verified the Sprint 1.2A
+hosted-only security fix (schema `CREATE` privileges, narrow
+`search_path`, `authenticated`/`anon` EXECUTE grants) and turned it into
+a **permanent regression suite**
+(`supabase/tests/rls/007_security_hardening_review.sql`) rather than
+leaving it as a one-off verification script — the exact class of bug
+found in Sprint 1.2A can now never silently regress unnoticed.
+
+**Extractor decision (ADR 0010):** `pypdf` (BSD-3-Clause), selected over
+the mission's own suggested default, `PyMuPDF` — which moved to AGPL-3.0
+licensing at v1.24.1, a real, unresolved legal exposure for a commercial
+clinical SaaS platform (the AGPL network-use clause). This is exactly the
+kind of blind-default risk the mission's own instruction ("do not select
+it blindly") anticipated; the ADR documents the full comparison against
+`pdfminer.six`/`pdfplumber` too.
+
+**Two real concurrency bugs found and fixed by actually racing two
+independent processes at the same extraction identity, not by reading the
+SQL:**
+
+1. `finalize_document_extraction_run()` raised a raw `unique_violation`
+   when two genuinely simultaneous extraction attempts at the same
+   identity both tried to mark themselves `succeeded` — the row-level
+   lock inside `create_document_extraction_run()` only locks an
+   *existing* row, so two callers can legitimately both create fresh
+   `running` rows the first time they race in. Fixed with an exception
+   handler that gracefully adopts the winning run instead of surfacing a
+   raw constraint-violation error to the Worker.
+2. A second, related race surfaced immediately after fixing the first:
+   the claim → create → insert-pages → finalize sequence is several
+   separate auto-committed statements, not one spanning transaction — a
+   job's own `document_extraction_runs` row can be superseded by a
+   *different* job's attempt at the same identity after the first job
+   already committed its `create` call but before it reached `finalize`.
+   That raised a raw "not running" error too. Fixed by explicitly
+   detecting the supersession case: adopt an already-succeeded winner if
+   one exists, otherwise raise a clear, named, retryable error — exactly
+   what a real Worker's error-classification layer expects, never a raw,
+   unclassified exception. Both fixes re-verified together: 5 consecutive
+   runs of the new dual-OS-process concurrency script
+   (`supabase/tests/concurrency/verify_concurrent_extraction_identity.sh`),
+   all 4 possible race outcomes observed naturally, zero unexpected
+   errors across all five. See
+   `docs/database/deterministic-pdf-extraction-schema.md`.
+
+**Verification, real not assumed:** local — a fresh `postgres:16` Docker
+container had all 8 migrations + seed + the full RLS suite (001–008) run
+against it, 100% green (117/117 cumulative assertions), including the
+pre-existing 001–007 suites unmodified on top of migration 0008's schema;
+two genuine dual-OS-process concurrency proofs (the unchanged Sprint 1.2A
+claim-race script, and the new extraction-identity-race script); Worker —
+91/91 pytest assertions (59 pre-existing + 32 new covering fixture
+behavior against 11 synthetic PDFs, determinism, source-integrity
+revalidation, and end-to-end processor orchestration),
+`python -m compileall` clean; Web — lint/typecheck/build/test all clean,
+the new extraction UI route compiles in the production build.
+
+**Hosted Development — verified.** Migration 0008 applied (`local==remote`
+confirmed). The corrected 007+008 SQL suite (24 assertions) ran clean
+against real hosted Postgres 17. A real end-to-end flow exercised the
+**unmodified production Worker code** against real infrastructure: a real
+GoTrue user/JWT, a real RLS-authorized Storage upload, the real
+`WorkerLoop`/extraction pipeline claiming and processing a real job with
+`service_role` credentials — 5/5 pages extracted from a real multi-page
+PDF, artifact uploaded to private Storage and independently re-downloaded
+and re-hashed (checksum match confirmed), idempotent reprocessing proven
+(a second real job at the same identity reused the same extraction run,
+no duplicate), the `authenticated` trust boundary denied for both an
+org_admin JWT and a clinician JWT, RLS confirmed permissive for org_admin
+and zero-row for clinician, and a genuine `source_object_missing` failure
+correctly classified (not crashed) when the Worker drained an unrelated
+fixture job with no real Storage object. One real, non-product finding
+along the way: the Supabase Management API's SQL query endpoint batches
+an entire multi-statement submission differently than `psql -f`'s
+per-statement autocommit, which made an unrelated `begin/rollback` test
+pattern (008's original TEST 15/15b) unsafe under that execution model —
+fixed in the committed test file itself (switched to the same bare-`DO`-
+block role-switch pattern already proven safe by TEST 16), re-verified
+locally with no regression. All synthetic hosted data (2 real GoTrue
+users, seed.sql's 5 placeholder users, all DB rows, both Storage objects)
+was cleaned up and confirmed zero-residual. Vercel Preview redeployed,
+`Ready`, the new extraction page-detail route present in the build,
+Deployment Protection intact. Full record:
+`docs/verification/sprint-1.2b-pdf-extraction-verification.md`.
+
+**Sprint 1.2B (Deterministic PDF Page and Text Extraction): Complete and
+Hosted-Verified.**
+
+---
+
+## -6. Prior session: Sprint 1.2A — Durable Processing Orchestration
 
 Implemented workstream `S1-C1`: a reliable execution control plane for
 the `document_processing_jobs` rows Sprint 1.1 creates `queued` —
@@ -340,12 +441,13 @@ across every affected table.
 
 ## 0. Current phase
 
-**Sprint 1 — workstream S1-C1, Durable Processing Orchestration, just
-closed.** Sprint 0.5 (hosted infrastructure & design system) is
-**Complete and Hosted-Verified** — see §-3/§1 for that history; it is not
-reopened here. See `MASTER_BACKLOG.md` for the reconciled Sprint 1
-workstream breakdown (S1-A/S1-B/S1-C1/S1-C2/S1-D/S1-E) — Sprint 1 is no
-longer tracked as a single flat task list.
+**Sprint 1 — workstream S1-C2, Deterministic PDF Page and Text
+Extraction, just closed locally (hosted verification in progress).**
+Sprint 0.5 (hosted infrastructure & design system) is **Complete and
+Hosted-Verified** — see §-3/§1 for that history; it is not reopened here.
+See `MASTER_BACKLOG.md` for the reconciled Sprint 1 workstream breakdown
+(S1-A/S1-B/S1-C1/S1-C2/S1-D/S1-E) — Sprint 1 is no longer tracked as a
+single flat task list.
 
 **S1-A (Guideline Registry Schema and Lifecycle) — Complete and
 Hosted-Verified** (prior session): schema, lifecycle engine, RLS,
@@ -362,20 +464,36 @@ environments. Full record:
 `docs/verification/sprint-1.1-document-intake-verification.md`.
 
 **S1-C1 (Durable Processing Orchestration) — Complete and
-Hosted-Verified** (this session): atomic Worker claim, hashed-lease
+Hosted-Verified** (prior session): atomic Worker claim, hashed-lease
 ownership with heartbeat renewal, exponential-backoff retry, dead-letter
 on exhaustion, lease-expiry crash recovery, queued/retry-scheduled
 cancellation, all proven with a controlled no-op processor — 85/85
 Postgres 16 assertions (cumulative, all suites), a genuine dual-OS-process
 concurrency proof (80 jobs, zero double-claims), 30/30 hosted assertions
 including a 20-parallel-request real HTTP concurrency race. **Two real,
-hosted-only bugs found and fixed this session** — a pgcrypto
+hosted-only bugs found and fixed that session** — a pgcrypto
 `search_path` gap and a default-privileges gap that had silently made the
 migration's core trust-boundary claim false (see §-6 above for the full
-account). Web lint/typecheck/build/test all clean. Vercel Preview
-redeployed, healthy, Deployment Protection intact. Full record: §-6 above
-and
+account). Full record:
 `docs/verification/sprint-1.2a-processing-orchestration-verification.md`.
+
+**S1-C2 (Deterministic PDF Page and Text Extraction) — locally complete,
+hosted verification in progress** (this session): the Worker's controlled
+no-op processor is replaced with a real, deterministic `pypdf`-based
+extraction pipeline (ADR 0010) — source integrity revalidated twice
+independently, page-level text extraction/normalization, page/artifact
+checksums, technical metrics, conservative suspected-scanned detection, a
+canonical JSON artifact independently re-verified after upload, atomic
+finalization with idempotent identity-based reuse. Full 001–008 Postgres
+16 suite green; two genuine dual-OS-process concurrency proofs (the
+unchanged S1-C1 claim-race script, and a new extraction-identity-race
+script — 5 consecutive runs, all 4 possible race outcomes observed, zero
+unexpected errors); 91/91 Worker pytest assertions. **Two real
+concurrency bugs found and fixed this session** by actually racing two
+independent processes at the same extraction identity — see §-7 above for
+the full account. Web lint/typecheck/build/test all clean. Full record:
+§-7 above and
+`docs/verification/sprint-1.2b-pdf-extraction-verification.md`.
 
 ---
 
@@ -554,52 +672,67 @@ owner, not something applied unilaterally here.
 | G-07: Auth covers session/permission layer, not full account lifecycle | No signup, no admin member-management screen | None — incremental | Low | Frontend/Backend | Sprint 1 |
 | G-09: No Playwright/browser E2E | Login/reset form submission unverified end-to-end via a real browser (the HTTP smoke test proves route protection and page delivery, not form interaction) | None — can start anytime | Low | Frontend/QA | **Pre-Controlled-Beta requirement, not a Sprint 1 blocker** |
 | G-10: No custom SMTP on hosted Development project | Default GoTrue email-send rate limit is low; can affect real password-reset email volume | Configure custom SMTP in Supabase dashboard | Low | DevOps | Before Controlled Beta, not blocking Sprint 1 |
-| G-14: No real PDF/OCR/chunking/embedding extraction | The Worker can claim/lease/retry/complete a job end-to-end, but its processor is a controlled no-op — no document content is ever actually read | S1-C1 (done) | Medium | AI/RAG | Sprint 1.2B (S1-C2, see §6) |
-
 **Closed this session:** G-13 (no processing-worker claim/retry
 implementation — the orchestration control plane is now real: atomic
 claim, hashed-lease ownership, heartbeat renewal, exponential-backoff
 retry, dead-lettering, crash recovery, and cancellation all exist and are
-hosted-verified, proven with a controlled no-op processor; the
-*extraction* half is tracked separately as new gap G-14, since ADR 0009
-deliberately keeps "can a job be claimed/executed/retried/recovered
-exactly once" separate from "what does execution actually do"). The
-Durable Processing Orchestration workstream (S1-C1) itself is Complete
-and Hosted-Verified.
+hosted-verified, proven with a controlled no-op processor). The Durable
+Processing Orchestration workstream (S1-C1) itself is Complete and
+Hosted-Verified.
+
+**Closed this session:** G-14 — the Worker's controlled no-op processor is
+replaced with a real, deterministic PDF page/text extractor (`pypdf`, ADR
+0010). Source integrity is revalidated twice independently before any
+extraction; a canonical JSON artifact (proven byte-identical across
+repeated runs) is uploaded privately and independently re-verified;
+finalization is atomic with idempotent identity-based reuse. Two real
+concurrency bugs were found and fixed by actually racing two independent
+processes at the same extraction identity — see §-7 for the full account.
+Verified both locally (001–008 RLS suite, two genuine dual-process
+concurrency proofs, 91/91 Worker pytest assertions, full web
+build/lint/test) and against the real hosted Development project (real
+GoTrue JWT, real Storage upload/download, the actual unmodified Worker
+code claiming and extracting a real PDF, idempotent reprocessing, trust
+boundary, RLS) — see §-7 and
+`docs/verification/sprint-1.2b-pdf-extraction-verification.md`. The
+Deterministic PDF Extraction workstream (S1-C2) itself is Complete and
+Hosted-Verified.
 
 **Closed prior sessions:** G-01 (hosted Supabase), G-08 (Vercel Protection
 Bypass), G-11/G-12 (Sprint 1.1 items), G-02/G-05/G-06 (Sprint 0 items) —
 see git history for the session-by-session record; not repeated here.
 
-None of the remaining gaps (G-03, G-04, G-07, G-09, G-10, G-14) block this
-task's closure — each is either a product/clinical decision, later Sprint
-1 work explicitly out of this task's scope (real extraction, AI provider
-selection), or a documented pre-Controlled-Beta requirement.
+None of the remaining gaps (G-03, G-04, G-07, G-09, G-10) block starting
+Sprint 1-D — each is either a product/clinical decision, later Sprint 1
+work explicitly out of scope (AI provider selection), or a documented
+pre-Controlled-Beta requirement.
 
 ---
 
 ## 6. Recommended next task
 
-Workstream S1-C1 (Durable Processing Orchestration) is closed. Atomic
-claim, hashed-lease ownership, heartbeat renewal, exponential-backoff
-retry, dead-lettering, lease-expiry crash recovery, cancellation,
-application layer, and minimal UI are implemented and verified against
-plain Postgres (including a genuine dual-process concurrency proof), the
-real hosted Development project (real JWTs, real `service_role` calls,
-including a 20-parallel-request real HTTP concurrency race), and Vercel
-Preview. Two real, hosted-only bugs (a pgcrypto `search_path` gap and a
-default-privileges gap that had made the trust-boundary claim false) were
-found and fixed this session — see §-6 for the full account.
+Workstream S1-C2 (Deterministic PDF Page and Text Extraction) is Complete
+and Hosted-Verified: a real, deterministic `pypdf`-based extractor (ADR
+0010, selected over the mission's suggested PyMuPDF specifically for its
+AGPL-3.0 licensing) plugs into the unchanged S1-C1 claim/lease/retry/
+complete lifecycle. Source-integrity double-revalidation, deterministic
+normalization, canonical JSON artifacts, atomic idempotent finalization,
+minimal Admin/Reviewer UI, and two real concurrency bugs found and fixed
+via genuine dual-process racing are all implemented and verified against
+plain Postgres 16, the Worker's own pytest suite (91/91), and the real
+hosted Development project end-to-end (real GoTrue JWT, real Storage,
+the actual unmodified Worker code). See §-7 for the full account and
+`docs/verification/sprint-1.2b-pdf-extraction-verification.md` for the
+complete verification record.
 
 ```text
-Begin Sprint 1.2B — Deterministic PDF Page and Text Extraction
+Begin Sprint 1-D — Extraction Review, OCR Decision, and Deterministic Chunking
 ```
 
-This is workstream S1-C2 (`MASTER_BACKLOG.md`): real PyMuPDF-based
-parsing plugs into the now-proven claim/lease/retry/complete lifecycle,
-replacing S1-C1's controlled no-op processor
-(`apps/worker/app/processing.py::noop_processor`). Still not chunking or
-a reviewer extraction-review queue (S1-D). G-03 (clinical domain
-confirmation) should ideally be resolved before or alongside real content
-work. Playwright browser-driven E2E (G-09) stays a documented
-pre-Controlled-Beta requirement, not a blocker.
+This is workstream S1-D (`MASTER_BACKLOG.md`): a reviewer queue over
+extraction results, a real decision on OCR for suspected-scanned pages,
+and deterministic chunking — none of which are implemented in S1-C2 by
+design (see `docs/domain/document-extraction-lifecycle.md`). G-03
+(clinical domain confirmation) should ideally be resolved before or
+alongside real content work. Playwright browser-driven E2E (G-09) stays a
+documented pre-Controlled-Beta requirement, not a blocker.

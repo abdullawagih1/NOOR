@@ -85,6 +85,26 @@ exists.
   contain internals. See
   `docs/security/worker-orchestration-authorization.md` and
   `docs/domain/document-processing-orchestration.md`.
+* **Deterministic PDF extraction (Sprint 1.2B): the same hardened trust
+  boundary, applied from the start.** Migration
+  `0008_deterministic_pdf_extraction.sql` adds three more Worker-only
+  functions, never granted to `authenticated`/`anon` from their very first
+  version — the exact fix migration 0007 needed a real hosted-only bug to
+  discover (see above) is now a permanent regression test
+  (`supabase/tests/rls/007_security_hardening_review.sql`) and was applied
+  proactively here rather than found the hard way twice. Source-document
+  integrity is revalidated independently in two places (Worker-side
+  streaming checksum/size/signature check, and again by the database
+  function before it will create an extraction run) before any extraction
+  ever begins — a checksum mismatch produces zero artifact. Two real
+  concurrency bugs were found and fixed by actually racing two independent
+  OS processes at the same deterministic extraction identity
+  (`supabase/tests/concurrency/verify_concurrent_extraction_identity.sh`,
+  5 consecutive runs, all 4 possible race outcomes observed): a raw
+  `unique_violation` on simultaneous success, and a raw "not running"
+  error when a job's run was superseded mid-flight — both now resolved
+  gracefully, never a raw database error surfaced to the Worker. See
+  `docs/security/pdf-extraction-security.md`.
 * **G-12 closed this session:** a guideline-version creator who also holds
   `guidelines.approve` still cannot approve their own version — the one
   self-approval scenario the Sprint 1 guideline-registry test suite could
@@ -175,8 +195,16 @@ exists.
 
 ## Known gaps (Sprint 1+)
 
+* No malware/antivirus scanning of the source PDF beyond signature
+  validation (unchanged from Sprint 1.1) applies equally to the Worker's
+  `pypdf`-based parsing step — a malicious PDF could theoretically exploit
+  a `pypdf`-level vulnerability. The extraction timeout and
+  exception-containment around every parse path are the only mitigations
+  in place this sprint. See `docs/security/pdf-extraction-security.md`.
 * No dependency vulnerability scanning beyond `npm audit` run manually —
-  not wired into CI as a blocking gate yet.
+  not wired into CI as a blocking gate yet. The same applies to the
+  Worker's new `pip` dependencies (`pypdf`, `reportlab`, `pillow`) — no
+  automated Python dependency audit exists in CI yet.
 * A new transitive dependency, `sharp` (pulled in by Next 15's image
   pipeline), carries its own disclosed advisory. `apps/web` doesn't use
   `next/image` anywhere, so this is currently inert — re-check before ever

@@ -6,8 +6,8 @@ retrieves and cites only approved, versioned guideline text, and refuses to
 answer when evidence is insufficient. Noor is not an autonomous diagnostician
 — the clinician always retains final clinical authority.
 
-This repository is at **Sprint 1, workstream S1-C1 — Durable Processing
-Orchestration**. Sprint 0.5's
+This repository is at **Sprint 1, workstream S1-C2 — Deterministic PDF
+Page and Text Extraction**. Sprint 0.5's
 hosted infrastructure foundation (identity/tenancy/RLS, real Supabase
 Auth, the Noor Design System, the worker scaffold, the shared clinical
 schema contract) is unchanged and remains verified — against plain
@@ -57,6 +57,28 @@ processor**, deliberately not real PDF extraction (that's Sprint 1.2B).
 concurrency proof, and 27/27 Worker pytest assertions. See
 `docs/domain/document-processing-orchestration.md`, ADR 0009, and
 `docs/verification/sprint-1.2a-processing-orchestration-verification.md`.
+
+**S1-C2 — deterministic PDF page and text extraction:** the Worker's
+controlled no-op processor is replaced with a real, deterministic
+extractor (`pypdf`, ADR 0010 — chosen over the mission's suggested
+`PyMuPDF` specifically because that library is AGPL-3.0, a real licensing
+risk for a commercial SaaS). Source integrity is revalidated twice,
+independently, before any extraction begins; text is normalized
+deterministically; a canonical JSON artifact (proven byte-identical
+across repeated runs) is uploaded privately and independently
+re-verified; finalization is atomic with idempotent identity-based reuse
+— one succeeded extraction per `(source checksum, pipeline version,
+configuration version, extractor name, extractor version)`. Two real
+concurrency bugs were found and fixed by actually racing two independent
+processes at the same extraction identity (not by reading the SQL) — see
+`docs/database/deterministic-pdf-extraction-schema.md`. Verified end to
+end against the real hosted Development project — real GoTrue JWT, real
+Storage upload, the actual unmodified Worker code claiming and extracting
+a real PDF, idempotent reprocessing, and the trust boundary confirmed
+denied for both an org_admin and a clinician JWT. No OCR, no chunking, no
+embeddings, no retrieval — deliberately out of scope (that's S1-D/S1-E).
+See `docs/domain/document-extraction-lifecycle.md`, ADR 0010, and
+`docs/verification/sprint-1.2b-pdf-extraction-verification.md`.
 
 The repository is pushed to GitHub with CI passing on real GitHub Actions
 runs. See `PROJECT_STATE.md` for the authoritative current status and open
@@ -196,12 +218,12 @@ false-passing.
 * `clinical/intended-use/INTENDED_USE.md`
 * `clinical/risk-management/RISK_REGISTER.md`
 * `docs/architecture/DECISIONS.md`
-* `docs/domain/{guideline-registry,guideline-lifecycle,guideline-source-documents,document-intake-lifecycle,document-processing-orchestration,document-processing-lifecycle}.md`
-* `docs/database/{guideline-registry-schema,secure-document-intake-schema,document-processing-orchestration-schema}.md`
-* `docs/security/{guideline-registry-authorization,document-intake-authorization,worker-orchestration-authorization}.md`
-* `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci,environment-variables,worker-deployment,worker-processing-runbook,job-recovery-and-dead-letter,guideline-document-upload}.md`
+* `docs/domain/{guideline-registry,guideline-lifecycle,guideline-source-documents,document-intake-lifecycle,document-processing-orchestration,document-processing-lifecycle,document-extraction-lifecycle,document-extraction-artifacts}.md`
+* `docs/database/{guideline-registry-schema,secure-document-intake-schema,document-processing-orchestration-schema,deterministic-pdf-extraction-schema}.md`
+* `docs/security/{guideline-registry-authorization,document-intake-authorization,worker-orchestration-authorization,pdf-extraction-security}.md`
+* `docs/operations/{hosted-supabase-setup,vercel-preview-deployment,github-ci,environment-variables,worker-deployment,worker-processing-runbook,job-recovery-and-dead-letter,guideline-document-upload,pdf-extraction-worker-runbook,extraction-failure-recovery}.md`
 * `docs/design-system/NOOR_DESIGN_SYSTEM.md`
-* `docs/verification/{sprint-0.5-hosted-verification,sprint-1-guideline-registry-verification,sprint-1.1-document-intake-verification,sprint-1.2a-processing-orchestration-verification}.md`
+* `docs/verification/{sprint-0.5-hosted-verification,sprint-1-guideline-registry-verification,sprint-1.1-document-intake-verification,sprint-1.2a-processing-orchestration-verification,sprint-1.2b-pdf-extraction-verification}.md`
 * `SECURITY.md`
 * `KNOWN_LIMITATIONS.md`
 

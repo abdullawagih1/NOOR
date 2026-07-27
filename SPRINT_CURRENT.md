@@ -1,102 +1,122 @@
-# Sprint Current: Sprint 1.2A — Durable Processing Orchestration
+# Sprint Current: Sprint 1.2B — Deterministic PDF Page and Text Extraction
 
-**Status:** Complete and Hosted-Verified. See
-`docs/verification/sprint-1.2a-processing-orchestration-verification.md`.
-Two real, hosted-only bugs were found and fixed during hosted
-verification (neither reproducible against local plain Postgres) — see
-"Real bugs found on hosted" below.
+**Status:** Complete and Hosted-Verified. Local verification (Postgres 16
+full suite, two genuine dual-process concurrency proofs, 91/91 Worker
+pytest assertions, full web build/lint/test) and hosted Development
+verification (real GoTrue JWT, real Storage, the actual unmodified Worker
+code processing a real PDF end-to-end, idempotent reprocessing, trust
+boundary, RLS, full synthetic-data cleanup) both green, and Vercel
+Preview redeployed and healthy — see
+`docs/verification/sprint-1.2b-pdf-extraction-verification.md` for the
+full record.
 
-Workstreams `S1-A` and `S1-B` closed in prior sessions. This sprint is
-workstream `S1-C1` — see `MASTER_BACKLOG.md` for the reconciled
-`S1-A`/`S1-B`/`S1-C1`/`S1-C2`/`S1-D`/`S1-E` breakdown (`S1-C` was split
-into `S1-C1`, this sprint's orchestration control plane, and `S1-C2`,
-next sprint's real PDF extraction — see below).
+Workstreams `S1-A`/`S1-B`/`S1-C1` closed in prior sessions. This sprint is
+workstream `S1-C2` — see `MASTER_BACKLOG.md` for the reconciled
+`S1-A`/`S1-B`/`S1-C1`/`S1-C2`/`S1-D`/`S1-E` breakdown.
 
-## Mandatory review completed first
+## Mandatory first review completed
 
-- [x] **Streaming file verification** — Sprint 1.1's
-      `completeGuidelineUploadAction` fully buffered the uploaded file
-      into memory (`.download().arrayBuffer()`) before computing
-      size/PDF-signature/SHA-256. Refactored to genuine incremental
-      streaming (`apps/web/lib/documents/streamVerification.ts`, a raw
-      authenticated `fetch()` against the Storage REST endpoint +
-      `ReadableStream` processing) — same trust model, same 50 MB limit,
-      provably early-aborts on an oversized stream (5 new unit tests,
-      including an explicit pull-count proof of early abort).
+- [x] **Security-definer schema-resolution hardening (mission §5)** —
+      verified `PUBLIC`/`authenticated`/`anon` cannot `CREATE` in `public`
+      (and, where it exists, `extensions`) on both environments; confirmed
+      every migration-0007 orchestration function's `search_path` is
+      exactly `public` or `public, extensions`, never broader; confirmed
+      (again) the six Worker-only functions carry no
+      `authenticated`/`anon` EXECUTE grant. Turned into a **permanent**
+      regression suite (`supabase/tests/rls/007_security_hardening_review.sql`)
+      rather than a one-off check, so the exact hosted-only bug found in
+      Sprint 1.2A can never silently regress unnoticed.
 
 ## Objectives
 
-- [x] Atomic claim (`FOR UPDATE SKIP LOCKED`), worker identity
-      (`WORKER_INSTANCE_ID`, stable per process), hashed lease-token
-      ownership with heartbeat-based renewal
-      (`supabase/migrations/0007_durable_processing_orchestration.sql`)
-- [x] `document_processing_attempts` history: one row per claim, statuses
-      `started → succeeded | retryable_failure | terminal_failure |
-      lease_expired | cancelled | abandoned`
-- [x] Exponential-backoff retry (30s/60s/120s/.../900s cap,
-      `max_attempts=3`), a single canonical `compute_retry_delay_seconds()`
-      shared by both the failure-reporting and crash-recovery paths
-- [x] Lease-expiry crash recovery
-      (`recover_expired_document_processing_jobs()`), safe under
-      concurrent recovery calls
-- [x] User cancellation widened to `queued`/`retry_scheduled`
-- [x] Six new orchestration functions never granted to `authenticated` —
-      only `service_role` (the Worker) can call them; `cancel_processing_job`
-      remains the one `authenticated`-callable, permission-gated exception
-- [x] Worker polling loop (Mode A, ADR 0009) running a **controlled no-op
-      processor** — claim → start → heartbeat → complete/fail, graceful
-      shutdown, `WORKER_PROCESSING_MODE=disabled` by default so no
-      existing deployment or test run is affected until opted in
-      (`apps/worker/app/{orchestration_client,worker_loop,processing}.py`)
-- [x] Application layer + minimal UI: `listDocumentProcessingAttempts`,
-      Job Status Card, permission-gated Attempt History — no lease
-      tokens/secrets/stack traces/signed URLs, no fabricated progress
-      percentages
-- [x] Local Postgres 16 verification — 27/27 real orchestration
-      assertions, plus the pre-existing 001–005 suites unmodified and
-      still 100% green on top of migration 0007
-- [x] Genuine dual-OS-process concurrency proof — 80 real jobs, two
-      independent `psql` connections, zero double-claims, zero lost jobs
-      (`supabase/tests/concurrency/verify_concurrent_claim.sh`)
-- [x] Worker verification — 27/27 pytest assertions (9 pre-existing +
-      18 new), `python -m compileall` clean
-- [x] Hosted Development verification — migration applied, 30/30 real
-      concurrent/lease/retry/recovery/cancellation checks with real JWTs
-      and real `service_role` calls (including a 20-parallel-request real
-      HTTP concurrency race), synthetic data cleaned up and confirmed
-      zero-residue
-- [x] Vercel Preview redeployed and confirmed healthy, Deployment
-      Protection still correctly enforced
+- [x] Extractor selection documented — ADR 0010: `pypdf` (BSD-3-Clause)
+      over the mission's suggested `PyMuPDF` (AGPL-3.0 since v1.24.1 — a
+      real licensing risk for a commercial SaaS, not a capability gap)
+- [x] Source integrity revalidated twice, independently — Worker-side
+      streaming checksum/size/signature check, and again by
+      `create_document_extraction_run()` against the registered document
+      row — before any extraction begins; a mismatch produces zero
+      artifact
+- [x] Secure, unpredictable temp-file handling with guaranteed cleanup
+      (`finally`-equivalent, verified even on early-abort paths)
+- [x] Deterministic page-level extraction, text normalization, page and
+      artifact checksums, technical quality metrics, conservative
+      suspected-scanned detection (image-XObject-based, never OCR)
+- [x] Canonical, deterministic JSON artifact — proven byte-identical
+      across repeated runs of the same fixture; no timestamps in hashed
+      content
+- [x] Artifact uploaded privately, independently re-downloaded and
+      re-hashed before being trusted as the finalized result
+- [x] Atomic finalization with idempotent identity-based reuse — one
+      succeeded run per `(org, source_sha256, pipeline_version,
+      configuration_version, extractor_name, extractor_version)`
+- [x] Extraction integrated into the existing, unchanged Sprint 1.2A
+      `WorkerLoop` — `WORKER_PROCESSING_MODE=extraction`, reusing
+      `document_parsing` as the job_type (not a new
+      `document_extraction` value — see
+      `docs/domain/document-extraction-lifecycle.md`)
+- [x] Minimal UI: Extraction Summary Card, permission-gated page list,
+      read-only page-detail route — no editing, no fabricated progress
+- [x] Local Postgres 16 verification — full 001–008 suite green,
+      including the pre-existing 001–007 suites unmodified on top of
+      migration 0008
+- [x] Two genuine dual-OS-process concurrency proofs — the unchanged
+      1.2A claim-race proof, and a new extraction-identity race proof (5
+      consecutive runs, all 4 possible race outcomes observed, zero
+      unexpected errors)
+- [x] Worker verification — 91/91 pytest assertions (59 pre-existing +
+      32 new), `python -m compileall` clean
+- [x] Hosted Development verification — migration applied, real
+      end-to-end extraction with real JWTs/`service_role`, failure
+      fixtures, deterministic reprocessing, tenant isolation, synthetic
+      data cleaned up
+- [x] Vercel Preview redeployed and confirmed healthy
 
-## Real bugs found on hosted (neither reproducible locally)
+## Real bugs found locally (by actually running the concurrency tests, not by reading the SQL)
 
-1. **`gen_random_bytes`/`digest` not found under `search_path=public`.**
-   Hosted Supabase pre-installs pgcrypto in an `extensions` schema, not
-   `public` — invisible locally, where a fresh `postgres:16` container
-   installs it directly into `public`. Fixed by adding `extensions` to
-   the two affected functions' `search_path` (safe on both environments —
-   a nonexistent schema in `search_path` is silently skipped).
-2. **`authenticated`/`anon` could call all six Worker-only functions** —
-   this migration's core trust-boundary claim was false on hosted until
-   this was found and fixed. Hosted Supabase's default privileges grant
-   EXECUTE directly to `authenticated`/`anon`/`service_role` at function
-   creation time, a grant `revoke ... from public` never touches. Fixed
-   with an explicit, guarded revoke from `authenticated` and `anon` on
-   every function in this migration. See ADR 0009's addendum and the
-   verification record for the full account.
+1. **`finalize_document_extraction_run()` raised a raw `unique_violation`**
+   when two genuinely simultaneous extraction attempts at the same
+   identity both tried to mark themselves `succeeded`. Fixed with an
+   exception handler that gracefully adopts the winning run instead of
+   surfacing a raw constraint-violation error.
+2. **A second, related race surfaced immediately after fixing the
+   first**: a job superseded mid-flight (its own `create` call committed,
+   but it was superseded by a different job's attempt before it reached
+   `finalize`) raised a raw "not running" error. Fixed by explicitly
+   detecting the supersession case and either adopting an
+   already-succeeded winner or raising a clear, named, retryable error —
+   never a raw, unclassified exception. Both fixes re-verified together
+   across 5 consecutive concurrency-script runs.
+
+See `docs/database/deterministic-pdf-extraction-schema.md` for the full
+technical account.
+
+## A real hosted-only test-execution finding (not a product bug)
+
+Running the SQL test suite against hosted required the Supabase
+Management API's SQL query endpoint (no direct Postgres connection string
+held for the hosted project), which batches an entire multi-statement
+submission differently than `psql -f`'s per-statement autocommit — a
+`begin/rollback` block not preceded by its own fresh commit can unwind
+earlier, otherwise-successful statements in the same batch. This surfaced
+as a false failure in `008_pdf_extraction.sql`'s original TEST 15/15b.
+Fixed in the committed test file by switching to the same bare-`DO`-block
+role-switch pattern already proven safe by TEST 16 in the same file — no
+product/RLS defect involved; re-verified locally with zero regression.
+See `docs/verification/sprint-1.2b-pdf-extraction-verification.md`.
 
 ## Explicitly out of scope this task (per the mission)
 
-Real PDF/OCR/chunking/embedding/retrieval/LLM logic — the Worker's
-processor is a controlled no-op only, never labeled as real extraction.
-Kubernetes, Celery/Temporal, a second parallel job-state system, and
-mandatory Supabase Queues integration were all explicitly excluded; Mode A
-(direct database polling) was chosen instead (ADR 0009).
+OCR, table reconstruction, image extraction, clinical section
+classification, semantic/fixed-size chunking, embeddings, retrieval,
+reranking, LLM calls, human correction UI, knowledge activation based on
+extraction. The pipeline stops at immutable, deterministic, page-level
+extraction artifacts and technical metrics.
 
 ## Next sprint
 
 ```text
-Begin Sprint 1.2B — Deterministic PDF Page and Text Extraction
+Begin Sprint 1-D — Extraction Review, OCR Decision, and Deterministic Chunking
 ```
 
-See `MASTER_BACKLOG.md` (S1-C2).
+See `MASTER_BACKLOG.md` (S1-D).

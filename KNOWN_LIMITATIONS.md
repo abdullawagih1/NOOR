@@ -1,4 +1,4 @@
-# Known Limitations — Sprint 1.2A
+# Known Limitations — Sprint 1.2B
 
 Honest accounting of what this build does and does not verify. Update in
 the same PR that resolves an item.
@@ -305,3 +305,69 @@ the same PR that resolves an item.
     simplification (both tables carry an identical RLS predicate); revisit
     if a future role ever needs job-status visibility without
     attempt-history visibility or vice versa.
+
+38. **No OCR.** A page with no extractable text layer is reported
+    honestly (`no_text_layer`/`suspected_scanned`), never silently
+    reconstructed. OCR remains explicitly out of scope (S1-D territory;
+    mission §4).
+
+39. **No table reconstruction, no image extraction.** Only page-level
+    plain text, dimensions, rotation, and technical metrics are extracted
+    — no structured tables, no embedded image content.
+
+40. **No layout-aware reading-order correction beyond the extractor's own
+    output.** `pypdf`'s `extract_text()` reconstructs reading order from
+    the PDF content stream's operator order — complex multi-column
+    layouts or right-to-left (Arabic) paragraphs may not extract in true
+    visual reading order. Noor's own normalization code never attempts to
+    algorithmically "fix" this (mission §17: no reordering, no inference).
+
+41. **No clinical section classification, no semantic or fixed-size
+    chunking, no embeddings, no retrieval.** This sprint stops at
+    immutable, deterministic, page-level extraction artifacts and
+    technical metrics — S1-D (chunking, reviewer extraction queue) and
+    S1-E (embeddings, retrieval) are future, separate workstreams.
+
+42. **No human correction UI.** The page-detail view
+    (`/knowledge/guidelines/[guidelineId]/extractions/[runId]/pages/[pageNumber]`)
+    is read-only — no editing, no clinical-approval controls. A reviewer
+    correction workflow is S1-D scope.
+
+43. **Suspected-scanned detection is a conservative heuristic, not a
+    certainty.** A page is flagged only when it has no extractable text
+    *and* contains at least one embedded raster image — this can miss
+    genuinely scanned pages whose PDF has no embedded-image XObject in an
+    unusual encoding, and will never falsely flag a text-bearing page.
+    See `docs/domain/document-extraction-artifacts.md`.
+
+44. **Encrypted/password-protected PDFs are rejected outright**, never
+    decrypted with a supplied password — `encrypted_pdf`/
+    `password_protected_pdf` are terminal (non-retryable) failure codes.
+
+45. **Extraction quality depends entirely on the source PDF's own text
+    layer.** A well-formed born-digital PDF extracts cleanly; a PDF with a
+    malformed or missing `ToUnicode` CMap may extract garbled or no text
+    — this is a property of the source file, not a pipeline defect, and
+    is reported as a low/zero character count rather than an error.
+
+46. **Production-scale and maximum-size (50 MB) extraction performance is
+    untested.** Only small synthetic fixtures (largest ~44 KB) were used
+    this sprint's verification — a real, large, complex clinical
+    guideline PDF's extraction time and memory profile are unverified.
+    `EXTRACTION_MAX_SECONDS` (default 300s) is a configurable bound, not a
+    tuned production value.
+
+47. **Orphaned temporary files from a hard-killed (`SIGKILL`) Worker
+    process are not actively swept.** Graceful shutdown and per-attempt
+    `finally`-block cleanup are both real and verified; there is no
+    startup routine that sweeps a stale `noor-extract-*` temp directory
+    left behind by a process that was killed rather than stopped cleanly.
+    See `docs/operations/pdf-extraction-worker-runbook.md`.
+
+48. **This pipeline provides technical extraction, not clinical
+    validation.** Page counts, character counts, blank-page detection,
+    and suspected-scanned flags are technical facts about the PDF's text
+    layer — they say nothing about clinical accuracy, guideline approval,
+    evidence quality, recommendation validity, or medical completeness
+    (mission §2.4). No extraction result implies or grants any clinical
+    status.
