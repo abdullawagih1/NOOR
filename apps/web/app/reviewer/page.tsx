@@ -12,10 +12,19 @@ export default function ReviewerPage() {
       />
       <EmptyState
         title="Guideline review queue is live"
-        description="Real guideline versions awaiting clinical review — approve/reject decisions and safety concerns are recorded and audited. Extraction/document review (post-parsing) remains later Sprint 1 scope."
+        description="Real guideline versions awaiting clinical review — approve/reject decisions and safety concerns are recorded and audited."
         action={
           <Link href="/reviewer/guidelines">
             <Button variant="secondary">Open Review Queue</Button>
+          </Link>
+        }
+      />
+      <EmptyState
+        title="Extraction technical review is live (Sprint 1-D1)"
+        description="A technical quality gate over deterministic PDF extraction — page-level findings, OCR/reprocessing/rejection decisions, and downstream chunking eligibility. This is a technical review, not a clinical one."
+        action={
+          <Link href="/reviewer/extractions">
+            <Button variant="secondary">Open Extraction Review Queue</Button>
           </Link>
         }
       />

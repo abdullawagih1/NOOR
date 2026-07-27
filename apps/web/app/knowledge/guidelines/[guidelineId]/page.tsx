@@ -36,6 +36,9 @@ import {
   formatBytes,
   shortSha,
 } from "@/lib/documents/ui";
+import { getLatestExtractionReviewForRun } from "@/lib/extraction-review/queries";
+import { ExtractionReviewStatusBadge } from "@/lib/extraction-review/ui";
+import { createExtractionReviewAction } from "@/lib/extraction-review/actions";
 import { UploadPanel } from "./UploadPanel";
 import { PageHeader, Card, Section, Badge, TextInput, Textarea, Select, Button, Alert } from "@noor/ui";
 
@@ -232,6 +235,8 @@ async function SourceDocuments({
               canReadExtractions={has(PERMISSIONS.GUIDELINE_EXTRACTIONS_READ)}
               canReadExtractionPages={has(PERMISSIONS.GUIDELINE_EXTRACTIONS_READ_PAGES)}
               canReadExtractionArtifacts={has(PERMISSIONS.GUIDELINE_EXTRACTIONS_READ_ARTIFACTS)}
+              canReadExtractionReviews={has(PERMISSIONS.GUIDELINE_EXTRACTION_REVIEWS_READ)}
+              canCreateExtractionReview={has(PERMISSIONS.GUIDELINE_EXTRACTION_REVIEWS_CREATE)}
             />
           ))}
         </div>
@@ -336,17 +341,22 @@ async function ExtractionSummaryCard({
   guidelineId,
   canReadPages,
   canReadArtifacts,
+  canReadReviews,
+  canCreateReview,
 }: {
   sourceDocumentId: string;
   guidelineId: string;
   canReadPages: boolean;
   canReadArtifacts: boolean;
+  canReadReviews: boolean;
+  canCreateReview: boolean;
 }) {
   const runs = await listDocumentExtractionRuns(sourceDocumentId);
   const run = runs[0];
   if (!run) return null;
 
   const pages = canReadPages && run.status === "succeeded" ? await listDocumentExtractionPages(run.id) : [];
+  const latestReview = canReadReviews && run.status === "succeeded" ? await getLatestExtractionReviewForRun(run.id) : null;
 
   return (
     <div className="mt-xs rounded-sm border border-border bg-surface p-xs">
@@ -361,6 +371,30 @@ async function ExtractionSummaryCard({
           <span className="font-mono text-muted">artifact:{shortSha(run.artifact_sha256)}</span>
         ) : null}
       </div>
+
+      {run.status === "succeeded" && canReadReviews ? (
+        <div className="mt-xs flex flex-wrap items-center gap-xs text-xs">
+          <span className="text-muted">Technical review:</span>
+          {latestReview ? (
+            <>
+              <ExtractionReviewStatusBadge status={latestReview.review_status} />
+              <a className="underline" href={`/reviewer/extractions/${latestReview.id}`}>
+                Open review
+              </a>
+            </>
+          ) : canCreateReview ? (
+            <form action={createExtractionReviewAction} className="inline">
+              <input type="hidden" name="extractionRunId" value={run.id} />
+              <input type="hidden" name="guidelineId" value={guidelineId} />
+              <Button type="submit" size="sm" variant="secondary">
+                Start technical review
+              </Button>
+            </form>
+          ) : (
+            <span className="text-muted">Not yet opened for review</span>
+          )}
+        </div>
+      ) : null}
 
       {run.status === "succeeded" ? (
         <dl className="mt-xs grid grid-cols-2 gap-x-md gap-y-xxs text-xs text-muted sm:grid-cols-4">
@@ -458,6 +492,8 @@ async function SourceDocumentRow({
   canReadExtractions,
   canReadExtractionPages,
   canReadExtractionArtifacts,
+  canReadExtractionReviews,
+  canCreateExtractionReview,
 }: {
   document: import("@/lib/documents/queries").GuidelineSourceDocumentRow;
   guidelineId: string;
@@ -466,6 +502,8 @@ async function SourceDocumentRow({
   canReadExtractions: boolean;
   canReadExtractionPages: boolean;
   canReadExtractionArtifacts: boolean;
+  canReadExtractionReviews: boolean;
+  canCreateExtractionReview: boolean;
 }) {
   const jobs = await listDocumentProcessingJobs(doc.id);
   const latestJob = jobs[0];
@@ -494,6 +532,8 @@ async function SourceDocumentRow({
           guidelineId={guidelineId}
           canReadPages={canReadExtractionPages}
           canReadArtifacts={canReadExtractionArtifacts}
+          canReadReviews={canReadExtractionReviews}
+          canCreateReview={canCreateExtractionReview}
         />
       ) : null}
 
