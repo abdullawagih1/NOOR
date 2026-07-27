@@ -4,3 +4,16 @@ pydantic==2.9.2
 pydantic-settings==2.6.1
 httpx==0.27.2
 pytest==8.3.3
+
+# Deterministic PDF extraction (Sprint 1.2B) — see ADR 0010.
+pypdf==6.14.2
+
+# Fixture generation only (apps/worker/tests/fixtures/pdf/generate_fixtures.py).
+# Never imported by app/pdf_extraction/* or any test's assertions — the
+# generated .pdf files are committed as static binary fixtures, so pytest
+# itself does not need these at run time. Kept in this single
+# requirements.txt (matching this project's one-file convention) rather
+# than a separate requirements-dev.txt, since they're only needed if a
+# fixture is ever regenerated.
+reportlab==4.2.5
+pillow==12.3.0

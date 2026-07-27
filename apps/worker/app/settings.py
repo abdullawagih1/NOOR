@@ -14,9 +14,20 @@ be friction with no corresponding behavior to protect.
 deployment and test run is unaffected until an operator explicitly opts in
 (Sprint 1.2A). "noop" runs the durable-orchestration claim/heartbeat/
 complete loop against a controlled no-op processor only — see ADR 0009 and
-`app/processing.py`. There is deliberately no third mode that selects a
-test failure-injection processor: those exist only as direct Python
-function parameters inside pytest, never as a runtime-selectable value.
+`app/processing.py`. "extraction" (Sprint 1.2B) runs the same loop against
+the real, deterministic PyPdfExtractor-backed processor — see ADR 0010 and
+`app/pdf_extraction/processor.py`. There is deliberately no mode that
+selects a test failure-injection processor: those exist only as direct
+Python function parameters inside pytest, never as a runtime-selectable
+value.
+
+`worker_enabled_job_types` reuses the existing `document_parsing` job_type
+value from migration 0006 rather than the mission's suggested
+`document_extraction` string — that job_type has meant "this job's payload
+is a PDF that needs its text extracted" since Sprint 1.1; Sprint 1.2B is
+what actually implements it for real, not a new job kind. See
+docs/domain/document-extraction-lifecycle.md for the naming
+reconciliation.
 """
 from __future__ import annotations
 
@@ -52,7 +63,14 @@ class Settings(BaseSettings):
     worker_lease_duration_seconds: int = 90
     worker_heartbeat_interval_seconds: int = 30
     worker_max_concurrent_jobs: int = 1
-    worker_processing_mode: str = "disabled"  # "disabled" | "noop"
+    worker_processing_mode: str = "disabled"  # "disabled" | "noop" | "extraction"
+
+    # --- Deterministic PDF extraction (Sprint 1.2B) -------------------------
+    worker_enabled_job_types: str = "document_parsing"
+    extraction_pipeline_version: str | None = None  # None -> use the pinned default in app/pdf_extraction/config.py
+    extraction_configuration_version: str | None = None
+    extraction_max_seconds: float = 300.0
+    extraction_temp_directory: str | None = None  # None -> OS default (tempfile.mkdtemp())
 
     @field_validator("worker_internal_token")
     @classmethod
@@ -67,9 +85,13 @@ class Settings(BaseSettings):
     @field_validator("worker_processing_mode")
     @classmethod
     def processing_mode_must_be_known(cls, value: str) -> str:
-        if value not in ("disabled", "noop"):
-            raise ValueError('WORKER_PROCESSING_MODE must be "disabled" or "noop"')
+        if value not in ("disabled", "noop", "extraction"):
+            raise ValueError('WORKER_PROCESSING_MODE must be "disabled", "noop", or "extraction"')
         return value
+
+    @property
+    def worker_enabled_job_types_list(self) -> list[str]:
+        return [t.strip() for t in self.worker_enabled_job_types.split(",") if t.strip()]
 
     @model_validator(mode="after")
     def _assign_stable_worker_instance_id(self) -> "Settings":

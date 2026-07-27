@@ -26,6 +26,8 @@ from pydantic import BaseModel, Field
 
 from app.auth import verify_internal_token
 from app.orchestration_client import OrchestrationClient
+from app.pdf_extraction.config import EXTRACTION_CONFIGURATION_VERSION, EXTRACTION_PIPELINE_VERSION, PDF_EXTRACTOR_NAME, PDF_EXTRACTOR_VERSION, assert_pinned_extractor_version
+from app.pdf_extraction.processor import make_extraction_processor
 from app.settings import get_settings
 from app.worker_loop import WorkerLoop
 
@@ -46,25 +48,50 @@ _worker_thread: threading.Thread | None = None
 async def lifespan(_: FastAPI):
     global _orchestration_client, _worker_loop, _worker_thread
 
-    if settings.worker_processing_mode == "noop":
+    if settings.worker_processing_mode in ("noop", "extraction"):
         if settings.supabase_url and settings.supabase_service_role_key:
-            _orchestration_client = OrchestrationClient(
-                str(settings.supabase_url), settings.supabase_service_role_key.get_secret_value()
-            )
-            _worker_loop = WorkerLoop(
+            supabase_url = str(settings.supabase_url)
+            service_role_key = settings.supabase_service_role_key.get_secret_value()
+            _orchestration_client = OrchestrationClient(supabase_url, service_role_key)
+
+            processor = None
+            if settings.worker_processing_mode == "extraction":
+                assert_pinned_extractor_version()
+                processor = make_extraction_processor(
+                    _orchestration_client,
+                    worker_instance_id=settings.worker_instance_id,  # type: ignore[arg-type]
+                    supabase_url=supabase_url,
+                    service_role_key=service_role_key,
+                    pipeline_version=settings.extraction_pipeline_version or EXTRACTION_PIPELINE_VERSION,
+                    configuration_version=settings.extraction_configuration_version or EXTRACTION_CONFIGURATION_VERSION,
+                    extractor_name=PDF_EXTRACTOR_NAME,
+                    extractor_version=PDF_EXTRACTOR_VERSION,
+                    max_seconds=settings.extraction_max_seconds,
+                    temp_directory=settings.extraction_temp_directory,
+                )
+
+            worker_loop_kwargs = dict(
                 client=_orchestration_client,
                 worker_instance_id=settings.worker_instance_id,  # type: ignore[arg-type]
                 poll_interval_seconds=settings.worker_poll_interval_seconds,
                 lease_duration_seconds=settings.worker_lease_duration_seconds,
                 heartbeat_interval_seconds=settings.worker_heartbeat_interval_seconds,
+                job_types=settings.worker_enabled_job_types_list,
             )
+            if processor is not None:
+                worker_loop_kwargs["processor"] = processor
+
+            _worker_loop = WorkerLoop(**worker_loop_kwargs)
             _worker_thread = threading.Thread(target=_worker_loop.run_forever, daemon=True)
             _worker_thread.start()
-            logger.info("orchestration polling loop started worker_instance_id=%s", settings.worker_instance_id)
+            logger.info(
+                "orchestration polling loop started worker_instance_id=%s mode=%s",
+                settings.worker_instance_id, settings.worker_processing_mode,
+            )
         else:
             logger.warning(
-                "WORKER_PROCESSING_MODE=noop but SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY are not set; "
-                "the orchestration polling loop will not start"
+                "WORKER_PROCESSING_MODE=%s but SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY are not set; "
+                "the orchestration polling loop will not start", settings.worker_processing_mode,
             )
 
     yield
@@ -146,9 +173,10 @@ def health() -> dict:
 def ready() -> dict:
     """
     Readiness probe. `orchestration_loop_running` reflects real, observable
-    thread state (WORKER_PROCESSING_MODE=noop and the background poll
-    thread is alive) — never a fabricated dependency check. Model-provider
-    dependencies remain unwired (Sprint 1.2B+).
+    thread state (WORKER_PROCESSING_MODE is "noop" or "extraction" and the
+    background poll thread is alive) — never a fabricated dependency check.
+    Model-provider dependencies remain unwired (retrieval/generation is
+    future scope).
     """
     return {
         "status": "ready",
