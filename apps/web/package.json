@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx tests/redirect.test.ts && tsx tests/permissions.test.ts && tsx tests/env.test.ts && tsx tests/guidelines-schemas.test.ts && tsx tests/guidelines-errors.test.ts && tsx tests/documents-schemas.test.ts && tsx tests/documents-errors.test.ts && tsx tests/documents-config.test.ts && tsx tests/documents-stream-verification.test.ts && tsx tests/documents-orchestration-ui.test.ts"
+    "test": "tsx tests/redirect.test.ts && tsx tests/permissions.test.ts && tsx tests/env.test.ts && tsx tests/guidelines-schemas.test.ts && tsx tests/guidelines-errors.test.ts && tsx tests/documents-schemas.test.ts && tsx tests/documents-errors.test.ts && tsx tests/documents-config.test.ts && tsx tests/documents-stream-verification.test.ts && tsx tests/documents-orchestration-ui.test.ts && tsx tests/extraction-review-schemas.test.ts && tsx tests/extraction-review-errors.test.ts"
   },
   "dependencies": {
     "next": "15.5.21",

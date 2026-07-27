@@ -93,6 +93,24 @@ check("each document-intake permission is mapped to at least one role", () => {
   }
 });
 
+check("each extraction review permission is mapped to at least one role", () => {
+  const extractionReviewPermissions = [
+    PERMISSIONS.GUIDELINE_EXTRACTION_REVIEWS_READ,
+    PERMISSIONS.GUIDELINE_EXTRACTION_REVIEWS_CREATE,
+    PERMISSIONS.GUIDELINE_EXTRACTION_REVIEWS_ASSIGN,
+    PERMISSIONS.GUIDELINE_EXTRACTION_REVIEWS_REVIEW,
+    PERMISSIONS.GUIDELINE_EXTRACTION_REVIEWS_SUBMIT,
+    PERMISSIONS.GUIDELINE_EXTRACTION_REVIEWS_REOPEN,
+    PERMISSIONS.GUIDELINE_EXTRACTION_FINDINGS_CREATE,
+    PERMISSIONS.GUIDELINE_EXTRACTION_FINDINGS_RESOLVE,
+    PERMISSIONS.GUIDELINE_EXTRACTION_SOURCE_READ,
+  ];
+  for (const key of extractionReviewPermissions) {
+    const mappingCount = (migrationSql.match(new RegExp(`'${key}'`, "g")) ?? []).length;
+    assert.ok(mappingCount >= 2, `"${key}" is seeded but never mapped to a role in any (role_key, permission_key) VALUES list`);
+  }
+});
+
 if (failures > 0) {
   console.log(`\n${failures} test(s) failed.`);
   process.exit(1);
