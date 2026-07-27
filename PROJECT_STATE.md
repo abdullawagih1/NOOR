@@ -102,6 +102,19 @@ was cleaned up and confirmed zero-residual. Vercel Preview redeployed,
 Deployment Protection intact. Full record:
 `docs/verification/sprint-1.2b-pdf-extraction-verification.md`.
 
+**A third real bug, found by CI itself, not locally:** the first push
+failed the `database` job — CI always starts a genuinely fresh Postgres
+container per run, and `008_pdf_extraction.sql` was missing its own
+explicit `grant select on document_extraction_runs,
+document_extraction_pages to authenticated` (the `authenticated` role
+doesn't exist until the RLS suite's first file creates it, so migration
+0008's own guarded grant is a no-op there — exactly the same constraint
+migrations 0005/0006 already solved in their own test files, which 008
+never copied). A reused local Docker container had been silently masking
+this the whole time. Fixed, re-verified against multiple genuinely fresh
+`postgres:16` containers, re-pushed — CI confirmed green
+(`4514f20`, run `30249901666`).
+
 **Sprint 1.2B (Deterministic PDF Page and Text Extraction): Complete and
 Hosted-Verified.**
 
