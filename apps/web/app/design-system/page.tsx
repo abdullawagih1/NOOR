@@ -1,10 +1,15 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import {
   spacing,
   radius,
   shadows,
   typeScale,
   semanticStates,
+  brandNavy,
+  brandBlue,
+  brandTeal,
+  brandEmerald,
   Button,
   IconButton,
   TextInput,
@@ -63,9 +68,32 @@ export default function DesignSystemPage() {
         description="Foundation tokens and components. This route 404s in production builds."
       />
 
+      <Section title="Official brand" description="Derived from the approved NOOR logo — see docs/brand/NOOR_BRAND.md. Never redrawn; only cropped from the original artwork.">
+        <div className="flex flex-col gap-lg">
+          <div className="flex flex-wrap items-center gap-lg">
+            <Image src="/brand/noor-logo-primary.png" alt="Noor — Clinical Intelligence" width={226} height={200} className="h-28 w-auto" />
+            <Image src="/brand/noor-logo-navigation.png" alt="Noor navigation lockup" width={121} height={100} className="h-16 w-auto" />
+            <Image src="/brand/noor-symbol.png" alt="Noor symbol" width={100} height={100} className="h-16 w-auto" />
+          </div>
+          <div className="h-3 w-full max-w-sm rounded-pill bg-brand-gradient" aria-hidden="true" />
+          {([
+            ["Deep Navy", brandNavy[500]],
+            ["Clinical Blue", brandBlue[500]],
+            ["Primary Teal", brandTeal[500]],
+            ["Emerald", brandEmerald[500]],
+          ] as const).map(([name, hex]) => (
+            <div key={name} className="flex items-center gap-sm">
+              <div className="h-10 w-10 rounded-md border border-border" style={{ backgroundColor: hex }} />
+              <span className="text-sm text-body">{name}</span>
+              <span className="font-mono text-xs text-muted">{hex}</span>
+            </div>
+          ))}
+        </div>
+      </Section>
+
       <Section title="Colors">
         <div className="grid grid-cols-2 gap-sm sm:grid-cols-4">
-          {["primary", "primary-active", "primary-soft", "ink", "body", "muted", "muted-soft", "canvas", "surface-soft", "surface-strong", "border", "border-strong"].map((name) => (
+          {["primary", "primary-active", "primary-soft", "accent", "accent-active", "accent-soft", "ink", "body", "muted", "muted-soft", "canvas", "surface-soft", "surface-strong", "border", "border-strong"].map((name) => (
             <div key={name} className="flex flex-col gap-xxs">
               <div className="h-12 rounded-md border border-border" style={{ backgroundColor: `var(--noor-color-${name})` }} />
               <span className="text-xs text-muted">{name}</span>
