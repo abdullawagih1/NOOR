@@ -1,5 +1,86 @@
 # Changelog
 
+## [Unreleased] — UX-1: NOOR Brand and Design System Alignment
+
+### Added
+
+* The official, user-approved NOOR logo, preserved byte-for-byte
+  (`apps/web/public/brand/source/noor-logo-original.jpeg`) and derived
+  into five real crops — never redrawn: `noor-logo-primary.png` (full
+  lockup), `noor-logo-navigation.png` (mark + wordmark), `noor-symbol.png`
+  (+ sized variants), `favicon.ico`, `social-preview.png`.
+* Favicon, Apple touch icon, Open Graph/Twitter card metadata, and
+  `themeColor` — none existed anywhere in the repository before this
+  sprint.
+* Four full brand color scales (`brandNavy`/`brandBlue`/`brandTeal`/
+  `brandEmerald`, 50–950) plus two support scales (`brandCyan`/
+  `brandSlate`) and one official gradient token
+  (`packages/ui/tokens/colors.ts`).
+* A new `accent` (Primary Teal) semantic slot, split out from `primary`
+  (Clinical Blue) — navigation-active state and the focus ring now use
+  `accent`, matching the logo's own blue-interaction/teal-wayfinding
+  split.
+* Five new, visually distinct status states —
+  `queued`/`retryScheduled`/`ocrRequired`/`reprocessingRequired`/
+  `deadLettered` — closing a real, found gap: `ocr_required` and
+  `reprocessing_required` were previously visually identical (same
+  color and icon, differing only in label text).
+* An "Official brand" section on the Development-only design-system
+  page (`/design-system`).
+* `docs/architecture/adr/0013-noor-brand-and-design-system-alignment.md`,
+  `docs/brand/{NOOR_BRAND,noor-logo-usage}.md`,
+  `docs/design/{noor-color-system,noor-component-theme,
+  noor-accessibility-review}.md`,
+  `docs/verification/ux-1-brand-alignment-verification.md`.
+
+### Changed
+
+* `packages/ui/components/{Button,Checkbox,Select,TextInput,
+  WorkspaceNav}.tsx` — focus rings and nav-active styling moved from
+  `primary` (blue) to the new `accent` (teal).
+* `apps/web/lib/{documents,extraction-review,ocr}/ui.tsx` — status
+  mappings for `queued`/`retry_scheduled`/`dead_lettered`/
+  `ocr_required`/`reprocessing_required` moved off the generic
+  `inactive`/`underReview`/`critical` buckets onto the five new,
+  distinct states.
+* `apps/web/app/WorkspaceHeader.tsx` — gained the navigation-crop logo
+  (the shared top nav every workspace layout renders; the app has no
+  sidebar, so none was invented).
+* `apps/web/app/login/page.tsx` — gained the primary logo and a
+  restrained gradient accent line; a real accessibility regression
+  (losing the page's only `<h1>` when the old `PageHeader` was removed)
+  was caught and fixed in the same edit.
+* `apps/web/app/layout.tsx` — added `metadataBase` (fixing a real
+  `next build` warning), icons, and Open Graph/Twitter metadata.
+
+### Verified this session (real, not assumed)
+
+* `apps/web`: `tsc --noEmit`, `next lint`, `next build` all clean (0
+  warnings); all 14 unit-test files pass individually.
+* `packages/ui`: `tsc --noEmit` clean.
+* `packages/clinical-schemas`: typecheck + all 6 tests pass.
+* `apps/worker`: the full pre-existing 79-assertion pytest suite still
+  passes unchanged — confirms this frontend-only sprint introduced zero
+  backend regression.
+* Every new color pairing checked against WCAG 2.2 (computed from real
+  hex values): all pass AA, most pass AAA — see
+  `docs/design/noor-accessibility-review.md`.
+
+### A real environmental issue, surfaced not hidden
+
+* Mid-session, this machine's `C:` drive was found at 99% capacity (0
+  bytes free at one measurement), making Docker unresponsive. Reported
+  to the user immediately rather than worked around silently; resumed
+  once minimal space was freed.
+
+### Known, not done this session (see KNOWN_LIMITATIONS.md, PROJECT_STATE.md)
+
+* **A real Vercel Preview deployment and browser-driven smoke test** —
+  not performed in this session segment.
+* No automated accessibility (axe/Lighthouse) or Playwright visual
+  regression tooling exists in this repository (pre-existing gap,
+  unchanged by this sprint).
+
 ## [Unreleased] — Sprint 1-D2: Controlled Page-Scoped OCR
 
 ### Added

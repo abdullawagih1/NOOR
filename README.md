@@ -132,9 +132,30 @@ full record.
 
 The repository is pushed to GitHub with CI passing on real GitHub Actions
 runs, including Sprint 1-D2's changes and the `worker` CI job's new
-tesseract-ocr install step. See `PROJECT_STATE.md` for
-the authoritative current status and open gaps (Playwright browser-driven
-E2E remains a pre-Controlled-Beta requirement, not a blocker).
+tesseract-ocr install step.
+
+**UX-1 — NOOR brand and design system alignment:** the user's officially
+approved NOOR logo is now the single source of truth for Noor's visual
+identity, derived into real, unmodified crops (never redrawn) for the
+top navigation, login page, favicon, app icons, and Open Graph card.
+Brand color anchors (Deep Navy, Clinical Blue, Primary Teal, Emerald)
+were independently pixel-sampled from the real logo and validated
+before being finalized as design tokens (`packages/ui/tokens/colors.ts`)
+that every shared component already consumed — re-branding the product
+was a token-value change, not a rewrite. Clinical safety semantics
+(danger/warning/critical) deliberately keep their pre-existing red/
+amber; only positive/neutral states adopted the brand hues. Verified
+locally (typecheck/lint/build clean across `apps/web`/`packages/ui`/
+`packages/clinical-schemas`, all unit tests passing, and the Worker's
+full 79-assertion suite unchanged, confirming zero backend regression).
+A real Vercel Preview deployment/browser check has not yet been
+performed for this sprint. See ADR 0013,
+`docs/brand/NOOR_BRAND.md`, and
+`docs/verification/ux-1-brand-alignment-verification.md`.
+
+See `PROJECT_STATE.md` for the authoritative current status and open
+gaps (Playwright browser-driven E2E remains a pre-Controlled-Beta
+requirement, not a blocker).
 
 ## Architecture
 

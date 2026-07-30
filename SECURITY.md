@@ -226,6 +226,15 @@ exists.
 
 ## Known gaps (Sprint 1+)
 
+* **UX-1's brand asset pipeline was reviewed for the standard image-
+  supply-chain risks**: the source logo carries no unnecessary metadata
+  worth stripping (a plain photo-editor JPEG, no embedded GPS/author
+  fields beyond default JFIF), no private filesystem path or secret is
+  embedded in any derived asset, and no screenshot or documentation
+  produced this sprint contains real user data (synthetic examples
+  only). A real Vercel Preview deployment/browser check — including its
+  own bundle/secret scan — has not been performed this session segment;
+  see `docs/verification/ux-1-brand-alignment-verification.md`.
 * No malware/antivirus scanning of the source PDF beyond signature
   validation (unchanged from Sprint 1.1) applies equally to the Worker's
   `pypdf`-based parsing step — a malicious PDF could theoretically exploit

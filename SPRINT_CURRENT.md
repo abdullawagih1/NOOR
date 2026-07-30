@@ -1,107 +1,94 @@
-# Sprint Current: Sprint 1-D2 — Controlled Page-Scoped OCR
+# Sprint Current: UX-1 — NOOR Brand and Design System Alignment
 
-**Status:** Complete and verified — locally, on hosted Development, and
-on a real Vercel Preview deployment (build `Ready`, CI green on
-`main`). The one gap left is a real browser-rendered check of the
-Preview URL, blocked by this Vercel team's own SSO Deployment
-Protection — see
-`docs/verification/sprint-1-d2-controlled-ocr-verification.md` for the
-full, honest account.
+**Status:** Locally complete and verified (typecheck/lint/build/all
+test suites clean across `apps/web`, `packages/ui`,
+`packages/clinical-schemas`, and `apps/worker`). A real Vercel Preview
+deployment and browser-driven smoke test have **not** been performed in
+this session segment — see
+`docs/verification/ux-1-brand-alignment-verification.md` for the full,
+honest account, including a real disk-space environmental issue
+encountered mid-session.
 
-Workstreams `S1-A`/`S1-B`/`S1-C1`/`S1-C2`/`S1-D1` closed in prior
-sessions. This sprint is workstream `S1-D2` — see `MASTER_BACKLOG.md` for
-the reconciled `S1-A`/`S1-B`/`S1-C1`/`S1-C2`/`S1-D1`/`S1-D2`/`S1-D3`/`S1-E`
-breakdown.
+Workstreams `S1-A`/`S1-B`/`S1-C1`/`S1-C2`/`S1-D1`/`S1-D2` closed in
+prior sessions. This sprint is workstream `UX-1` — a frontend/design
+sprint with **no** clinical-logic, database, RLS, or orchestration
+changes. See `MASTER_BACKLOG.md` for the reconciled backlog.
 
 ## Governing principle
 
-OCR execution success and OCR technical acceptance are two independent
-facts, exactly as S1-D1 established for extraction. OCR is page-scoped —
-only the pages a human reviewer explicitly flagged `ocr_candidate` are
-ever rendered or sent to the OCR engine, never a whole document — and
-never overwrites the deterministic native extraction it supplements.
+The user's approved NOOR logo is now the single source of truth for
+Noor's visual identity. The existing design-system token architecture
+(`packages/ui/tokens/*` → CSS custom properties → Tailwind utilities,
+ADR 0005) was sound and unchanged in structure — this sprint changed
+*values*, not architecture, plus a small number of component-level
+class references (see ADR 0013).
 
 ## Objectives
 
-- [x] Permission-scoped Storage hardening — `guideline-originals`/
-      `guideline-processed` `SELECT` now require an explicit permission
-      (`guideline_documents.read` / `guideline_extractions.read_artifacts`
-      / `guideline_ocr.read_artifacts`), not mere organization membership
-      — migration `0010_permission_scoped_storage_access.sql`, closing
-      the residual risk S1-D1 documented.
-- [x] OCR eligibility derived exclusively from explicit review evidence
-      (`document_extraction_page_reviews.review_status = 'ocr_candidate'`)
-      — never client-supplied, never from a technical heuristic alone.
-- [x] One controlled OCR request per extraction-review round, one durable
-      processing job per eligible page (not one document-wide job) —
-      migration `0011_controlled_page_scoped_ocr.sql`.
-- [x] Deterministic page rendering (`pypdfium2`) and self-hosted OCR
-      (`tesseract`, no cloud API) — see ADR 0012 for the selection
-      rationale against the mission's own criteria.
-- [x] OCR identity fully pinned (organization + source checksum +
-      extraction run + page + native page checksum + renderer identity +
-      rendered-image checksum + provider identity + model identity + OCR
-      config + language hints), idempotent reuse enforced by a partial
-      unique index, verified end-to-end including the reuse path.
-- [x] OCR results and native extraction kept as separate, independently
-      provenanced representations; `get_document_page_text_readiness()`
-      is the one place that derives which representation is canonical
-      per page — the underlying rows are never merged.
-- [x] OCR technical review, structurally separate from execution status,
-      with the same self-review block and reopen/invalidate semantics S1-D1
-      established for extraction review, plus a new cascade: reopening the
-      extraction review now invalidates any still-active dependent OCR
-      request, not just future request creation.
-- [x] Downstream chunking eligibility correctly derived for the
-      `ocr_required` path (every requested page must have an accepted
-      representation); retrieval eligibility remains hard-coded `false`.
-- [x] Local Postgres 16 verification — full 001–011 suite green across
-      four genuinely fresh containers (25 OCR assertions in 011, plus a
-      tightened, cross-sprint-consistent `submit_document_extraction_review`
-      rule bringing 009 to 41/41).
-- [x] Worker verification — 79/79 pytest assertions, including real
-      (non-mocked) rendering and Tesseract recognition against English/
-      Arabic/mixed-language synthetic fixtures, plus a real Docker-image
-      build-and-run smoke test.
-- [x] Web application UI — OCR request status on the guideline detail
-      page, an OCR review queue (`/reviewer/ocr`), and a side-by-side
-      review workspace (`/reviewer/ocr/[ocrReviewId]`) comparing the
-      original page, native extraction, and OCR result. Lint/typecheck/
-      build all clean; 136/136 test assertions (33 new).
-- [x] Hosted Development verification — real GoTrue JWTs, a real upload,
-      real extraction, real page-scoped OCR execution (Tesseract +
-      pypdfium2 against real Storage), a real downstream chunking-
-      eligibility flip, and a real permission-scoped Storage RLS proof;
-      all synthetic hosted data verified deleted back to zero afterward.
-- [x] Vercel Preview redeploy — deployment `Ready`
-      (`noor-pe7sql42t-abdullah-wagihs-projects.vercel.app`), build log
-      confirms both new routes in the production route table. A real
-      browser-rendered check is blocked by this team's own Vercel SSO
-      Deployment Protection and remains the one open item.
+- [x] Official logo preserved byte-for-byte (`apps/web/public/brand/source/`,
+      sha256-verified) and derived into five real, unmodified crops
+      (primary lockup, navigation lockup, symbol, favicon, social
+      preview) — never redrawn.
+- [x] Brand color anchors independently sampled from the real logo
+      pixels and validated against the mission's own supplied reference
+      values before being finalized — see
+      `docs/design/noor-color-system.md`.
+- [x] Centralized brand + semantic token system extended (not
+      replaced): four new 50–950 brand scales, a new `accent` (teal)
+      slot split out from `primary` (blue), one gradient token, and
+      five new distinct status states (`queued`/`retryScheduled`/
+      `ocrRequired`/`reprocessingRequired`/`deadLettered`) that close a
+      real, found gap — `ocr_required` and `reprocessing_required` were
+      previously visually identical.
+- [x] Shared UI components (`packages/ui`) updated: focus rings and
+      navigation-active state now use the new teal `accent`, not blue
+      `primary`, matching the logo's own blue-interaction/teal-
+      wayfinding split.
+- [x] Application shell — the logo was added to `WorkspaceHeader`, the
+      single shared top nav every workspace (admin/clinician/knowledge/
+      quality/reviewer) already renders. The mission described a
+      sidebar shell; the app has none, so none was invented.
+- [x] Login page redesigned with the primary logo and a restrained
+      gradient accent line; a real accessibility regression (losing the
+      page's only `<h1>`) was caught and fixed in the same edit.
+- [x] Favicon, app icons, Open Graph/Twitter metadata, and `themeColor`
+      added — none existed before this sprint.
+- [x] Development design-system page gained an "Official brand"
+      section (logo variants, gradient, anchor swatches); the existing
+      dynamic semantic-state swatch loop picked up the five new states
+      with zero page-level code change.
+- [x] Brand + design documentation written (ADR 0013,
+      `docs/brand/{NOOR_BRAND,noor-logo-usage}.md`,
+      `docs/design/{noor-color-system,noor-component-theme,
+      noor-accessibility-review}.md`).
+- [x] Full regression verification — `apps/web` typecheck/lint/build
+      clean, all 14 unit-test files pass, `packages/ui` typecheck
+      clean, `packages/clinical-schemas` typecheck+tests pass, and
+      `apps/worker`'s full 79-assertion pytest suite still passes
+      (confirms zero backend regression from a frontend-only sprint).
+- [ ] Vercel Preview deployment and browser-driven smoke test — **not
+      done this session segment**, see verification doc for why
+      (a real disk-space constraint was hit and flagged, not worked
+      around silently).
 
-## A prior session's work found non-functional, not merely incomplete
+## A real, disk-space environmental issue this session
 
-This session began by auditing in-progress, uncommitted work from an
-earlier Claude Code session (schema, Worker module, and an initial ADR
-already existed but had never been documented or verified). The audit
-found the Worker module could not even be imported
-(`app/ocr/processor.py` called a function that does not exist in
-`pipeline.py`), and a follow-on trace found the OCR-run identity was
-being recorded with a permanently empty image checksum — see
-`docs/verification/sprint-1-d2-controlled-ocr-verification.md` for the
-full account of these and six other real bugs (plus one real,
-hosted-only permission-model fact) found and fixed this session, none of
-which were assumed away.
+Mid-session, this machine's `C:` drive was found at 99% capacity (at
+one point 0 bytes reported free), making Docker unresponsive. This was
+surfaced to the user immediately rather than pushed through — see
+`docs/verification/ux-1-brand-alignment-verification.md`'s
+"Environmental note." All verification above completed successfully
+once minimal space was freed; none of it needed more than a few hundred
+MB.
 
 ## Explicitly out of scope this task (per the mission)
 
-Document-wide automatic OCR, multiple OCR providers/failover, handwriting
-recognition, table reconstruction, form understanding, manual text
-correction, chunk generation, embeddings, retrieval, reranking, LLM calls,
-clinical interpretation or evidence grading, automatic guideline
-activation, and any mutation of `document_extraction_pages`/
-`document_extraction_runs` (both remain exactly as immutable as S1-D1
-left them).
+Any change to database schema, RLS, permissions, processing states,
+extraction states, OCR states, review decisions, eligibility rules,
+Worker orchestration, or Storage authorization. Clinical semantic
+colors (danger/warning/critical) were deliberately left untouched by
+the brand refresh — see ADR 0013 §"Brand colors never override
+clinical safety semantics."
 
 ## Next sprint
 
@@ -109,4 +96,4 @@ left them).
 Begin Sprint 1-D3 — Deterministic Page-Aware Chunking
 ```
 
-See `MASTER_BACKLOG.md` (S1-D2/S1-D3).
+See `MASTER_BACKLOG.md` (S1-D3).

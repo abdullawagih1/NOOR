@@ -500,3 +500,35 @@ the same PR that resolves an item.
     include only one `clinical_reviewer` account. A second, genuinely
     distinct reviewer account exercising this same scenario has not been
     tested.
+
+65. **UX-1's Vercel Preview deployment and browser-driven smoke test
+    have not been performed** — a real disk-space environmental issue
+    (`C:` at 99% capacity, Docker unresponsive) was hit mid-session and
+    surfaced to the user rather than worked around; local verification
+    (typecheck/lint/build/all test suites across `apps/web`,
+    `packages/ui`, `packages/clinical-schemas`, `apps/worker`) completed
+    successfully once minimal space was freed, but no deployed,
+    browser-verified Preview exists yet for this sprint. See
+    `docs/verification/ux-1-brand-alignment-verification.md`.
+
+66. **No automated accessibility tooling (axe, Lighthouse CI, or
+    equivalent) exists in this repository.** Every WCAG contrast ratio
+    in `docs/design/noor-accessibility-review.md` was computed
+    programmatically from the actual hex values used, but no automated
+    DOM-level scan of a rendered page has ever been run — consistent
+    with this repository's broader, pre-existing gap (item 24: no
+    Playwright/browser-driven E2E exists at all).
+
+67. **No approved dark-background or monochrome NOOR logo variant
+    exists.** Only the white-background artwork was supplied and
+    approved. `brandColorsDark` (Noor's pre-existing dark-mode token
+    set) was updated for palette consistency, but the logo itself is
+    never placed on a dark surface anywhere in the product until such a
+    variant is produced by a human designer and separately approved —
+    see `docs/brand/noor-logo-usage.md`.
+
+68. **Favicon/app-icon legibility below ~32px is genuinely poor for the
+    logo's network-graphic detail.** This is an accepted fidelity
+    trade-off (the mission prohibits redrawing/simplifying the mark for
+    small sizes), not an oversight — see
+    `docs/brand/noor-logo-usage.md`.
