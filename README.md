@@ -76,9 +76,9 @@ end against the real hosted Development project — real GoTrue JWT, real
 Storage upload, the actual unmodified Worker code claiming and extracting
 a real PDF, idempotent reprocessing, and the trust boundary confirmed
 denied for both an org_admin and a clinician JWT. No OCR, no chunking, no
-embeddings, no retrieval — deliberately out of scope (that's S1-D1+).
-See `docs/domain/document-extraction-lifecycle.md`, ADR 0010, and
-`docs/verification/sprint-1.2b-pdf-extraction-verification.md`.
+embeddings, no retrieval at extraction time — deliberately out of scope
+(that's S1-D1+). See `docs/domain/document-extraction-lifecycle.md`,
+ADR 0010, and `docs/verification/sprint-1.2b-pdf-extraction-verification.md`.
 
 **S1-D1 — extraction review and technical quality gate:** "extraction
 execution succeeded" and "extraction quality is accepted" are two
@@ -92,15 +92,50 @@ function that re-checks every rule under lock. Downstream eligibility for
 OCR and chunking is server-derived, never a client-writable flag; a
 submitted decision is immutable except the one legal
 accepted-to-invalidated transition; self-review is blocked at the
-database level. No OCR execution, no chunking, no mutation of the
-deterministic extraction artifact — deliberately out of scope (that's
-S1-D2/S1-D3). See `docs/domain/extraction-review-lifecycle.md`, ADR 0011,
-and `docs/verification/sprint-1-d1-extraction-review-verification.md`.
+database level. No mutation of the deterministic extraction artifact —
+deliberately out of scope, permanently. See
+`docs/domain/extraction-review-lifecycle.md`, ADR 0011, and
+`docs/verification/sprint-1-d1-extraction-review-verification.md`.
+
+**S1-D2 — controlled page-scoped OCR:** only the exact pages a reviewer
+explicitly flagged `ocr_candidate` are ever rendered or sent to an OCR
+engine — never a whole document, never triggered by a technical
+heuristic alone (ADR 0012). Self-hosted Tesseract (no cloud API; no
+guideline content ever leaves Noor's own infrastructure for OCR) reads a
+deterministically rendered page image (`pypdfium2`); one durable
+processing job per page, one fully pinned OCR identity per attempt with
+idempotent reuse, OCR technical review structurally separate from
+execution status (the same execution/acceptance separation ADR 0011
+established, one layer deeper), and a single canonical-representation
+function (`get_document_page_text_readiness()`) that a future chunking
+pipeline can trust without ever needing to know whether a page's text
+came from native extraction or OCR. Permission-scoped Storage hardening
+(migration 0010) closed a residual risk S1-D1 had documented:
+`storage.objects` for source PDFs and processed artifacts now requires
+an explicit permission, not mere organization membership. An OCR review
+queue and side-by-side review workspace (original page, native
+extraction, and OCR result together) complete the application layer.
+Verified locally (four genuinely fresh Postgres 16 containers, 79
+Worker pytest assertions including real, non-mocked Tesseract
+recognition of English and mixed Arabic/English text, a real
+Docker-image build-and-run smoke test, and a clean Web lint/typecheck/
+build/test pass) **and on real hosted Development infrastructure** —
+real GoTrue JWTs, a real upload, real extraction, a real page-scoped OCR
+request, real Tesseract/pypdfium2 execution against real Storage, real
+downstream chunking-eligibility flip, and a real permission-scoped
+Storage RLS proof (denied for a clinician, permitted for the roles that
+should have access) — all synthetic hosted data verified deleted back to
+zero afterward. See
+`docs/architecture/adr/0012-controlled-page-scoped-ocr.md` and
+`docs/verification/sprint-1-d2-controlled-ocr-verification.md` for the
+full record.
 
 The repository is pushed to GitHub with CI passing on real GitHub Actions
-runs. See `PROJECT_STATE.md` for the authoritative current status and open
-gaps (Playwright browser-driven E2E remains a pre-Controlled-Beta
-requirement, not a blocker).
+runs (Sprint 1-D2's changes, including the `worker` CI job's new
+tesseract-ocr install step, are pending their first real run). See
+`PROJECT_STATE.md` for
+the authoritative current status and open gaps (Playwright browser-driven
+E2E remains a pre-Controlled-Beta requirement, not a blocker).
 
 ## Architecture
 

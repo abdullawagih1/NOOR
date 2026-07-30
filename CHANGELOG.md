@@ -1,5 +1,164 @@
 # Changelog
 
+## [Unreleased] — Sprint 1-D2: Controlled Page-Scoped OCR
+
+### Added
+
+* `supabase/migrations/0010_permission_scoped_storage_access.sql` —
+  closes the residual risk Sprint 1-D1 documented: `storage.objects`
+  `SELECT` for `guideline-originals`/`guideline-processed` now requires
+  an explicit permission (`guideline_documents.read` /
+  `guideline_extractions.read_artifacts` / `guideline_ocr.read_artifacts`),
+  not mere organization membership. No `authenticated` `INSERT` policy
+  exists for `guideline-processed` at all — only `service_role` writes
+  there.
+* `supabase/migrations/0011_controlled_page_scoped_ocr.sql` — six new
+  tables (`document_ocr_requests`, `document_ocr_request_pages`,
+  `document_ocr_runs`, `document_ocr_reviews`, `document_ocr_page_reviews`,
+  `document_ocr_findings`), a page-scoped extension of
+  `document_processing_jobs`, 9 new permissions, twelve client-facing
+  `SECURITY DEFINER` functions, three Worker-only functions
+  (`create_document_ocr_run`/`finalize_document_ocr_page`/`fail_document_ocr_run`),
+  a read-only `get_document_page_text_readiness()` derivation function,
+  and `create or replace` extensions of three Sprint 1-D1 functions
+  (`get_document_extraction_review_eligibility`,
+  `submit_document_extraction_review`, `reopen_extraction_review` — the
+  last now cascades into any still-active dependent OCR request).
+* `docs/architecture/adr/0012-controlled-page-scoped-ocr.md` — the
+  page-scoping rationale, provider/renderer selection (self-hosted
+  Tesseract + `pypdfium2`, not a cloud API), OCR identity/versioning, and
+  why chunking remains out of scope.
+* `apps/worker/app/ocr/{models,errors,config,checksums,renderer,provider,
+  artifact,artifact_storage,pipeline,processor}.py` — the full OCR
+  pipeline: a render-then-create-run-then-recognize three-phase design
+  (the run's identity depends on the rendered image's checksum, which is
+  only known after rendering), self-hosted Tesseract via `pytesseract`,
+  `pypdfium2` page rasterization, canonical artifact construction, and
+  `make_ocr_processor()` wired into the existing, unchanged
+  Sprint 1.2A `WorkerLoop` via a new `WORKER_PROCESSING_MODE=ocr`.
+* `apps/worker/scripts/fetch_tessdata_models.py` — fetches and
+  checksum-verifies the pinned `tessdata_fast` English/Arabic language
+  models from one specific upstream commit.
+* `supabase/tests/rls/011_controlled_ocr.sql` — 25 real assertions
+  covering request/page/run/review lifecycle, idempotent identity-based
+  reuse (both the partial-unique-index defense and the real
+  function-level reuse path across two different requests), `fail_document_ocr_run`
+  + retry-produces-a-fresh-run, the extraction-review-reopen cascade with
+  proof that succeeded pages are left historically untouched, self-review
+  blocking, cancellation, findings CRUD, and RLS/trust-boundary denial —
+  verified against three genuinely fresh `postgres:16` containers.
+* `apps/worker/tests/test_ocr_processor.py` (12 assertions) and
+  `test_ocr_renderer_and_provider.py` (8 assertions, **real** — non-mocked
+  — rendering and Tesseract recognition against the existing synthetic
+  fixtures, including real mixed Arabic/English recognition).
+* `docs/domain/{ocr-eligibility-and-lifecycle,ocr-page-representations}.md`,
+  `docs/database/controlled-ocr-schema.md`,
+  `docs/security/ocr-and-storage-authorization.md`,
+  `docs/operations/{ocr-worker-runbook,ocr-failure-recovery,ocr-model-upgrade}.md`,
+  `docs/verification/sprint-1-d2-controlled-ocr-verification.md`.
+* `apps/web/lib/ocr/{config,queries,schemas,errors,actions,ui}.ts(x)` —
+  the full application layer, mirroring `apps/web/lib/extraction-review/*`
+  one layer deeper: pinned OCR identity constants (kept in sync with
+  `apps/worker/app/ocr/config.py` by convention, not by shared code —
+  see the file's own doc comment), explicit-column queries, Zod
+  validation, safe error mapping, a Server Action per RPC including a
+  dedicated `createOcrReviewSourceAccessAction` gated by the new
+  `guideline_ocr.read_source` permission. 9 new `GUIDELINE_OCR_*`
+  constants added to `apps/web/lib/auth/permissions.ts`.
+* OCR review queue (`/reviewer/ocr`) and side-by-side review workspace
+  (`/reviewer/ocr/[ocrReviewId]`) — original page (signed URL,
+  auto-refreshed before expiry), native extraction text, and OCR
+  recognition result (character/word counts, average confidence
+  explicitly labeled as provider-specific technical metadata, text
+  checksum, warnings) shown together, findings panel, and the decision
+  submission form. An OCR section was added to the guideline detail
+  page's extraction summary card ("Start OCR request" → request status →
+  "Open OCR review").
+* `apps/web/tests/{ocr-schemas,ocr-errors}.test.ts` — 33 new assertions.
+
+### Fixed
+
+* **Five real bugs, found while making a prior session's uncommitted,
+  undocumented OCR work actually functional** — not assumed correct
+  because it existed: (1) `app/ocr/processor.py` called a function
+  (`run_ocr_pipeline`) that did not exist in `pipeline.py` — a plain
+  `ImportError`, found by actually trying to import the module inside a
+  built Docker image. (2) The Worker called `create_ocr_run` *before*
+  rendering, permanently recording every succeeded run's image checksum
+  as an empty string — fixed by restructuring into the documented
+  three-phase sequence. (3) `create_document_ocr_run`'s reused branch
+  never marked its request page terminal, which would have permanently
+  blocked opening a review for any reused identity — found while
+  designing the reuse test, not by reading the SQL. (4) Missing
+  `pytesseract`/`pypdfium2` in `requirements.txt` and a missing
+  `tesseract-ocr` apt install / tessdata fetch step in the Dockerfile —
+  confirmed fixed by an actual `docker build` and a real render+OCR run
+  inside the built image. (5) A Windows-specific Tesseract config-string
+  quoting bug (`pytesseract` splits its config with
+  `shlex.split(..., posix=not is_windows)`, which does not strip quotes
+  on Windows) — fixed by using the `TESSDATA_PREFIX` environment
+  variable instead, confirmed identical behavior on Linux afterward.
+* Two schema-level gaps against the mission's own invalidation rules and
+  established self-review policy, found by reading migration 0011
+  against the mission text directly: reopening the extraction review
+  never cascaded into an already-created OCR request, and
+  `start_document_ocr_review` had no self-review block (unlike its
+  Sprint 1-D1 extraction-review analogue). Both fixed inside migration
+  0011.
+* A real ordering bug in the new test file itself, found by the first
+  genuinely fresh container run: TEST 17's two throwaway, unlinked
+  `document_ocr` jobs were never cleaned up, so a later test claimed one
+  of them instead of the real job it depended on.
+* A real TypeScript bug in the new `apps/web/lib/ocr/queries.ts`, found
+  by `tsc --noEmit`, not by reading the code: `listOcrReviewQueue`
+  accessed a column directly on a `.select()` result built from a
+  non-literal string constant, which Supabase's generated types cannot
+  infer — fixed by following the `(row as unknown as RowType).field`
+  cast convention `apps/web/lib/extraction-review/queries.ts` already
+  established for exactly this reason.
+
+### Verified this session (not assumed)
+
+* Database: full 001–011 RLS suite green across three genuinely fresh
+  `postgres:16` containers (25 new OCR assertions).
+* Worker: `python -m compileall` clean; 79/79 pytest assertions (71
+  pre-existing/unaffected + 8 new real-engine tests); a real
+  `docker build` confirmed the pinned `tesseract-ocr` apt version
+  (`5.5.0-1+b1`) matches the code's pinned constant on the actual base
+  image, and a real render+OCR run inside the built image correctly
+  recognized English and mixed Arabic/English fixture text.
+* Web: lint/typecheck/production build all clean, including the two new
+  `/reviewer/ocr` routes (present in the build's route table); all 14
+  test files pass (136 assertions total, 33 new).
+* CI (`.github/workflows/pr.yml`) updated to install `tesseract-ocr` and
+  fetch tessdata before running Worker pytest — **not yet exercised on
+  GitHub Actions this session**.
+
+### Hosted Development verification (real, completed in a later continuation of this session)
+
+* Migrations `0010_permission_scoped_storage_access.sql` and
+  `0011_controlled_page_scoped_ocr.sql` applied to the real "Noor
+  Development" Supabase project.
+* A full real end-to-end run: real GoTrue JWTs, a real PDF upload, the
+  actual unmodified Worker code claiming and processing both a real
+  extraction job and a real OCR job (real pypdfium2 rendering, real
+  Tesseract recognition, a real Storage artifact upload independently
+  re-verified), and a real flip of `eligible_for_chunking` from `false`
+  to `true` once the OCR review was accepted.
+* A real permission-scoped Storage RLS proof against migration 0010
+  (zero local coverage by design) — a clinician denied, an
+  organization_admin and a clinical_reviewer both permitted, against the
+  same real Storage object with real JWTs.
+* All synthetic hosted data (organization, users, documents, extraction/
+  OCR rows, Storage objects, GoTrue accounts) deleted and verified back
+  to zero.
+
+### Known, not done this session (see KNOWN_LIMITATIONS.md, PROJECT_STATE.md)
+
+* **A Vercel Preview redeploy** — the new `/reviewer/ocr` routes have not
+  yet been exercised in a real browser or against a real deployed
+  environment.
+
 ## [Unreleased] — Sprint 1-D1: Extraction Review and Technical Quality Gate
 
 ### Added

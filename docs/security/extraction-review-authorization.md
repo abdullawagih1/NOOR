@@ -62,21 +62,18 @@ workspace:
 4. The signed URL is returned directly to the browser for the PDF
    `<iframe>` panel and is never logged or persisted anywhere.
 
-**A known, pre-existing limitation carried forward, not introduced by
-this sprint**: `storage.objects`' RLS policy (migration 0003) authorizes
-read access to any object under the caller's own organization's path
-prefix — it is organization-scoped, not permission-scoped. This means a
-clinician's own real session, if they constructed the exact Storage
-object path themselves and called the Supabase Storage API directly
-(bypassing Noor's own UI and server actions entirely), could still mint
-their own signed URL for a source PDF in their organization. This has
-been true since Sprint 1.1's document intake flow and is not something
-this sprint's `requirePermission` gate can close from the application
-layer alone — it would require tightening `storage.objects` RLS itself,
-which is out of this sprint's scope (see `KNOWN_LIMITATIONS.md`).
-Noor's own UI and server actions never grant this access to a clinician;
-what a clinician could do by hand-crafting raw Storage API calls is a
-documented gap, not a silent one.
+**Closed in Sprint 1-D2** (was a known, documented gap at the time this
+sprint was written): `storage.objects`' RLS policy for
+`guideline-originals` was, at the time, organization-scoped rather than
+permission-scoped — any active org member who constructed the exact
+Storage object path and called Supabase's Storage API directly could, in
+principle, mint their own signed URL for a source PDF regardless of
+their actual permissions. Migration `0010_permission_scoped_storage_access.sql`
+closed this by requiring `guideline_documents.read` at the Storage RLS
+layer itself, proven end-to-end against real hosted infrastructure with
+real GoTrue JWTs (a clinician denied, permitted roles allowed) — see
+`docs/security/ocr-and-storage-authorization.md` and
+`docs/verification/sprint-1-d2-controlled-ocr-verification.md`.
 
 ## Audit and events
 

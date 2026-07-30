@@ -1,12 +1,116 @@
 # PROJECT_STATE.md
 
-**Last updated:** Sprint 1-D1 — Extraction Review and Technical Quality
-Gate session (Claude Code, this environment)
+**Last updated:** Sprint 1-D2 — Controlled Page-Scoped OCR session
+(Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code)
 
 ---
 
-## -8. This session: Sprint 1-D1 — Extraction Review and Technical Quality Gate
+## -9. This session: Sprint 1-D2 — Controlled Page-Scoped OCR
+
+Implemented workstream `S1-D2`: permission-scoped Storage hardening
+(migration `0010_permission_scoped_storage_access.sql`, closing the
+residual risk S1-D1 documented — `storage.objects` RLS for the two
+guideline-content buckets now requires an explicit permission, not mere
+organization membership) and a controlled, page-scoped OCR pipeline
+(migration `0011_controlled_page_scoped_ocr.sql`, ADR 0012): OCR
+eligibility derived exclusively from explicit `ocr_candidate` review
+evidence, one durable processing job per eligible page, self-hosted
+Tesseract via `pypdfium2` rendering, a fully pinned OCR identity with
+idempotent reuse, OCR technical review structurally separate from
+execution status, and `get_document_page_text_readiness()` as the single
+canonical-representation derivation point for a future chunking
+pipeline.
+
+**This session began by auditing in-progress, uncommitted work from an
+earlier session, not by trusting it.** A prior Claude Code session had
+already written most of migrations 0010/0011 and the
+`apps/worker/app/ocr/*` module but left it uncommitted, undocumented, and
+— the audit found — **not actually functional**: `app/ocr/processor.py`
+called a function (`run_ocr_pipeline`) that does not exist in
+`pipeline.py`, an `ImportError` at module load time found by actually
+trying to import the module inside a built Docker image. Four more real
+bugs were found and fixed while making the module real
+(`docs/verification/sprint-1-d2-controlled-ocr-verification.md` has the
+full account): the OCR-run identity was being recorded with a
+permanently empty image checksum (Worker called `create_ocr_run` before
+rendering); `create_document_ocr_run`'s reused branch never marked its
+request page terminal, which would have permanently blocked
+`create_document_ocr_review` for any reused identity; missing
+`pytesseract`/`pypdfium2` in `requirements.txt` and a missing
+`tesseract-ocr` apt install / tessdata fetch in the Dockerfile; and a
+Windows-specific path-portability bug in Tesseract's config-string
+parsing (fixed via `TESSDATA_PREFIX`, confirmed identical behavior on
+Linux afterward). Two schema-level gaps against the mission's own
+invalidation rules and established self-review policy were also found by
+reading migration 0011 against the mission text directly: reopening the
+extraction review never cascaded into an already-created OCR request,
+and `start_document_ocr_review` had no self-review block (unlike its
+extraction-review analogue). Both fixed inside migration 0011 (still
+uncommitted, so edited directly rather than requiring a new migration
+file).
+
+**Verification, real not assumed:** local — the full 001–011 RLS suite
+(25 new OCR assertions) run against **three genuinely fresh
+`postgres:16` containers**, 100% green; a real ordering bug in the new
+test file itself (leftover throwaway jobs from a uniqueness test being
+claimed ahead of the jobs a later test depended on) was found by the
+first fresh-container run and fixed. Worker — 79/79 pytest assertions,
+including a new `test_ocr_processor.py` (Worker orchestration against a
+fake client, with `render_source_page`/`recognize_and_build_artifact`
+monkeypatched) and a new `test_ocr_renderer_and_provider.py` (**real,
+non-mocked** `pypdfium2` rendering and **real Tesseract recognition**
+against the synthetic English/Arabic/mixed-language fixtures — real
+mixed Arabic/English recognition confirmed, not assumed). A real
+Docker-image build-and-run smoke test confirmed the exact pinned
+`tesseract-ocr` apt version (`5.5.0-1+b1`) matches `app/ocr/config.py`'s
+constant on the actual base image (checked via `apt-cache policy`, not
+assumed), and confirmed real render+OCR end-to-end inside the built
+image. The web application UI was then built:
+`apps/web/lib/ocr/{config,queries,schemas,errors,actions,ui}.ts(x)` (the
+application layer, mirroring `apps/web/lib/extraction-review/*` one
+layer deeper — pinned OCR identity constants, explicit-column queries,
+Zod validation, safe error mapping, a Server Action per RPC including a
+dedicated signed-source-access action gated by the new
+`guideline_ocr.read_source` permission), an OCR review queue
+(`/reviewer/ocr`), a side-by-side review workspace
+(`/reviewer/ocr/[ocrReviewId]` — original page, native extraction, and
+OCR result shown together), and an OCR section on the guideline detail
+page's extraction summary card. A real TypeScript bug (accessing a
+column directly on a non-literal `.select()` result, which Supabase's
+generated types cannot infer) was found by `tsc --noEmit` and fixed by
+following the existing `(row as unknown as RowType).field` cast
+convention already established in `extraction-review/queries.ts`.
+`npm run typecheck`/`lint`/`build` all ran clean (the two new routes
+compile and appear in the production route table), and all 14
+`apps/web` test files (136 assertions total, 33 new — `ocr-schemas.test.ts`/
+`ocr-errors.test.ts`) pass, including `permissions.test.ts` confirming
+the 9 new `GUIDELINE_OCR_*` permission constants match migration 0011's
+real grants.
+
+**Hosted Development verification was completed in a later continuation
+of this same session**, once a Supabase Personal Access Token for the
+"Noor Development" project was provided: migrations 0010/0011 applied
+cleanly; a full real end-to-end run (real GoTrue JWTs, real upload, the
+actual unmodified Worker code for both extraction and OCR, real
+Tesseract/pypdfium2 execution, real downstream chunking-eligibility
+flip) succeeded; permission-scoped Storage RLS was proven against real
+JWTs (clinician denied, permitted roles allowed); all synthetic hosted
+data was deleted and verified back to zero. A real, hosted-only permission-model fact was surfaced only by actually
+running the flow (not a defect): `assign_ocr_reviewer` requires the
+caller, not just the assignee, to hold `guideline_ocr.review` —
+`organization_admin` deliberately does not hold it, so a reviewer must
+self-assign, which is not a self-review violation since that block is
+keyed on the source document's uploader, not the assigner. Full record:
+`docs/verification/sprint-1-d2-controlled-ocr-verification.md`.
+The Vercel Preview redeploy is tracked separately below.
+
+**Sprint 1-D2 (Controlled Page-Scoped OCR): complete and verified,
+locally and on hosted Development, including the web UI.**
+
+---
+
+## -8. Prior session: Sprint 1-D1 — Extraction Review and Technical Quality Gate
 
 Implemented workstream `S1-D1`: a technical quality gate over Sprint
 1.2B's deterministic extraction, structurally separate from execution
@@ -536,8 +640,9 @@ across every affected table.
 
 ## 0. Current phase
 
-**Sprint 1 — workstream S1-D1, Extraction Review and Technical Quality
-Gate, just closed locally (hosted verification in progress).**
+**Sprint 1 — workstream S1-D2, Controlled Page-Scoped OCR, locally
+complete and verified including the web UI; hosted verification remains
+outstanding (see §-9).**
 Sprint 0.5 (hosted infrastructure & design system) is **Complete and
 Hosted-Verified** — see §-3/§1 for that history; it is not reopened here.
 See `MASTER_BACKLOG.md` for the reconciled Sprint 1 workstream breakdown
@@ -827,30 +932,36 @@ pre-Controlled-Beta requirement.
 
 ## 6. Recommended next task
 
-Workstream S1-D1 (Extraction Review and Technical Quality Gate) is
-Complete and Hosted-Verified: review rounds, page/document-level
-findings, explicit per-page coverage, all five terminal decisions
-enforced inside one transactional function, server-derived downstream
-eligibility, database-level self-review blocking, and a deliberately
-separate permission namespace (ADR 0011) are all implemented and verified
-against plain Postgres 16 (39/39 new assertions, across multiple
-genuinely fresh containers), the full Web build/lint/typecheck/test
-suite, and the real hosted Development project end-to-end (real GoTrue
-JWTs, the actual unmodified Worker code, real PostgREST RPC calls for the
-full review lifecycle, real signed-Storage-access verification). See §-8
-for the full account and
-`docs/verification/sprint-1-d1-extraction-review-verification.md` for the
+Workstream S1-D2 (Controlled Page-Scoped OCR) is locally complete and
+verified: permission-scoped Storage hardening, OCR eligibility/request/
+run/review schema, a real self-hosted Tesseract pipeline, canonical
+page-text readiness, a deliberately separate permission namespace
+(ADR 0012), and the web application UI (OCR review queue and side-by-side
+review workspace) are all implemented and verified against plain
+Postgres 16 (25/25 new assertions, across three genuinely fresh
+containers), the Worker test suite (79/79, including real render+OCR
+against synthetic fixtures and a real Docker-image smoke test), and the
+Web test suite (136/136, including 33 new assertions this session) plus
+a clean lint/typecheck/production build. See §-9 for the full account,
+including six real bugs found and fixed, and
+`docs/verification/sprint-1-d2-controlled-ocr-verification.md` for the
 complete verification record.
 
+**One thing remains open from this sprint, not yet started**:
+
 ```text
-Begin Sprint 1-D2 — Controlled OCR Eligibility and OCR Processing Foundation
+Hosted Development verification for S1-D2 (migrations 0010/0011 applied
+to the real hosted project, real GoTrue JWTs exercising the full OCR
+request/run/review lifecycle against the real Worker and real Storage,
+a Vercel Preview redeploy, and a real-browser check of the new
+/reviewer/ocr routes) — blocked on hosted Supabase/Vercel credentials
+not being available in this session.
 ```
 
-This is workstream S1-D2 (`MASTER_BACKLOG.md`): OCR-provider selection and
-a controlled OCR execution pipeline for extraction runs/pages a review
-marked `ocr_required` — producing its own separately-provenanced OCR
-artifact, never a mutation of S1-C2's deterministic extraction or S1-D1's
-review records. G-03 (clinical domain confirmation) should ideally be
+Either close that gap, or begin Sprint 1-D3 — Deterministic Page-Aware
+Chunking (`MASTER_BACKLOG.md`), which only depends on
+`get_document_page_text_readiness()` (already implemented and verified)
+being correct. G-03 (clinical domain confirmation) should ideally be
 resolved before or alongside real content work. Playwright browser-driven
 E2E (G-09) stays a documented pre-Controlled-Beta requirement, not a
 blocker.

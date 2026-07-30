@@ -206,10 +206,12 @@ the same PR that resolves an item.
     accepting externally-sourced documents at any real scale — see
     `docs/security/document-intake-authorization.md`.
 
-23. **Only PDF is supported; no OCR.** `.pdf`/`application/pdf` is the only
-    accepted file type this sprint — no DOCX, HTML, images, or
-    scanned-image archives, and no OCR pipeline exists to make a
-    scanned/image-only PDF's content extractable later.
+23. **Only PDF is supported.** `.pdf`/`application/pdf` is the only
+    accepted file type — no DOCX, HTML, images, or scanned-image
+    archives. A controlled, page-scoped OCR pipeline for scanned/
+    image-only *pages within* an already-accepted PDF now exists
+    (Sprint 1-D2 — see item 57 below); this does not extend to other
+    file formats.
 
 24. **No browser-driven (Playwright) E2E of the upload flow.** The
     signed-upload-URL + direct-to-Storage-PUT sequence
@@ -306,10 +308,12 @@ the same PR that resolves an item.
     if a future role ever needs job-status visibility without
     attempt-history visibility or vice versa.
 
-38. **No OCR.** A page with no extractable text layer is reported
-    honestly (`no_text_layer`/`suspected_scanned`), never silently
-    reconstructed. OCR remains explicitly out of scope (S1-D territory;
-    mission §4).
+38. **Extraction itself performs no OCR.** A page with no extractable
+    text layer is reported honestly (`no_text_layer`/`suspected_scanned`)
+    by the deterministic extraction pipeline, never silently
+    reconstructed — OCR is a separate, human-gated pipeline (Sprint
+    1-D2, item 57) that only ever processes pages a reviewer explicitly
+    flagged, never triggered automatically by this flag.
 
 39. **No table reconstruction, no image extraction.** Only page-level
     plain text, dimensions, rotation, and technical metrics are extracted
@@ -389,15 +393,15 @@ the same PR that resolves an item.
     exist" check was deliberately not implemented in V1 (see ADR 0011
     §3.6) to avoid adding untested runtime complexity for an edge case.
 
-51. **`storage.objects` RLS remains organization-scoped, not
-    permission-scoped** (a pre-existing Sprint 1.1 characteristic, not
-    introduced by this sprint). Noor's own UI and server actions gate
-    signed source-PDF access behind `guideline_extraction_source.read`,
-    but a user who already holds *any* active membership in the
-    organization could, by constructing the exact Storage object path
-    and calling Supabase's Storage API directly (bypassing Noor's UI
-    entirely), still obtain their own signed URL. See
-    `docs/security/extraction-review-authorization.md`.
+51. **`storage.objects` RLS for `guideline-originals`/`guideline-processed`
+    is now permission-scoped, not merely organization-scoped — closed in
+    Sprint 1-D2** (migration `0010_permission_scoped_storage_access.sql`).
+    This item previously described the residual risk from Sprint 1.1;
+    see `docs/security/ocr-and-storage-authorization.md` for the closure
+    and `docs/security/extraction-review-authorization.md` for the
+    original finding. `evaluation-assets`/`generated-reports`/
+    `temporary-uploads` remain organization-scoped-only — none of them
+    hold guideline source content yet.
 
 52. **Reopening a review discards prior findings rather than copying them
     forward.** A reopened round starts with zero findings and zero pages
@@ -430,3 +434,64 @@ the same PR that resolves an item.
     reviewer's decision is final (subject to reopening/invalidation by
     an admin or quality manager) — there is no built-in "two independent
     reviewers must agree" workflow.
+
+57. **One OCR provider (Tesseract), self-hosted, no failover.** See ADR
+    0012 for the selection rationale. No cloud OCR API integration
+    exists or is planned without a separate, explicit
+    architectural/privacy approval.
+
+58. **No handwriting recognition, table reconstruction, form
+    understanding, or manual OCR-text correction.** OCR output is
+    machine-recognized plain text only; a future human-corrected-text
+    representation is an explicitly separate, not-yet-built workstream
+    (`docs/domain/ocr-page-representations.md`).
+
+59. **OCR provider confidence is technical metadata, not clinical
+    confidence, and is not comparable across providers or engine
+    versions.** Never presented in a UI (once built) as an accuracy
+    percentage or evidence-quality signal (mission §20).
+
+60. **OCR quality has not been benchmarked against real, complex
+    clinical guideline scans** — only synthetic fixtures (clean English,
+    clean Arabic, mixed Arabic/English, rotated, low-resolution, noisy,
+    empty-image, multi-column, table-like, headers/footers). Arabic and
+    mixed-language output should be assumed to need more careful human
+    technical review than clean English scans until real-world
+    benchmarking exists.
+
+61. **The OCR web application UI has not been exercised in a real
+    browser or against a real deployed environment.** The OCR review
+    queue (`/reviewer/ocr`), side-by-side review workspace
+    (`/reviewer/ocr/[ocrReviewId]`), and the guideline detail page's OCR
+    section are implemented and verified via `tsc --noEmit`, `next lint`,
+    a real production `next build` (both routes present in the route
+    table), and 136 unit-test assertions — but no Playwright/browser-
+    driven E2E and no hosted/Vercel check have been performed (consistent
+    with the same pre-existing gap for the extraction review workspace,
+    item 24).
+
+62. **Sprint 1-D2's Vercel Preview redeploy has not been performed.**
+    Hosted Development verification itself was completed in a later
+    continuation of this session (real GoTrue JWTs, a real upload, real
+    extraction and OCR execution via the actual unmodified Worker code
+    against real Storage, a real permission-scoped Storage RLS proof,
+    all synthetic hosted data verified deleted back to zero — see
+    `docs/verification/sprint-1-d2-controlled-ocr-verification.md`), but
+    the new `/reviewer/ocr` routes have not yet been exercised in a real
+    browser against a real deployed Preview environment.
+
+63. **`accepted_with_warnings` and `reprocessing_required` as
+    `submit_document_ocr_review` target statuses have no dedicated local
+    RLS test** — only `accepted` and `rejected` are exercised in
+    `supabase/tests/rls/011_controlled_ocr.sql`. The validation logic for
+    all four statuses was read directly against the SQL and is
+    structurally identical in shape to the two tested ones, but this is
+    a real, acknowledged test-coverage gap, not a verified-equivalent
+    claim.
+
+64. **The self-review test for OCR review uses a direct, test-only
+    fixture manipulation** (temporarily reassigning a source document's
+    `uploaded_by`), since this repository's synthetic test fixtures
+    include only one `clinical_reviewer` account. A second, genuinely
+    distinct reviewer account exercising this same scenario has not been
+    tested.

@@ -211,6 +211,18 @@ exists.
 * `/design-system` returns 404 whenever `NODE_ENV=production` — verified
   via a real production build; unreachable on any deployed environment,
   reachable only in local dev, where it renders mocked data only.
+* **`storage.objects` RLS for `guideline-originals`/`guideline-processed`
+  is now permission-scoped, not merely organization-scoped** (Sprint
+  1-D2, migration `0010_permission_scoped_storage_access.sql`) — closes
+  the residual risk documented in Sprint 1-D1. See
+  `docs/security/ocr-and-storage-authorization.md`.
+* **OCR is self-hosted (Tesseract), never a cloud API** — no guideline
+  page content leaves Noor's own infrastructure for OCR, no third-party
+  API key or DPA to protect. OCR only ever processes pages a human
+  reviewer explicitly flagged, never a whole document automatically
+  (ADR 0012). The three Worker-only OCR functions are explicitly
+  revoked from `PUBLIC`/`anon`/`authenticated`, the same trust boundary
+  as every other Worker-only function in this codebase.
 
 ## Known gaps (Sprint 1+)
 
@@ -222,21 +234,34 @@ exists.
   in place this sprint. See `docs/security/pdf-extraction-security.md`.
 * No dependency vulnerability scanning beyond `npm audit` run manually —
   not wired into CI as a blocking gate yet. The same applies to the
-  Worker's new `pip` dependencies (`pypdf`, `reportlab`, `pillow`) — no
-  automated Python dependency audit exists in CI yet.
+  Worker's `pip` dependencies (`pypdf`, `reportlab`, `pillow`, and, as of
+  Sprint 1-D2, `pytesseract`/`pypdfium2`) — no automated Python
+  dependency audit exists in CI yet.
+* **The OCR web application UI (request status, review queue, side-by-side
+  review workspace, and the `guideline_ocr.read_source`-gated signed-
+  source-access action) has been implemented and verified (typecheck/
+  lint/build/unit tests, plus the underlying RPCs and Storage RLS proven
+  against real hosted infrastructure) but has not been security-reviewed
+  against a real browser or a real deployed Vercel Preview environment** —
+  no Playwright/browser-driven E2E and no browser-driven Vercel check
+  have been performed. See `docs/security/ocr-and-storage-authorization.md`.
 * A new transitive dependency, `sharp` (pulled in by Next 15's image
   pipeline), carries its own disclosed advisory. `apps/web` doesn't use
   `next/image` anywhere, so this is currently inert — re-check before ever
   adopting it.
-* `storage.objects` RLS (migration 0003) remains organization-scoped, not
-  permission-scoped — a pre-existing Sprint 1.1 characteristic that
-  Sprint 1-D1's signed source-PDF access inherits rather than fixes. Any
-  active member of an organization who constructs the exact Storage
-  object path could, in principle, call Supabase's Storage API directly
-  and obtain their own signed URL, bypassing the
-  `guideline_extraction_source.read` permission gate that Noor's own UI
-  and server actions enforce. See
-  `docs/security/extraction-review-authorization.md`.
+* **Closed, Sprint 1-D2:** `storage.objects` RLS for the two
+  guideline-content buckets (`guideline-originals`/`guideline-processed`)
+  is no longer organization-scoped alone — migration
+  `0010_permission_scoped_storage_access.sql` now requires an explicit
+  permission (`guideline_documents.read` / `guideline_extractions.read_artifacts`
+  / `guideline_ocr.read_artifacts`) at the Storage RLS layer itself, real
+  end-to-end against hosted with real GoTrue JWTs (clinician denied,
+  permitted roles allowed — see
+  `docs/verification/sprint-1-d2-controlled-ocr-verification.md`). The
+  other three buckets (`evaluation-assets`/`generated-reports`/
+  `temporary-uploads`) remain organization-scoped only — a deliberate
+  scope decision, since none is used by any real flow yet. See
+  `docs/security/ocr-and-storage-authorization.md`.
 * No malware/antivirus scanning on uploaded PDFs — Sprint 1.1's intake
   flow validates the `%PDF-` file signature (confirms file *type*, not
   safety) and computes SHA-256, but no scanning provider is integrated
