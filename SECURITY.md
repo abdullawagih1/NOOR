@@ -240,11 +240,13 @@ exists.
 * **The OCR web application UI (request status, review queue, side-by-side
   review workspace, and the `guideline_ocr.read_source`-gated signed-
   source-access action) has been implemented and verified (typecheck/
-  lint/build/unit tests, plus the underlying RPCs and Storage RLS proven
-  against real hosted infrastructure) but has not been security-reviewed
-  against a real browser or a real deployed Vercel Preview environment** —
-  no Playwright/browser-driven E2E and no browser-driven Vercel check
-  have been performed. See `docs/security/ocr-and-storage-authorization.md`.
+  lint/build/unit tests, the underlying RPCs and Storage RLS proven
+  against real hosted infrastructure, and a real Vercel Preview
+  deployment confirmed `Ready`) but has not had a real browser-rendered
+  security review** — no Playwright/browser-driven E2E has been
+  performed, and this Vercel team's own SSO Deployment Protection blocks
+  any headless check of the live Preview URL. See
+  `docs/security/ocr-and-storage-authorization.md`.
 * A new transitive dependency, `sharp` (pulled in by Next 15's image
   pipeline), carries its own disclosed advisory. `apps/web` doesn't use
   `next/image` anywhere, so this is currently inert — re-check before ever

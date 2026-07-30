@@ -1,8 +1,10 @@
 # Sprint Current: Sprint 1-D2 — Controlled Page-Scoped OCR
 
-**Status:** Complete and verified, locally and on hosted Development,
-including the web application UI. The Vercel Preview redeploy is tracked
-separately below — see
+**Status:** Complete and verified — locally, on hosted Development, and
+on a real Vercel Preview deployment (build `Ready`, CI green on
+`main`). The one gap left is a real browser-rendered check of the
+Preview URL, blocked by this Vercel team's own SSO Deployment
+Protection — see
 `docs/verification/sprint-1-d2-controlled-ocr-verification.md` for the
 full, honest account.
 
@@ -71,7 +73,11 @@ never overwrites the deterministic native extraction it supplements.
       pypdfium2 against real Storage), a real downstream chunking-
       eligibility flip, and a real permission-scoped Storage RLS proof;
       all synthetic hosted data verified deleted back to zero afterward.
-- [ ] Vercel Preview redeploy — see below.
+- [x] Vercel Preview redeploy — deployment `Ready`
+      (`noor-pe7sql42t-abdullah-wagihs-projects.vercel.app`), build log
+      confirms both new routes in the production route table. A real
+      browser-rendered check is blocked by this team's own Vercel SSO
+      Deployment Protection and remains the one open item.
 
 ## A prior session's work found non-functional, not merely incomplete
 
@@ -100,8 +106,7 @@ left them).
 ## Next sprint
 
 ```text
-Complete Sprint 1-D2's one remaining gap — the Vercel Preview redeploy —
-or begin Sprint 1-D3 — Deterministic Page-Aware Chunking
+Begin Sprint 1-D3 — Deterministic Page-Aware Chunking
 ```
 
 See `MASTER_BACKLOG.md` (S1-D2/S1-D3).

@@ -106,7 +106,10 @@ keyed on the source document's uploader, not the assigner. Full record:
 The Vercel Preview redeploy is tracked separately below.
 
 **Sprint 1-D2 (Controlled Page-Scoped OCR): complete and verified,
-locally and on hosted Development, including the web UI.**
+locally, on hosted Development, and on a real Vercel Preview deployment
+(build `Ready`, CI green on `main`). The one open item is a real
+browser-rendered check of the Preview URL, blocked by this Vercel
+team's own SSO Deployment Protection.**
 
 ---
 

@@ -131,9 +131,8 @@ zero afterward. See
 full record.
 
 The repository is pushed to GitHub with CI passing on real GitHub Actions
-runs (Sprint 1-D2's changes, including the `worker` CI job's new
-tesseract-ocr install step, are pending their first real run). See
-`PROJECT_STATE.md` for
+runs, including Sprint 1-D2's changes and the `worker` CI job's new
+tesseract-ocr install step. See `PROJECT_STATE.md` for
 the authoritative current status and open gaps (Playwright browser-driven
 E2E remains a pre-Controlled-Beta requirement, not a blocker).
 

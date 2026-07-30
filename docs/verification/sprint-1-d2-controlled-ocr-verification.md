@@ -8,14 +8,18 @@ inferred or assumed. Companion docs: ADR 0012,
 `docs/operations/{ocr-worker-runbook,ocr-failure-recovery,ocr-model-upgrade}.md`.
 
 **Status: complete and verified, locally and on hosted Development,
-including the web application UI.** Hosted Development verification
-(mission §46) was completed in a later continuation of this same session
-once a Supabase Personal Access Token for the "Noor Development" project
-was provided — see "Hosted Development verification" below for the full,
-real account (real GoTrue JWTs, real Storage, real Tesseract/pypdfium2
-execution, real Storage-RLS permission-scoping proof, full synthetic-data
-cleanup verified back to zero). See "What was not done" below for the one
-remaining, deliberately-scoped gap (the Vercel Preview redeploy).
+including the web application UI, pushed to `main`, real CI green, and a
+real Vercel Preview deployed and confirmed `Ready`.** Hosted Development
+verification (mission §46) was completed in a later continuation of this
+same session once a Supabase Personal Access Token for the "Noor
+Development" project was provided — see "Hosted Development
+verification" below for the full, real account (real GoTrue JWTs, real
+Storage, real Tesseract/pypdfium2 execution, real Storage-RLS
+permission-scoping proof, full synthetic-data cleanup verified back to
+zero). The one thing that could not be done from this headless
+environment is a real browser-rendered check of the Preview URL, blocked
+by this Vercel team's own Deployment Protection SSO gate — see "What was
+not done" below.
 
 ## Starting state for this session
 
@@ -410,18 +414,47 @@ Admin API. Final verification query against hosted: organizations,
 guidelines, documents, extraction runs, OCR runs, processing jobs,
 `auth.users`, and `audit_events` for this session all read back **zero**.
 
+## Vercel Preview deployment — real, done
+
+The five commits above were pushed to `origin/main`
+(`08e3656dae5f4f2a390658d93bdf1290145e6f23`), and GitHub Actions'
+`PR Pipeline` workflow run for that exact commit completed
+`status: completed`, `conclusion: success` — confirmed via the GitHub
+REST API, not assumed.
+
+A real Vercel Preview deployment was then triggered (`vercel deploy` from
+the repo root, using the already-linked `.vercel/project.json`):
+`https://noor-pe7sql42t-abdullah-wagihs-projects.vercel.app`, deployment
+id `dpl_DwnzzYvkXCgsbBcnHgb9PNDjQn8t`, status **`● Ready`** (confirmed via
+`vercel inspect`, not assumed). The real build log (`vercel inspect
+--logs`) shows a clean `next build` — `✓ Compiled successfully`, and both
+new routes present in the real production route table:
+`ƒ /reviewer/ocr` (2.17 kB) and `ƒ /reviewer/ocr/[ocrReviewId]` (2.76 kB)
+— followed by `Deployment completed`.
+
+**What a headless check cannot get past**: this Vercel team has
+Deployment Protection enabled on Preview deployments — every direct
+`curl` to the live URL (including the site root `/`) returns `302` to
+`vercel.com/sso-api`, Vercel's own SSO gate, not an application error.
+This is expected, correct team-security behavior, not a deployment
+failure — but it also means no headless HTTP check (and no Playwright
+run from this environment) can render the page past that gate. A real
+browser check of `/reviewer/ocr` therefore still requires the user's own
+authenticated Vercel session — the build/route-table evidence above is
+real and strong, but it is not the same as a rendered-page visual check.
+
 ## What was not done (honest account)
 
-- **Vercel Preview redeploy and smoke test** — see "Vercel Preview
-  deployment" below for the current, real status.
+- **A real, browser-rendered check of `/reviewer/ocr` and
+  `/reviewer/ocr/[ocrReviewId]`** — blocked by this team's Vercel
+  Deployment Protection (SSO gate) from any headless environment; see
+  "Vercel Preview deployment" above. The build succeeded and both routes
+  are present in the real route table, which is strong but not
+  equivalent evidence.
 - **No Playwright/browser-driven E2E** of the new OCR review workspace —
   consistent with this repo's existing, documented gap for the
   extraction review workspace (`KNOWN_LIMITATIONS.md` item 24) and every
   other form-submission flow in this codebase.
-- **CI has not actually been run** on this branch — the workflow file was
-  updated and is believed correct (mirrors the Docker build's own
-  apt-install step, which was verified), but GitHub Actions itself was
-  not exercised this session.
 - **`accepted_with_warnings`/`reprocessing_required` as `submit_document_ocr_review`
   target statuses** have no dedicated local RLS test (see above) — the
   validation code path was read, not independently exercised.

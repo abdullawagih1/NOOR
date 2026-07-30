@@ -470,15 +470,20 @@ the same PR that resolves an item.
     with the same pre-existing gap for the extraction review workspace,
     item 24).
 
-62. **Sprint 1-D2's Vercel Preview redeploy has not been performed.**
-    Hosted Development verification itself was completed in a later
+62. **A real browser-rendered check of Sprint 1-D2's `/reviewer/ocr`
+    routes on the Vercel Preview deployment has not been performed.**
+    Hosted Development verification was completed in a later
     continuation of this session (real GoTrue JWTs, a real upload, real
     extraction and OCR execution via the actual unmodified Worker code
     against real Storage, a real permission-scoped Storage RLS proof,
-    all synthetic hosted data verified deleted back to zero — see
-    `docs/verification/sprint-1-d2-controlled-ocr-verification.md`), but
-    the new `/reviewer/ocr` routes have not yet been exercised in a real
-    browser against a real deployed Preview environment.
+    all synthetic hosted data verified deleted back to zero), the
+    commits were pushed to `main` with real CI green, and a real Vercel
+    Preview was deployed and confirmed `Ready` with both new routes in
+    the production route table — but this Vercel team's own SSO
+    Deployment Protection returns a `302` to every headless request
+    (including the site root), so no curl/Playwright check from this
+    environment can render the page past it. See
+    `docs/verification/sprint-1-d2-controlled-ocr-verification.md`.
 
 63. **`accepted_with_warnings` and `reprocessing_required` as
     `submit_document_ocr_review` target statuses have no dedicated local

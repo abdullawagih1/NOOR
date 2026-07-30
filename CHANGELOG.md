@@ -153,11 +153,21 @@
   OCR rows, Storage objects, GoTrue accounts) deleted and verified back
   to zero.
 
+### Vercel Preview deployment (real, completed in the same continuation)
+
+* Pushed to `main`, confirmed real GitHub Actions CI green, then a real
+  `vercel deploy` — status `Ready`, build log confirms both new routes
+  (`/reviewer/ocr`, `/reviewer/ocr/[ocrReviewId]`) in the production
+  route table.
+
 ### Known, not done this session (see KNOWN_LIMITATIONS.md, PROJECT_STATE.md)
 
-* **A Vercel Preview redeploy** — the new `/reviewer/ocr` routes have not
-  yet been exercised in a real browser or against a real deployed
-  environment.
+* **A real browser-rendered check of the Preview URL** — this Vercel
+  team's own SSO Deployment Protection returns a `302` to every headless
+  request, including the site root, so no curl/Playwright check from
+  this environment can render the page past it. The build succeeded and
+  both routes are present in the real route table, which is strong but
+  not equivalent evidence.
 
 ## [Unreleased] — Sprint 1-D1: Extraction Review and Technical Quality Gate
 
