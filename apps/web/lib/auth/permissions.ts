@@ -50,6 +50,19 @@ export const PERMISSIONS = {
   GUIDELINE_EXTRACTION_FINDINGS_CREATE: "guideline_extraction_findings.create",
   GUIDELINE_EXTRACTION_FINDINGS_RESOLVE: "guideline_extraction_findings.resolve",
   GUIDELINE_EXTRACTION_SOURCE_READ: "guideline_extraction_source.read",
+
+  // Controlled page-scoped OCR (Sprint 1-D2) — see
+  // docs/domain/ocr-eligibility-and-lifecycle.md. Again a deliberately
+  // separate namespace, one layer deeper (ADR 0012).
+  GUIDELINE_OCR_READ: "guideline_ocr.read",
+  GUIDELINE_OCR_CREATE: "guideline_ocr.create",
+  GUIDELINE_OCR_CANCEL: "guideline_ocr.cancel",
+  GUIDELINE_OCR_REVIEW: "guideline_ocr.review",
+  GUIDELINE_OCR_SUBMIT_REVIEW: "guideline_ocr.submit_review",
+  GUIDELINE_OCR_REOPEN_REVIEW: "guideline_ocr.reopen_review",
+  GUIDELINE_OCR_READ_ARTIFACTS: "guideline_ocr.read_artifacts",
+  GUIDELINE_OCR_READ_SOURCE: "guideline_ocr.read_source",
+  GUIDELINE_OCR_REPROCESS: "guideline_ocr.reprocess",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

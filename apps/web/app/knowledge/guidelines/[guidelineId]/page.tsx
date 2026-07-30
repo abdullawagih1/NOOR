@@ -39,6 +39,9 @@ import {
 import { getLatestExtractionReviewForRun } from "@/lib/extraction-review/queries";
 import { ExtractionReviewStatusBadge } from "@/lib/extraction-review/ui";
 import { createExtractionReviewAction } from "@/lib/extraction-review/actions";
+import { getOcrRequestForReview, getLatestOcrReviewForRequest } from "@/lib/ocr/queries";
+import { OcrRequestStatusBadge } from "@/lib/ocr/ui";
+import { createOcrRequestAction, createOcrReviewAction } from "@/lib/ocr/actions";
 import { UploadPanel } from "./UploadPanel";
 import { PageHeader, Card, Section, Badge, TextInput, Textarea, Select, Button, Alert } from "@noor/ui";
 
@@ -237,6 +240,8 @@ async function SourceDocuments({
               canReadExtractionArtifacts={has(PERMISSIONS.GUIDELINE_EXTRACTIONS_READ_ARTIFACTS)}
               canReadExtractionReviews={has(PERMISSIONS.GUIDELINE_EXTRACTION_REVIEWS_READ)}
               canCreateExtractionReview={has(PERMISSIONS.GUIDELINE_EXTRACTION_REVIEWS_CREATE)}
+              canReadOcr={has(PERMISSIONS.GUIDELINE_OCR_READ)}
+              canCreateOcr={has(PERMISSIONS.GUIDELINE_OCR_CREATE)}
             />
           ))}
         </div>
@@ -343,6 +348,8 @@ async function ExtractionSummaryCard({
   canReadArtifacts,
   canReadReviews,
   canCreateReview,
+  canReadOcr,
+  canCreateOcr,
 }: {
   sourceDocumentId: string;
   guidelineId: string;
@@ -350,6 +357,8 @@ async function ExtractionSummaryCard({
   canReadArtifacts: boolean;
   canReadReviews: boolean;
   canCreateReview: boolean;
+  canReadOcr: boolean;
+  canCreateOcr: boolean;
 }) {
   const runs = await listDocumentExtractionRuns(sourceDocumentId);
   const run = runs[0];
@@ -357,6 +366,8 @@ async function ExtractionSummaryCard({
 
   const pages = canReadPages && run.status === "succeeded" ? await listDocumentExtractionPages(run.id) : [];
   const latestReview = canReadReviews && run.status === "succeeded" ? await getLatestExtractionReviewForRun(run.id) : null;
+  const ocrRequest = canReadOcr && latestReview?.review_status === "ocr_required" ? await getOcrRequestForReview(latestReview.id) : null;
+  const ocrReview = ocrRequest ? await getLatestOcrReviewForRequest(ocrRequest.id) : null;
 
   return (
     <div className="mt-xs rounded-sm border border-border bg-surface p-xs">
@@ -392,6 +403,42 @@ async function ExtractionSummaryCard({
             </form>
           ) : (
             <span className="text-muted">Not yet opened for review</span>
+          )}
+        </div>
+      ) : null}
+
+      {latestReview?.review_status === "ocr_required" && canReadOcr ? (
+        <div className="mt-xs flex flex-wrap items-center gap-xs text-xs">
+          <span className="text-muted">OCR:</span>
+          {ocrRequest ? (
+            <>
+              <OcrRequestStatusBadge status={ocrRequest.status} />
+              {ocrReview ? (
+                <a className="underline" href={`/reviewer/ocr/${ocrReview.id}`}>
+                  Open OCR review
+                </a>
+              ) : ocrRequest.status === "processing" || ocrRequest.status === "queued" ? (
+                <span className="text-muted">Pages processing — a review can be opened once every page finishes</span>
+              ) : canCreateOcr ? (
+                <form action={createOcrReviewAction} className="inline">
+                  <input type="hidden" name="ocrRequestId" value={ocrRequest.id} />
+                  <input type="hidden" name="guidelineId" value={guidelineId} />
+                  <Button type="submit" size="sm" variant="secondary">
+                    Open OCR review
+                  </Button>
+                </form>
+              ) : null}
+            </>
+          ) : canCreateOcr ? (
+            <form action={createOcrRequestAction} className="inline">
+              <input type="hidden" name="extractionReviewId" value={latestReview.id} />
+              <input type="hidden" name="guidelineId" value={guidelineId} />
+              <Button type="submit" size="sm" variant="secondary">
+                Start OCR request
+              </Button>
+            </form>
+          ) : (
+            <span className="text-muted">Not yet requested</span>
           )}
         </div>
       ) : null}
@@ -494,6 +541,8 @@ async function SourceDocumentRow({
   canReadExtractionArtifacts,
   canReadExtractionReviews,
   canCreateExtractionReview,
+  canReadOcr,
+  canCreateOcr,
 }: {
   document: import("@/lib/documents/queries").GuidelineSourceDocumentRow;
   guidelineId: string;
@@ -504,6 +553,8 @@ async function SourceDocumentRow({
   canReadExtractionArtifacts: boolean;
   canReadExtractionReviews: boolean;
   canCreateExtractionReview: boolean;
+  canReadOcr: boolean;
+  canCreateOcr: boolean;
 }) {
   const jobs = await listDocumentProcessingJobs(doc.id);
   const latestJob = jobs[0];
@@ -534,6 +585,8 @@ async function SourceDocumentRow({
           canReadArtifacts={canReadExtractionArtifacts}
           canReadReviews={canReadExtractionReviews}
           canCreateReview={canCreateExtractionReview}
+          canReadOcr={canReadOcr}
+          canCreateOcr={canCreateOcr}
         />
       ) : null}
 

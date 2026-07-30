@@ -28,6 +28,15 @@ export default function ReviewerPage() {
           </Link>
         }
       />
+      <EmptyState
+        title="OCR technical review is live (Sprint 1-D2)"
+        description="Compares the original page, native extraction, and OCR recognition side by side for pages a reviewer explicitly flagged for OCR. This is a technical review of recognition quality, not a clinical one."
+        action={
+          <Link href="/reviewer/ocr">
+            <Button variant="secondary">Open OCR Review Queue</Button>
+          </Link>
+        }
+      />
     </main>
   );
 }
