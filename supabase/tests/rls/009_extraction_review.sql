@@ -899,6 +899,24 @@ begin
     raise exception 'TEST 27 FAILED: ocr_required was accepted without a decision_reason';
   end if;
 
+  -- Sprint 1-D2 tightened ocr_required to also require at least one page
+  -- actually marked ocr_candidate (see migration 0011's CREATE OR REPLACE
+  -- of submit_document_extraction_review) — a finding alone is no longer
+  -- sufficient, since create_document_ocr_request() only ever acts on
+  -- ocr_candidate pages. Prove that gap is still enforced before marking
+  -- page 3 ocr_candidate for real.
+  begin
+    perform submit_document_extraction_review(v_review_id, 'ocr_required', 'page 3 needs OCR before it can be used', null);
+  exception when others then
+    v_failed := true;
+  end;
+  if not v_failed then
+    raise exception 'TEST 27 FAILED: ocr_required was accepted with no page marked ocr_candidate';
+  end if;
+  v_failed := false;
+
+  perform mark_extraction_page_reviewed(v_review_id, 3, 'ocr_candidate', 'flag for OCR');
+
   select * into r from submit_document_extraction_review(v_review_id, 'ocr_required', 'page 3 needs OCR before it can be used', null);
   set local role authenticated;
   select * into elig from get_document_extraction_review_eligibility(fx('run_3_id'));
