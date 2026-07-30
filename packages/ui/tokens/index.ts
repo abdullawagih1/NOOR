@@ -4,7 +4,7 @@ export * from "./spacing";
 export * from "./radius";
 export * from "./shadows";
 
-import { brandColors, brandColorsDark, semanticStates, type SemanticStateKey } from "./colors";
+import { brandColors, brandColorsDark, brandGradient, semanticStates, type SemanticStateKey } from "./colors";
 import { spacing } from "./spacing";
 import { radius } from "./radius";
 import { shadows } from "./shadows";
@@ -53,6 +53,7 @@ export function semanticStateVarRefs(key: SemanticStateKey) {
 export function tokensToCssVariables(): string {
   const light = `:root {
   ${colorVars(brandColors)}
+  --noor-gradient-brand: ${brandGradient};
   ${semanticStateVars("fg")}
   ${semanticStateVars("bg")}
   ${semanticStateVars("border")}
