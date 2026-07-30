@@ -12,7 +12,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 const base =
   "inline-flex items-center justify-center gap-xs rounded-sm font-medium transition-colors " +
   "disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 " +
-  "focus-visible:outline-offset-2 focus-visible:outline-primary";
+  "focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 const variants: Record<ButtonVariant, string> = {
   primary: "bg-primary text-on-primary hover:bg-primary-active",
@@ -46,7 +46,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       title={label}
       className={cn(
         "inline-flex h-10 w-10 items-center justify-center rounded-pill transition-colors",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
         variant === "primary" ? "bg-primary text-on-primary hover:bg-primary-active" : "text-body hover:bg-surface-soft",
         className
       )}

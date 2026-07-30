@@ -6,7 +6,7 @@ import { cn } from "../src/cn";
 const fieldBase =
   "w-full rounded-sm border border-border bg-canvas px-md py-xs text-base text-ink " +
   "placeholder:text-muted-soft focus:border-primary focus:outline focus:outline-2 " +
-  "focus:outline-offset-0 focus:outline-primary disabled:bg-surface-soft disabled:text-muted";
+  "focus:outline-offset-0 focus:outline-accent disabled:bg-surface-soft disabled:text-muted";
 
 export interface TextFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;

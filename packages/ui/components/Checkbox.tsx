@@ -16,7 +16,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           id={inputId}
           type="checkbox"
           className={cn(
-            "h-4 w-4 rounded-[0.25rem] border-border-strong text-primary focus:outline focus:outline-2 focus:outline-primary",
+            "h-4 w-4 rounded-[0.25rem] border-border-strong text-primary focus:outline focus:outline-2 focus:outline-accent",
             className
           )}
           {...props}
@@ -42,7 +42,7 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(
           ref={ref}
           id={inputId}
           type="radio"
-          className={cn("h-4 w-4 border-border-strong text-primary focus:outline focus:outline-2 focus:outline-primary", className)}
+          className={cn("h-4 w-4 border-border-strong text-primary focus:outline focus:outline-2 focus:outline-accent", className)}
           {...props}
         />
         {label}

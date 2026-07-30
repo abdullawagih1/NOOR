@@ -1,4 +1,4 @@
-import { AlertTriangle, AlertOctagon, CheckCircle2, Shuffle, UserCheck, Sparkles, Info, Ban, Archive, Loader2, Eye, XCircle, CircleDashed, type LucideIcon } from "lucide-react";
+import { AlertTriangle, AlertOctagon, CheckCircle2, Shuffle, UserCheck, Sparkles, Info, Ban, Archive, Loader2, Eye, XCircle, CircleDashed, Clock, RotateCw, RotateCcw, ScanLine, type LucideIcon } from "lucide-react";
 import { semanticStates, semanticStateVarRefs, type SemanticStateKey } from "../tokens";
 import { cn } from "../src/cn";
 
@@ -30,6 +30,10 @@ const iconMap: Record<string, LucideIcon> = {
   eye: Eye,
   "x-circle": XCircle,
   "circle-dashed": CircleDashed,
+  clock: Clock,
+  "rotate-cw": RotateCw,
+  "rotate-ccw": RotateCcw,
+  "scan-line": ScanLine,
 };
 
 export interface SemanticStatusBadgeProps {

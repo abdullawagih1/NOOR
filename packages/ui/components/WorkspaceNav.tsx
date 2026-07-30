@@ -17,7 +17,7 @@ export function WorkspaceNav({ items }: { items: WorkspaceNavItem[] }) {
           aria-current={item.active ? "page" : undefined}
           className={cn(
             "rounded-pill px-md py-xxs text-sm font-medium transition-colors",
-            item.active ? "bg-primary-soft text-primary-active" : "text-muted hover:bg-surface-soft hover:text-ink"
+            item.active ? "bg-accent-soft text-accent-active" : "text-muted hover:bg-surface-soft hover:text-ink"
           )}
         >
           {item.label}
