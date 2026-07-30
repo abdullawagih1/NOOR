@@ -16,10 +16,14 @@ deployment and test run is unaffected until an operator explicitly opts in
 complete loop against a controlled no-op processor only — see ADR 0009 and
 `app/processing.py`. "extraction" (Sprint 1.2B) runs the same loop against
 the real, deterministic PyPdfExtractor-backed processor — see ADR 0010 and
-`app/pdf_extraction/processor.py`. There is deliberately no mode that
-selects a test failure-injection processor: those exist only as direct
-Python function parameters inside pytest, never as a runtime-selectable
-value.
+`app/pdf_extraction/processor.py`. "ocr" (Sprint 1-D2) runs the same loop
+against the controlled page-scoped OCR processor — see ADR 0012 and
+`app/ocr/processor.py`; it is disabled (not merely defaulted off) unless an
+operator also points `WORKER_ENABLED_JOB_TYPES` at `document_ocr`, the same
+opt-in-by-job-type mechanism "extraction" already relies on. There is
+deliberately no mode that selects a test failure-injection processor: those
+exist only as direct Python function parameters inside pytest, never as a
+runtime-selectable value.
 
 `worker_enabled_job_types` reuses the existing `document_parsing` job_type
 value from migration 0006 rather than the mission's suggested
@@ -63,7 +67,7 @@ class Settings(BaseSettings):
     worker_lease_duration_seconds: int = 90
     worker_heartbeat_interval_seconds: int = 30
     worker_max_concurrent_jobs: int = 1
-    worker_processing_mode: str = "disabled"  # "disabled" | "noop" | "extraction"
+    worker_processing_mode: str = "disabled"  # "disabled" | "noop" | "extraction" | "ocr"
 
     # --- Deterministic PDF extraction (Sprint 1.2B) -------------------------
     worker_enabled_job_types: str = "document_parsing"
@@ -71,6 +75,22 @@ class Settings(BaseSettings):
     extraction_configuration_version: str | None = None
     extraction_max_seconds: float = 300.0
     extraction_temp_directory: str | None = None  # None -> OS default (tempfile.mkdtemp())
+
+    # --- Controlled page-scoped OCR (Sprint 1-D2) ---------------------------
+    # All version/config fields below default to None, meaning "use the
+    # pinned constant in app/ocr/config.py" — mirrors the extraction fields
+    # above exactly. Only override these for a deliberate, reviewed OCR
+    # identity bump (ADR 0012's upgrade policy), never to point at
+    # whatever happens to be installed on a given host.
+    ocr_pipeline_version: str | None = None
+    ocr_configuration_version: str | None = None
+    ocr_render_configuration_version: str | None = None
+    ocr_render_dpi: int | None = None
+    ocr_render_color_mode: str | None = None
+    ocr_render_image_format: str | None = None
+    ocr_max_seconds: float = 300.0
+    ocr_temp_directory: str | None = None  # None -> OS default (tempfile.mkdtemp())
+    ocr_tessdata_dir: str | None = None  # None -> app/ocr/config.py's DEFAULT_TESSDATA_DIR
 
     @field_validator("worker_internal_token")
     @classmethod
@@ -85,8 +105,8 @@ class Settings(BaseSettings):
     @field_validator("worker_processing_mode")
     @classmethod
     def processing_mode_must_be_known(cls, value: str) -> str:
-        if value not in ("disabled", "noop", "extraction"):
-            raise ValueError('WORKER_PROCESSING_MODE must be "disabled", "noop", or "extraction"')
+        if value not in ("disabled", "noop", "extraction", "ocr"):
+            raise ValueError('WORKER_PROCESSING_MODE must be "disabled", "noop", "extraction", or "ocr"')
         return value
 
     @property

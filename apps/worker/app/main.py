@@ -18,6 +18,7 @@ import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Literal, Optional
 
 from fastapi import Depends, FastAPI
@@ -25,6 +26,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.auth import verify_internal_token
+from app.ocr.config import (
+    DEFAULT_TESSDATA_DIR,
+    OCR_CONFIGURATION_VERSION,
+    OCR_PIPELINE_VERSION,
+    RENDER_COLOR_MODE,
+    RENDER_CONFIGURATION_VERSION,
+    RENDER_DPI,
+    RENDER_IMAGE_FORMAT,
+    assert_pinned_provider_version,
+    assert_pinned_renderer_version,
+    assert_pinned_tessdata_models,
+)
+from app.ocr.processor import make_ocr_processor
 from app.orchestration_client import OrchestrationClient
 from app.pdf_extraction.config import EXTRACTION_CONFIGURATION_VERSION, EXTRACTION_PIPELINE_VERSION, PDF_EXTRACTOR_NAME, PDF_EXTRACTOR_VERSION, assert_pinned_extractor_version
 from app.pdf_extraction.processor import make_extraction_processor
@@ -48,7 +62,7 @@ _worker_thread: threading.Thread | None = None
 async def lifespan(_: FastAPI):
     global _orchestration_client, _worker_loop, _worker_thread
 
-    if settings.worker_processing_mode in ("noop", "extraction"):
+    if settings.worker_processing_mode in ("noop", "extraction", "ocr"):
         if settings.supabase_url and settings.supabase_service_role_key:
             supabase_url = str(settings.supabase_url)
             service_role_key = settings.supabase_service_role_key.get_secret_value()
@@ -68,6 +82,26 @@ async def lifespan(_: FastAPI):
                     extractor_version=PDF_EXTRACTOR_VERSION,
                     max_seconds=settings.extraction_max_seconds,
                     temp_directory=settings.extraction_temp_directory,
+                )
+            elif settings.worker_processing_mode == "ocr":
+                tessdata_dir = Path(settings.ocr_tessdata_dir) if settings.ocr_tessdata_dir else DEFAULT_TESSDATA_DIR
+                assert_pinned_renderer_version()
+                assert_pinned_provider_version()
+                assert_pinned_tessdata_models(tessdata_dir)
+                processor = make_ocr_processor(
+                    _orchestration_client,
+                    worker_instance_id=settings.worker_instance_id,  # type: ignore[arg-type]
+                    supabase_url=supabase_url,
+                    service_role_key=service_role_key,
+                    pipeline_version=settings.ocr_pipeline_version or OCR_PIPELINE_VERSION,
+                    render_dpi=settings.ocr_render_dpi or RENDER_DPI,
+                    render_color_mode=settings.ocr_render_color_mode or RENDER_COLOR_MODE,
+                    render_image_format=settings.ocr_render_image_format or RENDER_IMAGE_FORMAT,
+                    render_configuration_version=settings.ocr_render_configuration_version or RENDER_CONFIGURATION_VERSION,
+                    ocr_configuration_version=settings.ocr_configuration_version or OCR_CONFIGURATION_VERSION,
+                    tessdata_dir=tessdata_dir,
+                    max_seconds=settings.ocr_max_seconds,
+                    temp_directory=settings.ocr_temp_directory,
                 )
 
             worker_loop_kwargs = dict(

@@ -17,3 +17,15 @@ pypdf==6.14.2
 # fixture is ever regenerated.
 reportlab==4.2.5
 pillow==12.3.0
+
+# Controlled page-scoped OCR (Sprint 1-D2) — see ADR 0012.
+# pypdfium2 renders the exact registered PDF page to a pixel image
+# (app/ocr/renderer.py); pinned version must match app/ocr/config.py's
+# RENDERER_VERSION, enforced at startup by assert_pinned_renderer_version().
+pypdfium2==5.12.1
+# pytesseract is a thin subprocess wrapper around the system `tesseract`
+# binary (app/ocr/provider.py) — the binary itself is installed by the
+# Dockerfile (apt package tesseract-ocr), not by this requirements file;
+# pinned version must match app/ocr/config.py's OCR_PROVIDER_VERSION,
+# enforced at startup by assert_pinned_provider_version().
+pytesseract==0.3.13

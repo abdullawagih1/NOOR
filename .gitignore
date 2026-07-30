@@ -18,6 +18,11 @@ __pycache__/
 .venv/
 venv/
 
+# Pinned OCR language models (Sprint 1-D2) — fetched + checksum-verified by
+# apps/worker/scripts/fetch_tessdata_models.py, not committed as binaries.
+# See docs/operations/ocr-model-upgrade.md.
+apps/worker/tessdata/
+
 # Testing
 coverage/
 htmlcov/

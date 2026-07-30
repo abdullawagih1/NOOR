@@ -367,6 +367,183 @@ class OrchestrationClient:
         )
         return rows[0] if rows else {}
 
+    # -- Sprint 1-D2: controlled page-scoped OCR (migration 0011) -----------
+    # Same trust boundary as every method above — never granted to
+    # `authenticated`/`anon` (see supabase/tests/rls/011_controlled_ocr.sql
+    # TEST 15).
+
+    def get_ocr_job_context(self, job_id: uuid.UUID) -> dict[str, Any]:
+        """Joins a claimed `document_ocr` job back to its one eligible page
+        and the OCR request's pinned provider/renderer/model identity.
+        ClaimedJob itself carries no OCR-specific fields —
+        claim_next_document_processing_job (migration 0007, Sprint 1.2A) is
+        job-type-agnostic by design, so this supplementary lookup plays the
+        same role get_source_document() plays for extraction jobs."""
+        url = f"{self._base_url}/rest/v1/document_processing_jobs"
+        params = {"id": f"eq.{job_id}", "select": "ocr_request_page_id"}
+        job_row = self._get_one(url, params, "get_ocr_job_context")
+        ocr_request_page_id = job_row.get("ocr_request_page_id")
+        if not ocr_request_page_id:
+            raise OrchestrationError(f"job {job_id} is not linked to an OCR request page")
+
+        url = f"{self._base_url}/rest/v1/document_ocr_request_pages"
+        params = {
+            "id": f"eq.{ocr_request_page_id}",
+            "select": "id,organization_id,ocr_request_id,source_document_id,extraction_run_id,extraction_page_id,page_number",
+        }
+        page_row = self._get_one(url, params, "get_ocr_job_context")
+
+        url = f"{self._base_url}/rest/v1/document_ocr_requests"
+        params = {
+            "id": f"eq.{page_row['ocr_request_id']}",
+            "select": (
+                "provider_name,provider_version,model_identifier,model_version,"
+                "renderer_name,renderer_version,render_configuration_version,"
+                "ocr_configuration_version,language_hints"
+            ),
+        }
+        request_row = self._get_one(url, params, "get_ocr_job_context")
+
+        url = f"{self._base_url}/rest/v1/document_extraction_pages"
+        params = {"id": f"eq.{page_row['extraction_page_id']}", "select": "page_checksum"}
+        extraction_page_row = self._get_one(url, params, "get_ocr_job_context")
+
+        return {**page_row, **request_row, "native_page_checksum": extraction_page_row["page_checksum"]}
+
+    def _get_one(self, url: str, params: dict[str, Any], caller: str) -> dict[str, Any]:
+        try:
+            response = self._client.get(url, headers=self._headers, params=params)
+        except httpx.HTTPError as exc:
+            raise OrchestrationError(f"{caller}: transport error: {exc.__class__.__name__}") from exc
+        if response.status_code >= 400:
+            raise OrchestrationError(f"{caller} failed ({response.status_code})")
+        rows = response.json()
+        if not rows:
+            raise OrchestrationError(f"{caller}: no matching row for {params}")
+        return rows[0]
+
+    def create_ocr_run(
+        self,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        source_sha256: str,
+        native_page_checksum: str,
+        renderer_name: str,
+        renderer_version: str,
+        render_configuration_version: str,
+        render_dpi: int,
+        render_color_mode: str,
+        render_image_format: str,
+        page_image_sha256: str,
+        page_image_size_bytes: int,
+        provider_name: str,
+        provider_version: str,
+        model_identifier: str,
+        model_version: str,
+        ocr_configuration_version: str,
+        language_hints: list[str],
+        correlation_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        rows = self._rpc(
+            "create_document_ocr_run",
+            {
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_source_sha256": source_sha256,
+                "p_native_page_checksum": native_page_checksum,
+                "p_renderer_name": renderer_name,
+                "p_renderer_version": renderer_version,
+                "p_render_configuration_version": render_configuration_version,
+                "p_render_dpi": render_dpi,
+                "p_render_color_mode": render_color_mode,
+                "p_render_image_format": render_image_format,
+                "p_page_image_sha256": page_image_sha256,
+                "p_page_image_size_bytes": page_image_size_bytes,
+                "p_provider_name": provider_name,
+                "p_provider_version": provider_version,
+                "p_model_identifier": model_identifier,
+                "p_model_version": model_version,
+                "p_ocr_configuration_version": ocr_configuration_version,
+                "p_language_hints": list(language_hints),
+                "p_correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return rows[0] if rows else {}
+
+    def finalize_ocr_page(
+        self,
+        ocr_run_id: uuid.UUID,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        raw_text: str,
+        normalized_text: str,
+        character_count: int,
+        word_count: int,
+        text_checksum: str,
+        confidence_summary: dict[str, Any],
+        warnings: list[str],
+        provider_metadata_safe: dict[str, Any],
+        artifact_bucket: str,
+        artifact_path: str,
+        artifact_sha256: str,
+        artifact_size_bytes: int,
+        artifact_media_type: str,
+        correlation_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        rows = self._rpc(
+            "finalize_document_ocr_page",
+            {
+                "p_ocr_run_id": str(ocr_run_id),
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_raw_text": raw_text,
+                "p_normalized_text": normalized_text,
+                "p_character_count": character_count,
+                "p_word_count": word_count,
+                "p_text_checksum": text_checksum,
+                "p_confidence_summary": confidence_summary,
+                "p_warnings": warnings,
+                "p_provider_metadata_safe": provider_metadata_safe,
+                "p_artifact_bucket": artifact_bucket,
+                "p_artifact_path": artifact_path,
+                "p_artifact_sha256": artifact_sha256,
+                "p_artifact_size_bytes": artifact_size_bytes,
+                "p_artifact_media_type": artifact_media_type,
+                "p_correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return rows[0] if rows else {}
+
+    def fail_ocr_run(
+        self,
+        ocr_run_id: uuid.UUID,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        error_code: str,
+        error_class: str,
+        error_message_safe: str,
+        correlation_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        rows = self._rpc(
+            "fail_document_ocr_run",
+            {
+                "p_ocr_run_id": str(ocr_run_id),
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_error_code": error_code,
+                "p_error_class": error_class,
+                "p_error_message_safe": error_message_safe,
+                "p_correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return rows[0] if rows else {}
+
 
 def _jsonable(payload: dict[str, Any]) -> dict[str, Any]:
     return {k: (str(v) if isinstance(v, uuid.UUID) else v) for k, v in payload.items()}
