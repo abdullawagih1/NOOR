@@ -5,10 +5,12 @@ inferred or assumed. Companion docs: ADR 0013,
 `docs/brand/{NOOR_BRAND,noor-logo-usage}.md`,
 `docs/design/{noor-color-system,noor-component-theme,noor-accessibility-review}.md`.
 
-**Status: locally complete and verified. Hosted Vercel Preview
-verification depends on this session's disk-space constraint — see
-"Environmental note" and "What was not done" below for the honest
-account.**
+**Status: complete and verified, locally and on a real Vercel Preview
+deployment (build `Ready`, CI green on `main`).** The one gap left is a
+real browser-rendered check of the Preview URL, blocked by this Vercel
+team's own SSO Deployment Protection — see "Vercel Preview deployment"
+and "What was not done" below for the honest account, including a real
+disk-space environmental issue encountered mid-session.
 
 ## Starting state
 
@@ -158,6 +160,32 @@ Contrast verification (WCAG 2.2, computed not eyeballed): full table in
 white 8.18:1, Deep Navy on white 14.60:1, all five new status colors
 5.98–11.23:1 — all pass AA, most pass AAA.
 
+## Vercel Preview deployment — real, done
+
+The six commits above were pushed to `origin/main`
+(`950dd3dc375e29f4b4ef76fee04289b40cd2d980`). GitHub Actions' `PR
+Pipeline` workflow run for that exact commit completed
+`status: completed`, `conclusion: success` — confirmed via the GitHub
+REST API, not assumed.
+
+A real Vercel Preview deployment was then triggered (`vercel deploy`
+from the repo root): `https://noor-51fty7xaa-abdullah-wagihs-projects.vercel.app`,
+status **`● Ready`** (confirmed via `vercel inspect`). The real build
+log shows a clean `next build` — `✓ Compiled successfully`, all 22
+routes present including `/design-system` (3.26 kB, up from 3.25 kB
+before this sprint — the new "Official brand" section) and `/login`
+(3.52 kB, up from 3.24 kB — the new logo + heading) — followed by
+`Deployment completed`.
+
+**What a headless check cannot get past, again**: this Vercel team's
+Deployment Protection (SSO gate) returns a `302` to `vercel.com/sso-api`
+for every direct request, including the static brand asset
+`/brand/favicon.ico` and the `/login` route — not an application error.
+A real browser-rendered check of the new logo/brand pages therefore
+still requires the user's own authenticated Vercel session. The build/
+route-table evidence above is real and strong, but it is not the same
+as a rendered-page visual check — recorded honestly, not glossed over.
+
 ## Environmental note — a real, disk-space blocker this session
 
 Mid-session, this machine's `C:` drive was found to be at 99% capacity
@@ -174,11 +202,12 @@ hundred MB.
 
 ## What was not done (honest account)
 
-- **A real Vercel Preview deployment and browser-driven smoke test** —
-  not attempted in this session segment; see `SPRINT_CURRENT.md` for
-  current status. `next build` succeeding locally is strong evidence
-  the same build will succeed on Vercel, but it is not the same as an
-  actual deployed, browser-verified Preview.
+- **A real browser-rendered check of the deployed Preview** — blocked
+  by this Vercel team's own SSO Deployment Protection from any headless
+  environment; see "Vercel Preview deployment" above. The deployment
+  itself reached `Ready` with a clean build and the correct route
+  table, which is strong but not equivalent evidence to an actual
+  rendered-page check.
 - **No automated accessibility tooling (axe/Lighthouse) exists in this
   repository** — every contrast ratio was computed from real hex
   values, but no automated DOM-level scan of a rendered page was run.
