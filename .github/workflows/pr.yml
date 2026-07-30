@@ -67,7 +67,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # Controlled page-scoped OCR (Sprint 1-D2, ADR 0012): the runner's own
+      # tesseract-ocr apt version will not necessarily match the pinned
+      # OCR_PROVIDER_VERSION in app/ocr/config.py (that exact pin is
+      # verified against the production Docker base image at build time,
+      # not here) — this step only needs a real `tesseract` binary present
+      # so the OCR unit tests can exercise real recognition rather than
+      # skip themselves for a missing engine.
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr
       - run: pip install -r requirements.txt
+      - run: python scripts/fetch_tessdata_models.py
       - run: python -m py_compile app/main.py
       - run: python -m pytest tests/ -v
 
