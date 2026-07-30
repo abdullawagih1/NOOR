@@ -22,14 +22,14 @@ export function DocumentStatusBadge({ status, className }: { status: DocumentSta
 }
 
 const JOB_STATUS_DISPLAY: Record<ProcessingJobStatus, { state: SemanticStateKey; label: string }> = {
-  queued: { state: "inactive", label: "Queued" },
-  claimed: { state: "underReview", label: "Claimed" },
+  queued: { state: "queued", label: "Queued" },
+  claimed: { state: "processing", label: "Claimed" },
   processing: { state: "processing", label: "Processing" },
-  retry_scheduled: { state: "underReview", label: "Retry Scheduled" },
+  retry_scheduled: { state: "retryScheduled", label: "Retry Scheduled" },
   succeeded: { state: "verified", label: "Succeeded" },
   failed: { state: "critical", label: "Failed" },
   cancelled: { state: "withdrawn", label: "Cancelled" },
-  dead_lettered: { state: "critical", label: "Dead-lettered" },
+  dead_lettered: { state: "deadLettered", label: "Dead-lettered" },
 };
 
 export function JobStatusBadge({ status, className }: { status: ProcessingJobStatus; className?: string }) {

@@ -12,8 +12,8 @@ const REVIEW_STATUS_DISPLAY: Record<ExtractionReviewStatus, { state: SemanticSta
   in_review: { state: "processing", label: "In Review" },
   accepted: { state: "verified", label: "Accepted" },
   accepted_with_warnings: { state: "warning", label: "Accepted With Warnings" },
-  ocr_required: { state: "underReview", label: "OCR Required" },
-  reprocessing_required: { state: "underReview", label: "Reprocessing Required" },
+  ocr_required: { state: "ocrRequired", label: "OCR Required" },
+  reprocessing_required: { state: "reprocessingRequired", label: "Reprocessing Required" },
   rejected: { state: "critical", label: "Rejected" },
   invalidated: { state: "withdrawn", label: "Invalidated" },
 };

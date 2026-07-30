@@ -3,12 +3,12 @@ import type { OcrRequestStatus, OcrRunStatus, OcrReviewStatus, OcrPageReviewStat
 
 const REQUEST_STATUS_DISPLAY: Record<OcrRequestStatus, { state: SemanticStateKey; label: string }> = {
   created: { state: "inactive", label: "Created" },
-  queued: { state: "inactive", label: "Queued" },
+  queued: { state: "queued", label: "Queued" },
   processing: { state: "processing", label: "Processing" },
   awaiting_review: { state: "underReview", label: "Awaiting Review" },
   accepted: { state: "verified", label: "Accepted" },
   accepted_with_warnings: { state: "warning", label: "Accepted With Warnings" },
-  reprocessing_required: { state: "underReview", label: "Reprocessing Required" },
+  reprocessing_required: { state: "reprocessingRequired", label: "Reprocessing Required" },
   rejected: { state: "critical", label: "Rejected" },
   cancelled: { state: "withdrawn", label: "Cancelled" },
   invalidated: { state: "withdrawn", label: "Invalidated" },
@@ -37,7 +37,7 @@ const REVIEW_STATUS_DISPLAY: Record<OcrReviewStatus, { state: SemanticStateKey; 
   in_review: { state: "processing", label: "In Review" },
   accepted: { state: "verified", label: "Accepted" },
   accepted_with_warnings: { state: "warning", label: "Accepted With Warnings" },
-  reprocessing_required: { state: "underReview", label: "Reprocessing Required" },
+  reprocessing_required: { state: "reprocessingRequired", label: "Reprocessing Required" },
   rejected: { state: "critical", label: "Rejected" },
   invalidated: { state: "withdrawn", label: "Invalidated" },
 };
@@ -51,7 +51,7 @@ const PAGE_REVIEW_STATUS_DISPLAY: Record<OcrPageReviewStatus, { state: SemanticS
   unreviewed: { state: "inactive", label: "Unreviewed" },
   accepted: { state: "verified", label: "Accepted" },
   accepted_with_warnings: { state: "warning", label: "Accepted With Warnings" },
-  reprocessing_required: { state: "underReview", label: "Reprocessing Required" },
+  reprocessing_required: { state: "reprocessingRequired", label: "Reprocessing Required" },
   rejected: { state: "critical", label: "Rejected" },
 };
 
