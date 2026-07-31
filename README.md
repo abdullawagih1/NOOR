@@ -147,11 +147,27 @@ was a token-value change, not a rewrite. Clinical safety semantics
 amber; only positive/neutral states adopted the brand hues. Verified
 locally (typecheck/lint/build clean across `apps/web`/`packages/ui`/
 `packages/clinical-schemas`, all unit tests passing, and the Worker's
-full 79-assertion suite unchanged, confirming zero backend regression).
-A real Vercel Preview deployment/browser check has not yet been
-performed for this sprint. See ADR 0013,
-`docs/brand/NOOR_BRAND.md`, and
+full 79-assertion suite unchanged, confirming zero backend regression),
+and on a real Vercel Preview deployment (`Ready`, CI green on `main`).
+See ADR 0013, `docs/brand/NOOR_BRAND.md`, and
 `docs/verification/ux-1-brand-alignment-verification.md`.
+
+**UX-1.1 — visual acceptance and public surface redesign (corrective):**
+UX-1's tokens were real, but the actual rendered public/auth pages still
+failed visual acceptance — the root page still showed the Sprint 0.5
+placeholder, and `/login` rendered with a full dark background. Root
+cause: `<html>` carried no `data-theme`, so a pre-existing (ADR 0005)
+`prefers-color-scheme: dark` CSS rule silently overrode the light
+palette for any visitor on a dark-mode OS — there is no user-facing dark
+mode anywhere in the product. Fixed by pinning `data-theme="light"`.
+The root landing page, login, forgot/update-password, 403/access-denied,
+and new not-found/error pages were all rebuilt on shared `PublicShell`/
+`AuthShell` components; 22 real Playwright/Chromium screenshots
+(desktop/tablet/mobile, plus RTL-simulated captures) were captured
+against the actual running app. **Final status intentionally remains
+"Implementation Complete, Pending User Visual Acceptance"** — this
+mission does not self-close. See
+`docs/verification/ux-1-1-visual-acceptance.md`.
 
 See `PROJECT_STATE.md` for the authoritative current status and open
 gaps (Playwright browser-driven E2E remains a pre-Controlled-Beta

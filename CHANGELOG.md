@@ -1,5 +1,75 @@
 # Changelog
 
+## [Unreleased] — UX-1.1: Visual Acceptance and Public Surface Redesign
+
+Corrective workstream. UX-1's tokens were real, but the actual rendered
+public/auth pages failed visual acceptance — this fixes the pages
+themselves and the root cause underneath them.
+
+### Fixed (root causes, not symptoms)
+
+* **The "full dark background" on `/login`** was a real, pre-existing
+  bug, not a design choice: `apps/web/app/layout.tsx`'s `<html>`
+  carried no `data-theme`, so `packages/ui/tokens/index.ts`'s
+  `@media (prefers-color-scheme: dark)` rule silently applied the dark
+  palette for any visitor on a dark-mode OS. Fixed by pinning
+  `data-theme="light"` on `<html>` — Noor has no user-facing dark-mode
+  toggle, so nothing was removed.
+* **The lower-left black "N"** — confirmed (not assumed) to be Next.js's
+  own built-in development-mode indicator; never present in production
+  or a deployed Vercel Preview. Disabled locally via `devIndicators: false`.
+* A real RTL bug: the new public footer's `sm:text-left` did not flip
+  under `dir="rtl"` — corrected to the logical `sm:text-start`.
+
+### Added
+
+* `apps/web/app/PublicShell.tsx` — shared header/footer for `/`,
+  `/403`, `/access-denied`, `/not-found`, `/error`.
+* `apps/web/app/AuthShell.tsx` — `AuthSplitShell` (two-column, `/login`)
+  and `AuthCardShell` (centered, the secondary auth/error pages).
+* `apps/web/app/not-found.tsx`, `apps/web/app/error.tsx` — neither
+  existed before; Next.js was serving unstyled defaults.
+* `apps/web/tests/public-pages-content.test.ts` — bans retired Sprint
+  0.5 phrases, enforces exactly one `<h1>` on `/` and `/login`, guards
+  the `data-theme="light"` fix and the shared-shell usage against
+  regression.
+* `@playwright/test` (new dev dependency of `apps/web`) — used to
+  capture 22 real screenshots (desktop/tablet/mobile × `/`/`/login`,
+  desktop+mobile × `/forgot-password`/`/403`/`/access-denied`, 3
+  RTL-simulated captures). See
+  `docs/verification/ux-1-1-visual-acceptance.md`.
+
+### Changed
+
+* `apps/web/app/page.tsx` — completely replaced. The Sprint 0.5
+  placeholder copy and the four raw public workspace links are gone;
+  real landing-page structure with accurate current-capability claims.
+* `apps/web/app/login/page.tsx` — two-column layout via `AuthSplitShell`.
+* `apps/web/app/{forgot-password,update-password,403,access-denied}/page.tsx`
+  — moved onto the shared `AuthCardShell`; 403/access-denied gained a
+  "Return to home" recovery action.
+* `apps/web/next.config.mjs` — `devIndicators: false`.
+
+### Verified this session (real, not assumed)
+
+* `apps/web`: `tsc --noEmit`, `next lint`, `next build` all clean (0
+  warnings, 23 routes); all 15 unit-test files pass individually.
+* `packages/ui`: `tsc --noEmit` clean. `packages/clinical-schemas`:
+  typecheck + 6/6 tests pass. `apps/worker`: full 79-assertion suite
+  unchanged — zero backend regression from this frontend-only mission.
+
+### Known, not done this session (see KNOWN_LIMITATIONS.md, PROJECT_STATE.md)
+
+* **User visual acceptance of the screenshot evidence** — this
+  mission's final status intentionally remains "Implementation
+  Complete, Pending User Visual Acceptance," not self-declared done.
+* A real Vercel Preview browser-rendered check — blocked by this
+  team's own SSO Deployment Protection (same pre-existing constraint as
+  UX-1).
+* No automated accessibility (axe/Lighthouse) or standing Playwright
+  visual-regression suite — the 22 screenshots are one-time acceptance
+  evidence for this mission, not a repeatable regression suite.
+
 ## [Unreleased] — UX-1: NOOR Brand and Design System Alignment
 
 ### Added

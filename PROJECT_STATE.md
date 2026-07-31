@@ -1,12 +1,78 @@
 # PROJECT_STATE.md
 
-**Last updated:** UX-1 — NOOR Brand and Design System Alignment session
-(Claude Code, this environment)
+**Last updated:** UX-1.1 — Visual Acceptance and Public Surface
+Redesign session (Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code)
 
 ---
 
-## -10. This session: UX-1 — NOOR Brand and Design System Alignment
+## -11. This session: UX-1.1 — Visual Acceptance and Public Surface Redesign
+
+A corrective workstream: UX-1's brand tokens and shared components were
+real and working, but the actual rendered public/auth pages still
+failed visual acceptance when checked against real screenshots — the
+root landing page still showed the Sprint 0.5 placeholder, and the
+login page rendered with a full dark background despite UX-1's light
+theme having been implemented.
+
+**Root cause found by reading the code, not guessed:**
+`apps/web/app/layout.tsx`'s `<html>` element carried no `data-theme`
+attribute, so `packages/ui/tokens/index.ts`'s
+`@media (prefers-color-scheme: dark)` CSS rule silently applied the
+dark palette (dark navy canvas, lighter/lower-contrast button colors)
+to every page for any visitor whose OS prefers dark mode — which is
+common. There is no user-facing theme toggle anywhere in the product;
+this was an unintended side effect of pre-existing (ADR 0005) dark-mode
+token infrastructure, not a deliberate feature. Fixed by pinning
+`data-theme="light"` on `<html>`, consistent with the mission's own
+rule that dark mode is out of scope unless it already exists as a
+fully functional user-selectable mode.
+
+**The lower-left black "N" artifact was investigated, not assumed:**
+confirmed to be Next.js's own built-in development-mode indicator (no
+`devIndicators` config existed; no matching third-party dependency; not
+an application component) — it never renders in production or a
+deployed Vercel Preview. Disabled locally via the documented
+`devIndicators: false` flag.
+
+**Rebuilt:** the root landing page (real header/hero/capability-cards/
+workflow/trust/footer, accurate current-capability copy, protected
+workspace routes no longer exposed as raw public links); the login page
+(two-column `AuthSplitShell` — white brand panel with a fully legible
+logo, soft-cyan form panel); `/forgot-password`/`/update-password`
+(moved onto a shared `AuthCardShell`); `/403`/`/access-denied` (same
+shell, gained a real recovery action); `/not-found.tsx`/`/error.tsx`
+(created — neither existed before, Next.js was serving unstyled
+defaults). A real RTL bug was found and fixed in the same pass: the new
+footer's `sm:text-left` did not flip under `dir="rtl"` — corrected to
+the logical `sm:text-start`.
+
+**Verification, real not assumed:** `apps/web` — `tsc --noEmit` clean,
+`next lint` clean, `next build` clean (0 warnings, 23 routes), all 15
+unit-test files pass individually including a new
+`public-pages-content.test.ts` (bans the retired Sprint 0.5 phrases,
+enforces exactly one `<h1>` on `/` and `/login`, guards the
+`data-theme="light"` fix against regression). `packages/ui` typecheck
+clean. `packages/clinical-schemas` typecheck + 6/6 tests pass.
+`apps/worker`'s full 79-assertion pytest suite unchanged — confirms
+zero backend regression from a frontend-only corrective mission.
+**22 real Playwright/Chromium screenshots** were captured against the
+actual running `next dev` server — desktop/tablet/mobile for `/` and
+`/login`, desktop+mobile for `/forgot-password`/`/403`/`/access-denied`,
+plus 3 RTL-simulated captures (forcing `dir="rtl"` on the live DOM,
+since Noor has no routed Arabic locale yet) — proving the two-column
+login layout mirrors correctly, the logo is never mirrored, and the RTL
+footer bug above is fixed. Full record, including the screenshot table:
+`docs/verification/ux-1-1-visual-acceptance.md`.
+
+**UX-1.1: Implementation Complete, Pending User Visual Acceptance.**
+This status is deliberate — the mission's own governing rule is that
+visual acceptance is the user's call, not a self-declared outcome of a
+passing build.
+
+---
+
+## -10. Prior session: UX-1 — NOOR Brand and Design System Alignment
 
 Implemented workstream `UX-1`: the user's approved NOOR logo (a
 stylized "N" — navy/blue network graphic on the left stroke, teal/

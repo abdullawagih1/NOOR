@@ -532,3 +532,28 @@ the same PR that resolves an item.
     trade-off (the mission prohibits redrawing/simplifying the mark for
     small sizes), not an oversight — see
     `docs/brand/noor-logo-usage.md`.
+
+69. **UX-1.1's screenshots are a one-time visual-acceptance artifact,
+    not a standing automated visual-regression suite.** No axe/
+    Lighthouse accessibility scan and no repeatable Playwright
+    visual-diff test were added — the 22 screenshots in
+    `docs/verification/screenshots/ux-1-1/` prove this specific
+    mission's redesign, they do not guard future changes from
+    regressing the same pages. Consistent with this repository's
+    broader, pre-existing gap (item 24/66: no Playwright/browser-driven
+    E2E exists at all).
+
+70. **UX-1.1's RTL screenshots are a layout-mirroring simulation, not
+    real Arabic content.** Noor has no routed Arabic locale (no `/ar/...`
+    path, no i18n routing) — the RTL captures force `dir="rtl"`/
+    `lang="ar"` on the existing English-copy DOM immediately before
+    capture, proving the flex-based layouts and token system mirror
+    correctly, not that real Arabic typography has been visually
+    verified in production use. See
+    `docs/verification/ux-1-1-visual-acceptance.md`.
+
+71. **UX-1.1's final status intentionally remains "Implementation
+    Complete, Pending User Visual Acceptance"** until the user reviews
+    the real screenshot evidence and explicitly approves it — this is
+    not an oversight or an incomplete task, it is this mission's own
+    required acceptance gate. See `SPRINT_CURRENT.md`.

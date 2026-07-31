@@ -1,99 +1,83 @@
-# Sprint Current: UX-1 — NOOR Brand and Design System Alignment
+# Sprint Current: UX-1.1 — Visual Acceptance and Public Surface Redesign
 
-**Status:** Locally complete and verified (typecheck/lint/build/all
-test suites clean across `apps/web`, `packages/ui`,
-`packages/clinical-schemas`, and `apps/worker`). A real Vercel Preview
-deployment and browser-driven smoke test have **not** been performed in
-this session segment — see
-`docs/verification/ux-1-brand-alignment-verification.md` for the full,
-honest account, including a real disk-space environmental issue
-encountered mid-session.
+**Status:** UX-1.1 — Implementation Complete, Pending User Visual
+Acceptance. This is a corrective workstream: UX-1 shipped real brand
+tokens, but the actual rendered public/auth pages still failed visual
+acceptance against real screenshots. See
+`docs/verification/ux-1-1-visual-acceptance.md` for the full record,
+including the root-cause diagnosis and 22 real Playwright screenshots.
 
-Workstreams `S1-A`/`S1-B`/`S1-C1`/`S1-C2`/`S1-D1`/`S1-D2` closed in
-prior sessions. This sprint is workstream `UX-1` — a frontend/design
-sprint with **no** clinical-logic, database, RLS, or orchestration
-changes. See `MASTER_BACKLOG.md` for the reconciled backlog.
+Workstreams `S1-A`/`S1-B`/`S1-C1`/`S1-C2`/`S1-D1`/`S1-D2`/`UX-1` closed
+in prior sessions. This sprint is workstream `UX-1.1`.
 
 ## Governing principle
 
-The user's approved NOOR logo is now the single source of truth for
-Noor's visual identity. The existing design-system token architecture
-(`packages/ui/tokens/*` → CSS custom properties → Tailwind utilities,
-ADR 0005) was sound and unchanged in structure — this sprint changed
-*values*, not architecture, plus a small number of component-level
-class references (see ADR 0013).
+Screenshots, not descriptions, are the acceptance evidence. This
+mission does not close itself — the final status stays "Implementation
+Complete, Pending User Visual Acceptance" until the user reviews the
+actual screenshots and says so.
+
+## Root cause found (not assumed)
+
+The "dark login page" complaint was not a design decision — it was a
+real, pre-existing bug: `apps/web/app/layout.tsx`'s `<html>` element
+carried no `data-theme` attribute, so `packages/ui/tokens/index.ts`'s
+`@media (prefers-color-scheme: dark)` rule silently applied the dark
+palette to every page for any visitor on a dark-mode OS. There is no
+user-facing theme toggle anywhere in the product — this was never a
+deliberate feature. Fixed by pinning `data-theme="light"` on `<html>`.
+
+The lower-left black "N" was investigated, not guessed: confirmed by
+reading `next.config.mjs` (no `devIndicators` config existed) to be
+Next.js's own built-in development-mode indicator — never present in
+production or a deployed Vercel Preview. Disabled locally via the
+documented `devIndicators: false` flag for clean screenshots.
 
 ## Objectives
 
-- [x] Official logo preserved byte-for-byte (`apps/web/public/brand/source/`,
-      sha256-verified) and derived into five real, unmodified crops
-      (primary lockup, navigation lockup, symbol, favicon, social
-      preview) — never redrawn.
-- [x] Brand color anchors independently sampled from the real logo
-      pixels and validated against the mission's own supplied reference
-      values before being finalized — see
-      `docs/design/noor-color-system.md`.
-- [x] Centralized brand + semantic token system extended (not
-      replaced): four new 50–950 brand scales, a new `accent` (teal)
-      slot split out from `primary` (blue), one gradient token, and
-      five new distinct status states (`queued`/`retryScheduled`/
-      `ocrRequired`/`reprocessingRequired`/`deadLettered`) that close a
-      real, found gap — `ocr_required` and `reprocessing_required` were
-      previously visually identical.
-- [x] Shared UI components (`packages/ui`) updated: focus rings and
-      navigation-active state now use the new teal `accent`, not blue
-      `primary`, matching the logo's own blue-interaction/teal-
-      wayfinding split.
-- [x] Application shell — the logo was added to `WorkspaceHeader`, the
-      single shared top nav every workspace (admin/clinician/knowledge/
-      quality/reviewer) already renders. The mission described a
-      sidebar shell; the app has none, so none was invented.
-- [x] Login page redesigned with the primary logo and a restrained
-      gradient accent line; a real accessibility regression (losing the
-      page's only `<h1>`) was caught and fixed in the same edit.
-- [x] Favicon, app icons, Open Graph/Twitter metadata, and `themeColor`
-      added — none existed before this sprint.
-- [x] Development design-system page gained an "Official brand"
-      section (logo variants, gradient, anchor swatches); the existing
-      dynamic semantic-state swatch loop picked up the five new states
-      with zero page-level code change.
-- [x] Brand + design documentation written (ADR 0013,
-      `docs/brand/{NOOR_BRAND,noor-logo-usage}.md`,
-      `docs/design/{noor-color-system,noor-component-theme,
-      noor-accessibility-review}.md`).
+- [x] Root landing page (`/`) completely redesigned — the Sprint 0.5
+      placeholder (raw workspace links, "no clinical data or generation
+      pipeline is wired yet") is gone. Real header/hero/capability-
+      cards/workflow/trust/footer structure with accurate current-
+      capability copy; protected workspace routes are no longer exposed
+      as raw public links.
+- [x] Login page redesigned as a two-column light composition (white
+      brand panel with the full logo legible, soft-cyan form panel) —
+      no more full dark background, no more logo-as-pasted-rectangle.
+- [x] Forgot-password / update-password pages moved onto the same
+      shared `AuthCardShell`.
+- [x] 403 / access-denied pages moved onto `AuthCardShell`, gained a
+      real recovery action. `not-found.tsx` / `error.tsx` created —
+      neither existed before (Next.js was serving unstyled defaults).
+- [x] A real RTL bug found and fixed: the footer's `sm:text-left` did
+      not flip under `dir="rtl"` — corrected to logical `sm:text-start`.
+- [x] Content-regression tests added (`public-pages-content.test.ts`) —
+      bans the retired Sprint 0.5 phrases, enforces exactly one `<h1>`
+      on `/` and `/login`, enforces the shared shells are actually used,
+      guards the `data-theme="light"` fix against regression.
+- [x] 22 real Playwright/Chromium screenshots captured — desktop/
+      tablet/mobile for `/` and `/login`, desktop+mobile for
+      `/forgot-password`/`/403`/`/access-denied`, plus 3 RTL-simulated
+      captures. See `docs/verification/screenshots/ux-1-1/`.
 - [x] Full regression verification — `apps/web` typecheck/lint/build
-      clean, all 14 unit-test files pass, `packages/ui` typecheck
-      clean, `packages/clinical-schemas` typecheck+tests pass, and
-      `apps/worker`'s full 79-assertion pytest suite still passes
-      (confirms zero backend regression from a frontend-only sprint).
-- [ ] Vercel Preview deployment and browser-driven smoke test — **not
-      done this session segment**, see verification doc for why
-      (a real disk-space constraint was hit and flagged, not worked
-      around silently).
-
-## A real, disk-space environmental issue this session
-
-Mid-session, this machine's `C:` drive was found at 99% capacity (at
-one point 0 bytes reported free), making Docker unresponsive. This was
-surfaced to the user immediately rather than pushed through — see
-`docs/verification/ux-1-brand-alignment-verification.md`'s
-"Environmental note." All verification above completed successfully
-once minimal space was freed; none of it needed more than a few hundred
-MB.
+      clean (0 warnings), all 15 unit-test files pass, `packages/ui`
+      typecheck clean, `packages/clinical-schemas` typecheck+tests
+      pass, `apps/worker`'s full 79-assertion suite unchanged.
+- [ ] User visual acceptance of the screenshots — **pending**.
 
 ## Explicitly out of scope this task (per the mission)
 
 Any change to database schema, RLS, permissions, processing states,
 extraction states, OCR states, review decisions, eligibility rules,
-Worker orchestration, or Storage authorization. Clinical semantic
-colors (danger/warning/critical) were deliberately left untouched by
-the brand refresh — see ADR 0013 §"Brand colors never override
-clinical safety semantics."
+Worker orchestration, or Storage authorization. No i18n/routed-Arabic-
+locale work — the RTL screenshots are a layout-mirroring simulation on
+the existing English copy, not new Arabic content.
 
-## Next sprint
+## Next step
 
 ```text
-Begin Sprint 1-D3 — Deterministic Page-Aware Chunking
+User Visual Review of UX-1.1 Screenshots
 ```
 
-See `MASTER_BACKLOG.md` (S1-D3).
+Do not begin S1-D3 until the user has reviewed and approved. See
+`MASTER_BACKLOG.md`.
