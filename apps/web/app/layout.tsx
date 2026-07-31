@@ -57,7 +57,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" dir="ltr" className={`${inter.variable} ${plexArabic.variable}`}>
+    // UX-1.1: data-theme="light" is pinned deliberately, not incidentally.
+    // packages/ui/tokens/index.ts's generated CSS applies the dark palette
+    // automatically via `@media (prefers-color-scheme: dark)` whenever
+    // <html> carries no data-theme — which is exactly what every page
+    // (including /login) was doing before this fix. There is no
+    // user-facing theme toggle anywhere in the product, so that dark
+    // palette was activating silently for any visitor on a dark-mode OS,
+    // not by design. Noor has no functioning user-selectable dark mode
+    // today (ADR 0013/UX-1.1) — this pins the light palette everywhere
+    // until one is deliberately built, rather than leaving the brand
+    // refresh at the mercy of the visitor's OS setting.
+    <html lang="en" dir="ltr" data-theme="light" className={`${inter.variable} ${plexArabic.variable}`}>
       <body className="font-sans antialiased">
         <TokensStyleTag />
         {children}

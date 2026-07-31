@@ -1,4 +1,5 @@
 import { UpdatePasswordForm } from "./UpdatePasswordForm";
+import { AuthCardShell } from "../AuthShell";
 import { Card, PageHeader } from "@noor/ui";
 
 // Session-dependent (the recovery session set by /auth/callback) — must
@@ -12,11 +13,13 @@ export default async function UpdatePasswordPage({
 }) {
   const params = await searchParams;
   return (
-    <main className="mx-auto flex max-w-md flex-col gap-lg p-xl">
-      <PageHeader title="Choose a new password" description="This completes your password reset." />
-      <Card>
-        <UpdatePasswordForm error={params.error} />
-      </Card>
-    </main>
+    <AuthCardShell>
+      <div className="flex flex-col gap-lg">
+        <PageHeader title="Choose a new password" description="This completes your password reset." />
+        <Card>
+          <UpdatePasswordForm error={params.error} />
+        </Card>
+      </div>
+    </AuthCardShell>
   );
 }
