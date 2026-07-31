@@ -226,6 +226,31 @@ the repository), driving the actual `next dev` server on
 development. No mock data, no design tool, no static mockup — every
 screenshot is the real rendered application.
 
+## Hosted verification — real, done
+
+The five commits above were pushed to `origin/main`
+(`f52f2e085d283c8c90785a20992cb80ebbee8a72`). GitHub Actions' `PR
+Pipeline` workflow run for that exact commit completed
+`status: completed`, `conclusion: success` — confirmed via the GitHub
+REST API.
+
+A real Vercel Preview deployment was then triggered:
+`https://noor-hux9lqo3h-abdullah-wagihs-projects.vercel.app`, status
+**`● Ready`** (confirmed via `vercel inspect`). The real build log shows
+a clean `next build` — `✓ Compiled successfully`, all 23 routes present
+including the new `/_not-found`, and `/`/`/403`/`/access-denied` now
+correctly prerender as **static** content (`○`), matching the local
+build exactly — followed by `Deployment completed`.
+
+**What a headless check still cannot get past**: this Vercel team's
+Deployment Protection (SSO gate) returns a `302` to `vercel.com/sso-api`
+for every direct request, including `/login` — the same pre-existing
+constraint documented in UX-1's own verification record, not a new
+issue. A real browser-rendered check of the deployed Preview therefore
+still requires the user's own authenticated Vercel session; the local
+Playwright screenshots above are the real visual evidence for this
+mission's acceptance gate.
+
 ## What was not done (honest account)
 
 - **Hosted Vercel Preview browser-rendered verification** — see
