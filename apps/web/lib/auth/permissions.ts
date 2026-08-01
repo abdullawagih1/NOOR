@@ -63,6 +63,20 @@ export const PERMISSIONS = {
   GUIDELINE_OCR_READ_ARTIFACTS: "guideline_ocr.read_artifacts",
   GUIDELINE_OCR_READ_SOURCE: "guideline_ocr.read_source",
   GUIDELINE_OCR_REPROCESS: "guideline_ocr.reprocess",
+
+  // Deterministic page-aware chunking (Sprint 1-D3) — see
+  // docs/domain/chunking-technical-review.md. Again a deliberately
+  // separate namespace, one layer deeper (ADR 0014). No dedicated
+  // "cancel" key — chunking jobs are cancelled through the existing
+  // generic GUIDELINE_PROCESSING_JOBS_CANCEL permission (a documented
+  // scope decision, migration 0012).
+  GUIDELINE_CHUNKING_READ: "guideline_chunking.read",
+  GUIDELINE_CHUNKING_CREATE: "guideline_chunking.create",
+  GUIDELINE_CHUNKING_READ_ARTIFACTS: "guideline_chunking.read_artifacts",
+  GUIDELINE_CHUNKING_REVIEW: "guideline_chunking.review",
+  GUIDELINE_CHUNKING_SUBMIT_REVIEW: "guideline_chunking.submit_review",
+  GUIDELINE_CHUNKING_REOPEN_REVIEW: "guideline_chunking.reopen_review",
+  GUIDELINE_CHUNKING_INVALIDATE: "guideline_chunking.invalidate",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

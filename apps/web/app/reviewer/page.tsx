@@ -37,6 +37,15 @@ export default function ReviewerPage() {
           </Link>
         }
       />
+      <EmptyState
+        title="Chunk technical review is live (Sprint 1-D3)"
+        description="Checks deterministic chunk boundaries, provenance, and sizing before a document can become eligible for a future embedding step. This is a technical review, not a clinical one, and it never edits chunk text."
+        action={
+          <Link href="/reviewer/chunking">
+            <Button variant="secondary">Open Chunking Review Queue</Button>
+          </Link>
+        }
+      />
     </main>
   );
 }

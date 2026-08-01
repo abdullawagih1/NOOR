@@ -42,6 +42,9 @@ import { createExtractionReviewAction } from "@/lib/extraction-review/actions";
 import { getOcrRequestForReview, getLatestOcrReviewForRequest } from "@/lib/ocr/queries";
 import { OcrRequestStatusBadge } from "@/lib/ocr/ui";
 import { createOcrRequestAction, createOcrReviewAction } from "@/lib/ocr/actions";
+import { getLatestChunkingRunForDocument, getLatestChunkingReviewForRun } from "@/lib/chunking/queries";
+import { ChunkingRunStatusBadge } from "@/lib/chunking/ui";
+import { createChunkingJobAction, createChunkingReviewAction } from "@/lib/chunking/actions";
 import { UploadPanel } from "./UploadPanel";
 import { PageHeader, Card, Section, Badge, TextInput, Textarea, Select, Button, Alert } from "@noor/ui";
 
@@ -242,6 +245,8 @@ async function SourceDocuments({
               canCreateExtractionReview={has(PERMISSIONS.GUIDELINE_EXTRACTION_REVIEWS_CREATE)}
               canReadOcr={has(PERMISSIONS.GUIDELINE_OCR_READ)}
               canCreateOcr={has(PERMISSIONS.GUIDELINE_OCR_CREATE)}
+              canReadChunking={has(PERMISSIONS.GUIDELINE_CHUNKING_READ)}
+              canCreateChunking={has(PERMISSIONS.GUIDELINE_CHUNKING_CREATE)}
             />
           ))}
         </div>
@@ -350,6 +355,8 @@ async function ExtractionSummaryCard({
   canCreateReview,
   canReadOcr,
   canCreateOcr,
+  canReadChunking,
+  canCreateChunking,
 }: {
   sourceDocumentId: string;
   guidelineId: string;
@@ -359,6 +366,8 @@ async function ExtractionSummaryCard({
   canCreateReview: boolean;
   canReadOcr: boolean;
   canCreateOcr: boolean;
+  canReadChunking: boolean;
+  canCreateChunking: boolean;
 }) {
   const runs = await listDocumentExtractionRuns(sourceDocumentId);
   const run = runs[0];
@@ -368,6 +377,10 @@ async function ExtractionSummaryCard({
   const latestReview = canReadReviews && run.status === "succeeded" ? await getLatestExtractionReviewForRun(run.id) : null;
   const ocrRequest = canReadOcr && latestReview?.review_status === "ocr_required" ? await getOcrRequestForReview(latestReview.id) : null;
   const ocrReview = ocrRequest ? await getLatestOcrReviewForRequest(ocrRequest.id) : null;
+  const CHUNKING_ELIGIBLE_REVIEW_STATUSES = new Set(["accepted", "accepted_with_warnings", "ocr_required"]);
+  const chunkingEligible = canReadChunking && latestReview ? CHUNKING_ELIGIBLE_REVIEW_STATUSES.has(latestReview.review_status) : false;
+  const chunkingRun = chunkingEligible ? await getLatestChunkingRunForDocument(sourceDocumentId) : null;
+  const chunkingReview = chunkingRun ? await getLatestChunkingReviewForRun(chunkingRun.id) : null;
 
   return (
     <div className="mt-xs rounded-sm border border-border bg-surface p-xs">
@@ -439,6 +452,42 @@ async function ExtractionSummaryCard({
             </form>
           ) : (
             <span className="text-muted">Not yet requested</span>
+          )}
+        </div>
+      ) : null}
+
+      {chunkingEligible ? (
+        <div className="mt-xs flex flex-wrap items-center gap-xs text-xs">
+          <span className="text-muted">Chunking:</span>
+          {chunkingRun ? (
+            <>
+              <ChunkingRunStatusBadge status={chunkingRun.status} />
+              {chunkingReview ? (
+                <a className="underline" href={`/reviewer/chunking/${chunkingReview.id}`}>
+                  Open chunking review
+                </a>
+              ) : chunkingRun.status === "running" ? (
+                <span className="text-muted">Chunking in progress</span>
+              ) : chunkingRun.status === "succeeded" && canCreateChunking ? (
+                <form action={createChunkingReviewAction} className="inline">
+                  <input type="hidden" name="chunkingRunId" value={chunkingRun.id} />
+                  <input type="hidden" name="guidelineId" value={guidelineId} />
+                  <Button type="submit" size="sm" variant="secondary">
+                    Open chunking review
+                  </Button>
+                </form>
+              ) : null}
+            </>
+          ) : canCreateChunking ? (
+            <form action={createChunkingJobAction} className="inline">
+              <input type="hidden" name="sourceDocumentId" value={sourceDocumentId} />
+              <input type="hidden" name="guidelineId" value={guidelineId} />
+              <Button type="submit" size="sm" variant="secondary">
+                Start chunking
+              </Button>
+            </form>
+          ) : (
+            <span className="text-muted">Not yet chunked</span>
           )}
         </div>
       ) : null}
@@ -543,6 +592,8 @@ async function SourceDocumentRow({
   canCreateExtractionReview,
   canReadOcr,
   canCreateOcr,
+  canReadChunking,
+  canCreateChunking,
 }: {
   document: import("@/lib/documents/queries").GuidelineSourceDocumentRow;
   guidelineId: string;
@@ -555,6 +606,8 @@ async function SourceDocumentRow({
   canCreateExtractionReview: boolean;
   canReadOcr: boolean;
   canCreateOcr: boolean;
+  canReadChunking: boolean;
+  canCreateChunking: boolean;
 }) {
   const jobs = await listDocumentProcessingJobs(doc.id);
   const latestJob = jobs[0];
@@ -587,6 +640,8 @@ async function SourceDocumentRow({
           canCreateReview={canCreateExtractionReview}
           canReadOcr={canReadOcr}
           canCreateOcr={canCreateOcr}
+          canReadChunking={canReadChunking}
+          canCreateChunking={canCreateChunking}
         />
       ) : null}
 
