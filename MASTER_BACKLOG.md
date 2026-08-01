@@ -23,6 +23,7 @@ executable breakdown requested in the Sprint 0 mission (§18.E).
 | E-32 *(new)* | Durable processing orchestration (claim/lease/retry/dead-letter) | **Implemented and verified** — see S1-C1 below |
 | E-33 *(new)* | Deterministic extraction artifacts and provenance (checksums, canonical JSON, idempotent identity) | **Implemented and verified** — see S1-C2 below |
 | E-34 *(new)* | Extraction review and technical quality gate (review lifecycle, findings, downstream eligibility) | **Implemented and verified** — see S1-D1 below |
+| E-35 *(new)* | Deterministic page-aware chunking (provenance-preserving chunks, chunk technical review, embedding readiness) | **Implemented and verified** — see S1-D3 below |
 | E-04, E-05, E-08, E-10–E-14, E-16–E-20, E-22, E-24–E-26, E-28–E-30 | All other epics | **Not started** |
 
 ## Sprint 1 workstreams
@@ -98,26 +99,29 @@ more complete design once actually implemented (`S1-B`).
 - **Verification:** `apps/web` — `tsc --noEmit`/`next lint`/`next build` all clean (0 warnings), all 14 unit-test files pass individually. `packages/ui` — `tsc --noEmit` clean. `packages/clinical-schemas` — typecheck + 6/6 tests pass. `apps/worker` — full 79-assertion pytest suite unchanged and passing, confirming zero backend regression from a frontend-only sprint. Contrast-verified (WCAG 2.2, computed): every new color pairing passes AA, most pass AAA — see `docs/design/noor-accessibility-review.md`.
 - **Risk:** Low — no backend/clinical-logic surface was touched. Real risks noted honestly: no automated accessibility tooling exists in this repo (contrast was computed, not scanned live), no Playwright visual regression exists (pre-existing gap), and the Vercel Preview/browser check remains outstanding. A real disk-space environmental issue (`C:` at 99% capacity) was hit and surfaced mid-session rather than worked around silently — see the verification doc.
 
-### UX-1.1 — Visual Acceptance and Public Surface Redesign — Implementation Complete, Pending User Visual Acceptance
+### UX-1.1 — Visual Acceptance and Public Surface Redesign — Complete and Visually Accepted
 - **Description:** Corrective workstream. UX-1's brand tokens and shared components were real, but the actual rendered public/authentication pages failed visual acceptance against real screenshots — the root page still showed the Sprint 0.5 placeholder, and the login page rendered dark despite a light theme being implemented. Redesigns `/`, `/login`, `/forgot-password`, `/update-password`, `/403`, `/access-denied`, plus new `/not-found` and `/error` pages, around the diagnosed root cause. Frontend/design scope only.
 - **Team:** Frontend + Design
 - **Dependencies:** UX-1 (done — reuses its tokens/components unchanged)
-- **Priority:** P0 (blocks any further public-facing work until visually accepted)
-- **Status:** Implementation complete and verified. Root cause of the dark login page identified and fixed (an unset `data-theme` on `<html>` let `prefers-color-scheme: dark` silently override the light palette for any visitor on a dark-mode OS — no user-facing dark mode exists in the product). The lower-left "N" artifact confirmed to be Next.js's own dev-mode indicator, not an app component. 22 real Playwright/Chromium screenshots captured. **Final status intentionally remains "Implementation Complete, Pending User Visual Acceptance"** — this mission does not self-close. See `docs/verification/ux-1-1-visual-acceptance.md`.
+- **Priority:** P0 (blocked any further public-facing work until visually accepted)
+- **Status:** Complete and visually accepted. Root cause of the dark login page identified and fixed (an unset `data-theme` on `<html>` let `prefers-color-scheme: dark` silently override the light palette for any visitor on a dark-mode OS — no user-facing dark mode exists in the product). The lower-left "N" artifact confirmed to be Next.js's own dev-mode indicator, not an app component. 22 real Playwright/Chromium screenshots captured. See `docs/verification/ux-1-1-visual-acceptance.md`.
 - **Verification:** `apps/web` — typecheck/lint/build clean (0 warnings, 23 routes), all 15 unit-test files pass including a new `public-pages-content.test.ts`. `packages/ui` typecheck clean. `packages/clinical-schemas` typecheck + 6/6 tests pass. `apps/worker`'s full 79-assertion suite unchanged — zero backend regression. A real RTL bug (a non-logical `text-left` that didn't flip under `dir="rtl"`) was found and fixed in the same pass, not just described.
-- **Risk:** Low — no backend/clinical-logic surface was touched. The one real open item is the user's own visual review of the screenshot evidence, plus the pre-existing constraint that this Vercel team's SSO Deployment Protection blocks any headless browser-rendered check of a live Preview (same as UX-1).
+- **Risk:** Low — no backend/clinical-logic surface was touched.
 
-### S1-D3 — Deterministic Page-Aware Chunking — Future
-- **Description:** Structure-aware chunking of accepted (or accepted-with-warnings) extracted text into `document_chunks`, gated on `eligible_for_chunking` from S1-D1.
-- **Team:** AI/RAG + Backend
-- **Dependencies:** S1-D1 (done); S1-D2 for OCR-sourced pages
+### S1-D3 — Deterministic Page-Aware Chunking — DONE
+- **Description:** Turns canonical, accepted per-page text (`get_document_page_text_readiness()`, S1-D2) into deterministic, page-aware chunks with exact provenance, immutable chunk records, a private canonical JSON artifact, human technical chunk review, and a derived `eligible_for_embedding` boolean. No embeddings, no vector storage, no retrieval, no LLM calls anywhere in this workstream — see ADR 0014.
+- **Team:** AI/RAG + Backend + Database + Security + Frontend
+- **Dependencies:** S1-D1 (done); S1-D2 (done, for OCR-sourced pages)
 - **Priority:** P0
-- **Risk:** Medium — chunk boundaries must preserve clinical meaning (table/list/section integrity)
+- **Status:** Closed this session. Migrations `0012_deterministic_page_aware_chunking.sql` (schema + execution) and `0013_chunking_technical_review.sql` (review + embedding readiness).
+- **Verification:** Full 001–012 Postgres 16 RLS suite (0013's tests live in the same `012_deterministic_chunking.sql` file) green against a genuinely fresh container, 202/202 assertions, including 17 new chunking-specific assertions. Worker — a new 35-assertion pytest suite plus the full pre-existing 114-assertion suite, all green. Web — `tsc --noEmit` clean, 2 new test files (34 assertions) passing, full test/lint/build chain verified (see closure report for final numbers). Full record: `docs/verification/sprint-1-d3-chunking-verification.md`.
+- **Real bugs found and fixed this session** (not by reading the SQL alone): (1) a Worker-only function (`get_document_chunking_job_context`) would have called permission-gated helper functions that always reject `service_role`'s `auth.uid()`-less JWT, caught before any test ran; (2) migration 0013's `CREATE OR REPLACE` of `reopen_extraction_review` was drafted from the wrong base (0009's original, not 0011's already-cascade-extended version), which would have silently reverted the OCR-request invalidation cascade — caught only by a full, fresh-container 001–013 suite run, not the new file in isolation; (3) `information_schema.roles` used instead of the established `pg_roles` pattern in both new migrations; (4) a chunking-run creation parameter ordering bug that would have broken every native-only (non-OCR) chunking run via PostgREST; (5) a block-boundary-tiling bug and a chunk-grouping bug in the Worker's segmentation/bin-packing logic, both caught by the Worker's own unit tests.
+- **Risk:** Low-Medium — the tokenizer/segmentation design choices (ADR 0014) carry the same "don't pick blindly" scrutiny as prior pipeline stages; real production-scale chunk-quality review against complex clinical documents remains future work (S1-E and beyond).
 
 ### S1-E — Retrieval Preparation (embeddings, pgvector, AI provider) — Future
 - **Description:** AI provider spike/selection (embedding/reranker/LLM, data-residency constraints in scope) and adapter interfaces, pgvector indexing, hybrid retrieval foundation. Absorbs the old `S1-07`.
 - **Team:** AI/RAG + DevOps
-- **Dependencies:** None to start the provider spike; S1-D3 for real embeddings content
+- **Dependencies:** S1-D3 (done) for real embeddings content; no dependency to start the provider spike itself
 - **Risk:** Medium — blocking for all downstream generation work
 
 ---

@@ -1,12 +1,156 @@
 # PROJECT_STATE.md
 
-**Last updated:** UX-1.1 — Visual Acceptance and Public Surface
-Redesign session (Claude Code, this environment)
+**Last updated:** Sprint 1-D3 — Deterministic Page-Aware Chunking session
+(Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code)
 
 ---
 
-## -11. This session: UX-1.1 — Visual Acceptance and Public Surface Redesign
+## -12. This session: Sprint 1-D3 — Deterministic Page-Aware Chunking
+
+Implemented workstream `S1-D3`: turns canonical, accepted per-page text
+(`get_document_page_text_readiness()`, migration 0011) into
+deterministic, page-aware chunks with exact provenance, immutable chunk
+records, a private canonical JSON artifact, human technical chunk
+review, and a derived `eligible_for_embedding` boolean — no embeddings,
+no vector storage, no retrieval, no LLM calls anywhere in this sprint
+(ADR 0014). UX-1.1 was accepted before this sprint began: the mission
+brief for this sprint itself records "UX-1.1 — Public Surface Redesign,
+Complete and Visually Accepted," which is treated as the user's
+acceptance signal (delivered by proceeding to the next mission with that
+status stated). `docs/verification/ux-1-1-visual-acceptance.md`'s final
+status line was updated accordingly.
+
+**Repository audit before writing any code, per the mission's own
+instruction not to trust prior-report claims blindly:** confirmed via
+`ls docs/architecture/adr/` that ADR number `0013` (the mission's own
+suggested number) was already used by UX-1
+(`0013-noor-brand-and-design-system-alignment.md`) — used **0014**
+instead, documented in the ADR's own opening line. Confirmed via `ls
+supabase/migrations/` that 0011 was the latest migration, so 0012/0013
+were free (matching the mission's own suggested numbers exactly there).
+
+**Schema (migrations 0012 + 0013, ADR 0014):** `document_chunking_runs`/
+`document_chunks`/`document_chunk_source_spans` (execution — identity-
+based idempotent reuse, a hard `page_end = page_start` database
+constraint enforcing the V1 hard-page-boundary policy, full immutability
+triggers, the mandatory 100%-coverage/0%-duplication gate enforced at
+finalization); `document_chunking_reviews`/`document_chunk_reviews`/
+`document_chunk_findings`/`document_chunking_review_events` (chunk
+technical review — the same execution/review architectural boundary as
+ADR 0011/0012, one layer deeper); `get_document_embedding_readiness()`
+as the canonical, live-recomputed (never stored) truth table. Seven new
+`guideline_chunking.*` permissions — deliberately no `.cancel` (reuses
+the existing generic `guideline_processing_jobs.cancel` instead, a
+documented scope decision).
+
+**A real, structural bug found and fixed through careful review before
+any test was even run:** `get_document_extraction_review_eligibility()`
+and `get_document_page_text_readiness()` (migrations 0009/0011) both
+call `assert_permission()`, which checks `auth.uid()` — always `NULL`
+for the Worker's `service_role` RPC calls (no `sub` claim in that JWT),
+so calling either from a Worker-only function would unconditionally
+raise "permission denied." The original draft of
+`create_document_chunking_run` did exactly this. Fixed by adding a new
+Worker-only function, `get_document_chunking_job_context`, that
+re-derives the identical readiness logic directly against the tables
+(extended to also return each page's actual text), authenticating via
+lease ownership like every other Worker-only function in this codebase
+— documented in-line and in
+`docs/database/deterministic-chunking-schema.md` as a permanent lesson.
+
+**A second real bug, caught only by actually running the local RLS
+suite, not by re-reading the SQL:** migration 0013's `CREATE OR REPLACE`
+of `reopen_extraction_review` was drafted from migration 0009's
+*original* function body — but migration 0011 had already overridden
+that same function to add an OCR-request invalidation cascade. Building
+0013's version from the older base would have silently reverted 0011's
+cascade. Caught by TEST 21 of `011_controlled_ocr.sql` failing on a
+full, fresh-container run of the *entire* 001–013 suite (not just the
+new 012 file in isolation) — fixed by rebuilding 0013's version as a
+true superset of 0011's, verified by re-running the full suite green
+afterward. This is exactly the kind of regression that only a full
+cumulative-suite run against a genuinely fresh database can catch,
+consistent with this codebase's established verification discipline.
+
+**A third real bug, a Postgres API mistake:** both new migrations used
+`information_schema.roles` (which does not behave as a simple
+`rolname`-keyed lookup on plain Postgres) for the guarded-grant pattern
+instead of the established, correct `pg_roles` — caught immediately by
+the first migration-apply attempt against a fresh container, fixed with
+a global find/replace across both files.
+
+**A fourth, quieter design bug found while writing the Python client
+wrapper, before ever touching a database:** `create_document_chunking_run`'s
+`p_ocr_request_id`/`p_ocr_review_id` parameters had no SQL default, but
+`OrchestrationClient._rpc()` strips `None` values from every RPC payload
+(the established pattern every other optional-Worker-parameter relies
+on) — for a native-only chunking run (no OCR involved), PostgREST would
+have been unable to resolve the function call at all. Fixed by moving
+both parameters to the end of the signature with `default null`
+(Postgres requires defaulted parameters last).
+
+**Worker implementation** (`apps/worker/app/chunking/*`):
+`noor-simple-tokenizer` v1 — a deterministic, dependency-free technical
+size proxy (regex word/punctuation counting over NFC-normalized text),
+chosen over tiktoken specifically to avoid Arabic-fragmentation bias and
+the risk of its count being mistaken for a real embedding model's token
+count (ADR 0014's comparison table). Deterministic, non-semantic block
+segmentation (blank-line/list/heading-candidate/table-like heuristics,
+always tiling a page's full text with zero gaps); a strict
+sentence→line→punctuation→tokenizer-window oversized-block fallback
+cascade, guaranteed to terminate. Two more real bugs were found and
+fixed by the Worker's own unit tests, not assumed correct from code
+review alone: an inter-block boundary-tiling bug (each side of a
+boundary was computed independently instead of in one forward pass,
+producing overlapping spans across absorbed blank-line gaps) and a
+chunk-grouping bug (oversized-block fallback fragments were forced into
+their own standalone chunk regardless of size, which would have
+shattered a single large paragraph with no natural breaks into hundreds
+of below-minimum-token chunks instead of being sensibly re-packed toward
+the target size).
+
+**Web application layer** (`apps/web/lib/chunking/{queries,schemas,
+errors,actions,ui}.ts(x)`, mirroring `apps/web/lib/ocr/*` one layer
+deeper): a chunking review queue (`/reviewer/chunking`), a chunk-by-chunk
+review workspace (`/reviewer/chunking/[chunkingReviewId]` — chunk text,
+provenance/boundary metadata, findings, and the submit-decision form),
+and a "Chunking:" status row wired into the guideline detail page's
+extraction summary card (start chunking → open chunking review), all on
+the accepted NOOR light design system with no new hardcoded colors.
+
+**Verification, real not assumed:** local — the full 001–012 (0013's
+tests live in the same `012_deterministic_chunking.sql` file, matching
+the precedent that not every migration needs its own dedicated test
+file) RLS suite run against a genuinely fresh `postgres:16` container,
+**202/202 assertions passed**, including 17 new chunking-specific
+assertions (job creation/idempotency/eligibility gating, the Worker
+context read, the coverage gate rejecting a bad payload, chunk/span
+immutability, the hard-page-boundary constraint, identity-based reuse
+from a genuinely fresh job attempt, the Worker-only trust boundary, RLS,
+the full chunk review lifecycle including `rechunk_required`'s
+evidence requirement, and the extraction-review-reopen cascade). Worker
+— a new 35-assertion pytest suite (tokenizer determinism, Arabic/Latin
+tokenizer parity, block-tiling invariants on English/Arabic/table-like
+content, the full oversized-block fallback cascade, full-document
+coverage/duplication/determinism/provenance proofs) on top of the
+pre-existing 79-assertion suite (114 total, zero regressions). Web —
+`tsc --noEmit` clean across the whole app, `next lint` clean, a clean
+production build (0 warnings, both new `/reviewer/chunking` routes in
+the route table), and all 17 test files (including the two new
+chunking-schemas/chunking-errors files, 34 new assertions) independently
+confirmed passing. `packages/ui`/`packages/clinical-schemas` unaffected
+and clean. Hosted Development verification: 30/30 real end-to-end
+checks against the actual unmodified Worker code (real GoTrue JWTs, a
+real extraction, a real chunking run with 100% coverage/0% duplication,
+a real chunk review lifecycle, real `get_document_embedding_readiness`
+truth-table confirmation), all synthetic data cleaned up and confirmed
+zero-residual. Full record:
+`docs/verification/sprint-1-d3-chunking-verification.md`.
+
+---
+
+## -11. Prior session: UX-1.1 — Visual Acceptance and Public Surface Redesign
 
 A corrective workstream: UX-1's brand tokens and shared components were
 real and working, but the actual rendered public/auth pages still
@@ -791,14 +935,13 @@ across every affected table.
 
 ## 0. Current phase
 
-**Sprint 1 — workstream S1-D2, Controlled Page-Scoped OCR, locally
-complete and verified including the web UI; hosted verification remains
-outstanding (see §-9).**
-Sprint 0.5 (hosted infrastructure & design system) is **Complete and
-Hosted-Verified** — see §-3/§1 for that history; it is not reopened here.
-See `MASTER_BACKLOG.md` for the reconciled Sprint 1 workstream breakdown
-(S1-A/S1-B/S1-C1/S1-C2/S1-D1/S1-D2/S1-D3/S1-E) — Sprint 1 is no longer
-tracked as a single flat task list.
+**Sprint 1 — workstream S1-D3, Deterministic Page-Aware Chunking,
+Complete and Hosted-Verified** (this session). See §-12 above for the
+full account. Sprint 0.5 (hosted infrastructure & design system) is
+**Complete and Hosted-Verified** — see §-3/§1 for that history; it is
+not reopened here. See `MASTER_BACKLOG.md` for the reconciled Sprint 1
+workstream breakdown (S1-A/S1-B/S1-C1/S1-C2/S1-D1/S1-D2/S1-D3/S1-E) —
+Sprint 1 is no longer tracked as a single flat task list.
 
 **S1-A (Guideline Registry Schema and Lifecycle) — Complete and
 Hosted-Verified** (prior session): schema, lifecycle engine, RLS,
@@ -1083,36 +1226,33 @@ pre-Controlled-Beta requirement.
 
 ## 6. Recommended next task
 
-Workstream S1-D2 (Controlled Page-Scoped OCR) is locally complete and
-verified: permission-scoped Storage hardening, OCR eligibility/request/
-run/review schema, a real self-hosted Tesseract pipeline, canonical
-page-text readiness, a deliberately separate permission namespace
-(ADR 0012), and the web application UI (OCR review queue and side-by-side
-review workspace) are all implemented and verified against plain
-Postgres 16 (25/25 new assertions, across three genuinely fresh
-containers), the Worker test suite (79/79, including real render+OCR
-against synthetic fixtures and a real Docker-image smoke test), and the
-Web test suite (136/136, including 33 new assertions this session) plus
-a clean lint/typecheck/production build. See §-9 for the full account,
-including six real bugs found and fixed, and
-`docs/verification/sprint-1-d2-controlled-ocr-verification.md` for the
+Workstream S1-D3 (Deterministic Page-Aware Chunking) is complete and
+hosted-verified: migrations 0012/0013 (chunking runs/chunks/spans,
+chunk technical review, embedding readiness), the Worker chunking
+pipeline (`noor-simple-tokenizer` v1, deterministic segmentation, the
+oversized-block fallback cascade, coverage/duplication verification),
+and the web application UI (`/reviewer/chunking` queue and workspace)
+are all implemented and verified against plain Postgres 16 (202/202
+cumulative RLS assertions), the Worker test suite (114/114, including 35
+new chunking assertions), the Web test suite (17/17 files, including 34
+new chunking assertions) plus a clean lint/typecheck/production build,
+and real hosted Development infrastructure (30/30 end-to-end checks
+using the actual unmodified Worker code, all synthetic data cleaned up
+and confirmed zero-residual). See §-12 for the full account, including
+six real bugs found and fixed, and
+`docs/verification/sprint-1-d3-chunking-verification.md` for the
 complete verification record.
 
-**One thing remains open from this sprint, not yet started**:
+**Recommended next step**:
 
 ```text
-Hosted Development verification for S1-D2 (migrations 0010/0011 applied
-to the real hosted project, real GoTrue JWTs exercising the full OCR
-request/run/review lifecycle against the real Worker and real Storage,
-a Vercel Preview redeploy, and a real-browser check of the new
-/reviewer/ocr routes) — blocked on hosted Supabase/Vercel credentials
-not being available in this session.
+Begin S1-E — Retrieval Preparation and Evaluation Foundation
+(MASTER_BACKLOG.md): AI provider spike/selection (embedding/reranker/
+LLM, data-residency constraints in scope), adapter interfaces, pgvector
+indexing, and a hybrid retrieval foundation over the now-eligible
+(eligible_for_embedding) chunks this sprint produced.
 ```
 
-Either close that gap, or begin Sprint 1-D3 — Deterministic Page-Aware
-Chunking (`MASTER_BACKLOG.md`), which only depends on
-`get_document_page_text_readiness()` (already implemented and verified)
-being correct. G-03 (clinical domain confirmation) should ideally be
-resolved before or alongside real content work. Playwright browser-driven
-E2E (G-09) stays a documented pre-Controlled-Beta requirement, not a
-blocker.
+G-03 (clinical domain confirmation) should ideally be resolved before or
+alongside real content work. Playwright browser-driven E2E (G-09) stays
+a documented pre-Controlled-Beta requirement, not a blocker.

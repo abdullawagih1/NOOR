@@ -1,4 +1,4 @@
-# Known Limitations — Sprint 1-D1
+# Known Limitations — Sprint 1-D3
 
 Honest accounting of what this build does and does not verify. Update in
 the same PR that resolves an item.
@@ -552,8 +552,47 @@ the same PR that resolves an item.
     verified in production use. See
     `docs/verification/ux-1-1-visual-acceptance.md`.
 
-71. **UX-1.1's final status intentionally remains "Implementation
-    Complete, Pending User Visual Acceptance"** until the user reviews
-    the real screenshot evidence and explicitly approves it — this is
-    not an oversight or an incomplete task, it is this mission's own
-    required acceptance gate. See `SPRINT_CURRENT.md`.
+71. ~~UX-1.1's final status intentionally remains "Implementation
+    Complete, Pending User Visual Acceptance."~~ **Resolved.** The user
+    accepted the screenshot evidence — final status is "Complete and
+    Visually Accepted." See `docs/verification/ux-1-1-visual-acceptance.md`.
+
+72. **`noor-simple-tokenizer`'s token count is a technical sizing proxy
+    only, never a real embedding model's token count.** Chunk sizing
+    (`TARGET_CHUNK_TOKENS`/`HARD_MAXIMUM_CHUNK_TOKENS`) is bounded by a
+    deterministic, dependency-free regex tokenizer chosen specifically
+    to avoid Arabic-fragmentation bias and the risk of its count being
+    mistaken for a real model's tokenization (ADR 0014). Whichever
+    embedding model S1-E eventually selects will almost certainly
+    tokenize differently — this is expected and does not require
+    rechunking by itself, but real per-model token budgets must be
+    re-derived at that point, not assumed from this sprint's counts.
+
+73. **Chunking has not been benchmarked against real, complex clinical
+    documents.** Verified against synthetic English/Arabic/mixed-language/
+    list/heading/table-like/oversized-paragraph fixtures only (Worker
+    unit tests) and small synthetic fixtures in the RLS suite — no real
+    multi-column clinical guideline PDF, footnote-heavy document, or
+    genuinely large document (hundreds of pages) has been chunked yet.
+    `finalize_document_chunking_run`'s single atomic insert is sized for
+    this sprint's fixture scale — see
+    `docs/operations/chunking-worker-runbook.md`'s scaling note.
+
+74. **No automated "rechunk" trigger exists.** A `rechunk_required`/
+    `rejected` chunk review decision does not automatically re-run
+    chunking under a different configuration — a human must decide what
+    `CHUNKING_CONFIGURATION_VERSION` change is warranted and request a
+    new chunking job. See `docs/operations/chunking-failure-and-rechunking.md`.
+
+75. **The chunking review workspace has no original-page visual panel.**
+    Unlike the OCR review workspace (which shows the original rendered
+    page alongside native/OCR text), the chunking review workspace shows
+    only chunk text and provenance metadata — a deliberate scope
+    reduction, since a reviewer already saw the original page during
+    extraction/OCR review. Revisit if chunk-boundary review in practice
+    needs the original page visible again.
+
+76. **A real browser-rendered check of Sprint 1-D3's `/reviewer/chunking`
+    routes has not been performed**, for the same reason as item 62 (OCR)
+    — this Vercel team's SSO Deployment Protection blocks any headless
+    browser check of a live Preview URL from this environment.

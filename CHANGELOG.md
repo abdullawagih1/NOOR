@@ -1,5 +1,77 @@
 # Changelog
 
+## [Unreleased] — Sprint 1-D3: Deterministic Page-Aware Chunking
+
+Turns canonical, accepted per-page text into deterministic, page-aware
+chunks with exact provenance, immutable chunk records, a private
+canonical JSON artifact, human technical chunk review, and a derived
+`eligible_for_embedding` boolean. No embeddings, vector storage,
+retrieval, or LLM calls anywhere in this workstream — see ADR 0014.
+
+### Added
+
+* `supabase/migrations/0012_deterministic_page_aware_chunking.sql` —
+  `document_chunking_runs`/`document_chunks`/
+  `document_chunk_source_spans`, `create_document_chunking_job`,
+  Worker-only `get_document_chunking_job_context`/
+  `create_document_chunking_run`/`finalize_document_chunking_run`/
+  `fail_document_chunking_run`, the mandatory 100%-coverage/
+  0%-duplication finalization gate, a real `page_end = page_start`
+  database constraint enforcing the V1 hard-page-boundary policy, seven
+  new `guideline_chunking.*` permissions, RLS.
+* `supabase/migrations/0013_chunking_technical_review.sql` —
+  `document_chunking_reviews`/`document_chunk_reviews`/
+  `document_chunk_findings`/`document_chunking_review_events`, the full
+  chunk review lifecycle, `get_document_embedding_readiness()`, and an
+  extension of `reopen_extraction_review` (built as a superset of
+  migration 0011's own OCR-cascade version, not migration 0009's
+  original) to also invalidate a dependent succeeded chunking run.
+* `apps/worker/app/chunking/*` — `noor-simple-tokenizer` v1 (a
+  deterministic, dependency-free technical size proxy, never a real
+  embedding model's token count), deterministic block segmentation with
+  a full-text tiling guarantee, a strict sentence → line → punctuation →
+  tokenizer-window oversized-block fallback cascade, greedy chunk
+  bin-packing, independent coverage/duplication verification, canonical
+  artifact construction/upload, and the `document_chunking` processor
+  mode.
+* `apps/web/lib/chunking/{queries,schemas,errors,actions,ui}.ts(x)` and
+  `apps/web/app/reviewer/chunking/*` — a chunking review queue, a
+  chunk-by-chunk review workspace, and a "Chunking:" status row on the
+  guideline detail page.
+* `docs/architecture/adr/0014-deterministic-page-aware-chunking.md`,
+  `docs/domain/chunking-eligibility-and-lifecycle.md`,
+  `docs/domain/chunk-provenance-and-source-spans.md`,
+  `docs/domain/chunking-technical-review.md`,
+  `docs/database/deterministic-chunking-schema.md`,
+  `docs/security/chunking-authorization.md`,
+  `docs/operations/chunking-worker-runbook.md`,
+  `docs/operations/chunking-failure-and-rechunking.md`,
+  `docs/verification/sprint-1-d3-chunking-verification.md`.
+
+### Fixed (found during this sprint's own development, not pre-existing)
+
+* A Worker-only function would have called permission-gated helper
+  functions that always reject `service_role`'s `auth.uid()`-less JWT —
+  caught before any test ran, fixed with a dedicated Worker-only context
+  function (`get_document_chunking_job_context`).
+* Migration 0013's `reopen_extraction_review` override was initially
+  drafted from the wrong base (migration 0009's original, not migration
+  0011's already-cascade-extended version) — would have silently
+  reverted the OCR-request invalidation cascade. Caught only by a full,
+  fresh-container 001–013 suite run.
+* `information_schema.roles` (nonexistent as a simple lookup on plain
+  Postgres) replaced with the established `pg_roles` pattern in both new
+  migrations.
+* A chunking-run-creation parameter ordering bug that would have broken
+  every native-only (non-OCR) chunking run via PostgREST's named-
+  parameter calling convention.
+* A block-boundary-tiling bug (each side of an inter-block boundary was
+  computed independently, producing overlapping spans) and a
+  chunk-grouping bug (oversized-block fallback fragments were forced
+  into their own standalone chunk regardless of size) in the Worker's
+  segmentation/bin-packing logic — both caught by the Worker's own unit
+  tests.
+
 ## [Unreleased] — UX-1.1: Visual Acceptance and Public Surface Redesign
 
 Corrective workstream. UX-1's tokens were real, but the actual rendered

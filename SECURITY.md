@@ -223,6 +223,22 @@ exists.
   (ADR 0012). The three Worker-only OCR functions are explicitly
   revoked from `PUBLIC`/`anon`/`authenticated`, the same trust boundary
   as every other Worker-only function in this codebase.
+* **Deterministic page-aware chunking (Sprint 1-D3): a deliberately
+  separate permission namespace, one layer deeper than OCR.**
+  `guideline_chunking.*` is distinct from both `guideline_extractions.*`
+  and `guideline_ocr.*`; clinicians hold none of it. The four Worker-only
+  chunking functions authenticate purely via lease ownership, never via
+  organization permissions — a real design bug of exactly this kind
+  (a Worker-only function accidentally calling a permission-gated one,
+  which would always fail against `service_role`'s `auth.uid()`-less
+  JWT) was caught and fixed before any test ran, and is now a documented
+  permanent lesson (`docs/database/deterministic-chunking-schema.md`,
+  `docs/security/chunking-authorization.md`). Self-review is blocked at
+  the database level, matching extraction/OCR review. Chunks and their
+  source spans are fully immutable once created — no maintenance
+  override exists for direct deletion of either table (unlike finding
+  tables), a documented gap to revisit only if a real operational need
+  arises.
 
 ## Known gaps (Sprint 1+)
 

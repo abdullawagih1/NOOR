@@ -6,8 +6,8 @@ retrieves and cites only approved, versioned guideline text, and refuses to
 answer when evidence is insufficient. Noor is not an autonomous diagnostician
 — the clinician always retains final clinical authority.
 
-This repository is at **Sprint 1, workstream S1-D1 — Extraction Review
-and Technical Quality Gate**. Sprint 0.5's
+This repository is at **Sprint 1, workstream S1-D3 — Deterministic
+Page-Aware Chunking**. Sprint 0.5's
 hosted infrastructure foundation (identity/tenancy/RLS, real Supabase
 Auth, the Noor Design System, the worker scaffold, the shared clinical
 schema contract) is unchanged and remains verified — against plain
@@ -130,9 +130,29 @@ zero afterward. See
 `docs/verification/sprint-1-d2-controlled-ocr-verification.md` for the
 full record.
 
+**S1-D3 — deterministic page-aware chunking:** turns canonical, accepted
+per-page text into deterministic, page-aware chunks with exact
+provenance — never embeddings, vector storage, retrieval, or LLM calls
+(ADR 0014). A `noor-simple-tokenizer` v1 (a deterministic, dependency-
+free size proxy — never a real embedding model's token count) bounds
+chunk size; deterministic block segmentation tiles each page's text with
+zero gaps; a strict sentence → line → punctuation → tokenizer-window
+fallback cascade splits any oversized block; a chunking run may only
+succeed once exact character-level coverage is proven 100% with 0%
+duplication. Chunk technical review is structurally separate from
+execution status (the same execution/acceptance separation ADR 0011/0012
+established, one layer deeper) — a document only becomes eligible for a
+future embedding step once a human reviewer accepts every chunk. Verified
+locally (a genuinely fresh Postgres 16 container, 202 cumulative RLS
+assertions, a 35-assertion Worker unit-test suite covering tokenizer/
+segmentation/coverage/determinism, and a clean Web typecheck/test/lint/
+build pass) and on real hosted Development infrastructure. See
+`docs/architecture/adr/0014-deterministic-page-aware-chunking.md` and
+`docs/verification/sprint-1-d3-chunking-verification.md` for the full
+record.
+
 The repository is pushed to GitHub with CI passing on real GitHub Actions
-runs, including Sprint 1-D2's changes and the `worker` CI job's new
-tesseract-ocr install step.
+runs, including Sprint 1-D3's changes.
 
 **UX-1 — NOOR brand and design system alignment:** the user's officially
 approved NOOR logo is now the single source of truth for Noor's visual
@@ -164,9 +184,7 @@ The root landing page, login, forgot/update-password, 403/access-denied,
 and new not-found/error pages were all rebuilt on shared `PublicShell`/
 `AuthShell` components; 22 real Playwright/Chromium screenshots
 (desktop/tablet/mobile, plus RTL-simulated captures) were captured
-against the actual running app. **Final status intentionally remains
-"Implementation Complete, Pending User Visual Acceptance"** — this
-mission does not self-close. See
+against the actual running app. **Complete and Visually Accepted.** See
 `docs/verification/ux-1-1-visual-acceptance.md`.
 
 See `PROJECT_STATE.md` for the authoritative current status and open

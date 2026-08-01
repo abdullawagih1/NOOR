@@ -270,10 +270,8 @@ mission's acceptance gate.
 
 ## Final status
 
-**UX-1.1 — Implementation Complete, Pending User Visual Acceptance.**
+**UX-1.1 — Complete and Visually Accepted.**
 
-This status is deliberate, not a placeholder — this mission's own
-governing rule is that visual acceptance is the user's call, not a
-self-declared outcome of a passing build. Do not change this line to
-"Complete and Visually Accepted" without the user having actually
-reviewed the screenshots above and said so.
+The user reviewed the screenshot evidence above and confirmed
+acceptance by proceeding to Sprint 1-D3, whose own mission brief
+records this workstream as accepted.
