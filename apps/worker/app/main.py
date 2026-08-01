@@ -26,6 +26,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.auth import verify_internal_token
+from app.chunking.config import (
+    CHUNKING_CONFIGURATION_VERSION,
+    CHUNKING_PIPELINE_VERSION,
+    NORMALIZATION_VERSION,
+)
+from app.chunking.processor import make_chunking_processor
 from app.ocr.config import (
     DEFAULT_TESSDATA_DIR,
     OCR_CONFIGURATION_VERSION,
@@ -62,7 +68,7 @@ _worker_thread: threading.Thread | None = None
 async def lifespan(_: FastAPI):
     global _orchestration_client, _worker_loop, _worker_thread
 
-    if settings.worker_processing_mode in ("noop", "extraction", "ocr"):
+    if settings.worker_processing_mode in ("noop", "extraction", "ocr", "chunking"):
         if settings.supabase_url and settings.supabase_service_role_key:
             supabase_url = str(settings.supabase_url)
             service_role_key = settings.supabase_service_role_key.get_secret_value()
@@ -102,6 +108,16 @@ async def lifespan(_: FastAPI):
                     tessdata_dir=tessdata_dir,
                     max_seconds=settings.ocr_max_seconds,
                     temp_directory=settings.ocr_temp_directory,
+                )
+            elif settings.worker_processing_mode == "chunking":
+                processor = make_chunking_processor(
+                    _orchestration_client,
+                    worker_instance_id=settings.worker_instance_id,  # type: ignore[arg-type]
+                    supabase_url=supabase_url,
+                    service_role_key=service_role_key,
+                    pipeline_version=settings.chunking_pipeline_version or CHUNKING_PIPELINE_VERSION,
+                    configuration_version=settings.chunking_configuration_version or CHUNKING_CONFIGURATION_VERSION,
+                    normalization_version=settings.chunking_normalization_version or NORMALIZATION_VERSION,
                 )
 
             worker_loop_kwargs = dict(

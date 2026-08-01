@@ -20,7 +20,11 @@ the real, deterministic PyPdfExtractor-backed processor — see ADR 0010 and
 against the controlled page-scoped OCR processor — see ADR 0012 and
 `app/ocr/processor.py`; it is disabled (not merely defaulted off) unless an
 operator also points `WORKER_ENABLED_JOB_TYPES` at `document_ocr`, the same
-opt-in-by-job-type mechanism "extraction" already relies on. There is
+opt-in-by-job-type mechanism "extraction" already relies on. "chunking"
+(Sprint 1-D3) runs the same loop against the deterministic page-aware
+chunking processor — see ADR 0014 and `app/chunking/processor.py`; it is
+disabled unless `WORKER_ENABLED_JOB_TYPES` also includes
+`document_chunking`, the same opt-in mechanism. There is
 deliberately no mode that selects a test failure-injection processor: those
 exist only as direct Python function parameters inside pytest, never as a
 runtime-selectable value.
@@ -67,7 +71,7 @@ class Settings(BaseSettings):
     worker_lease_duration_seconds: int = 90
     worker_heartbeat_interval_seconds: int = 30
     worker_max_concurrent_jobs: int = 1
-    worker_processing_mode: str = "disabled"  # "disabled" | "noop" | "extraction" | "ocr"
+    worker_processing_mode: str = "disabled"  # "disabled" | "noop" | "extraction" | "ocr" | "chunking"
 
     # --- Deterministic PDF extraction (Sprint 1.2B) -------------------------
     worker_enabled_job_types: str = "document_parsing"
@@ -92,6 +96,17 @@ class Settings(BaseSettings):
     ocr_temp_directory: str | None = None  # None -> OS default (tempfile.mkdtemp())
     ocr_tessdata_dir: str | None = None  # None -> app/ocr/config.py's DEFAULT_TESSDATA_DIR
 
+    # --- Deterministic page-aware chunking (Sprint 1-D3) --------------------
+    # All version fields default to None, meaning "use the pinned constant
+    # in app/chunking/config.py" — mirrors the extraction/OCR fields above.
+    # No source download or temp directory is needed here: chunking reads
+    # already-accepted text directly from the database (via the Worker-only
+    # get_document_chunking_job_context RPC), never re-parses the original
+    # file.
+    chunking_pipeline_version: str | None = None
+    chunking_configuration_version: str | None = None
+    chunking_normalization_version: str | None = None
+
     @field_validator("worker_internal_token")
     @classmethod
     def token_must_be_long_enough(cls, value: SecretStr) -> SecretStr:
@@ -105,8 +120,8 @@ class Settings(BaseSettings):
     @field_validator("worker_processing_mode")
     @classmethod
     def processing_mode_must_be_known(cls, value: str) -> str:
-        if value not in ("disabled", "noop", "extraction", "ocr"):
-            raise ValueError('WORKER_PROCESSING_MODE must be "disabled", "noop", "extraction", or "ocr"')
+        if value not in ("disabled", "noop", "extraction", "ocr", "chunking"):
+            raise ValueError('WORKER_PROCESSING_MODE must be "disabled", "noop", "extraction", "ocr", or "chunking"')
         return value
 
     @property

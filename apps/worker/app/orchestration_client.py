@@ -544,6 +544,129 @@ class OrchestrationClient:
         )
         return rows[0] if rows else {}
 
+    # -- Sprint 1-D3: deterministic page-aware chunking (migration 0012) ----
+    # Same trust boundary as every method above — never granted to
+    # `authenticated`/`anon`. get_document_chunking_job_context is this
+    # Worker's own un-gated equivalent of get_document_page_text_readiness
+    # (which cannot be called from here — see the comment on that function
+    # in migration 0012 for why).
+
+    def get_chunking_job_context(
+        self, job_id: uuid.UUID, worker_instance_id: str, lease_token: str
+    ) -> list[dict[str, Any]]:
+        return self._rpc(
+            "get_document_chunking_job_context",
+            {
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+            },
+        )
+
+    def create_chunking_run(
+        self,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        extraction_run_id: uuid.UUID,
+        extraction_review_id: uuid.UUID,
+        source_sha256: str,
+        input_manifest: dict[str, Any],
+        input_manifest_sha256: str,
+        pipeline_version: str,
+        configuration_version: str,
+        normalization_version: str,
+        tokenizer_name: str,
+        tokenizer_version: str,
+        ocr_request_id: uuid.UUID | None = None,
+        ocr_review_id: uuid.UUID | None = None,
+        correlation_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        rows = self._rpc(
+            "create_document_chunking_run",
+            {
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_extraction_run_id": str(extraction_run_id),
+                "p_extraction_review_id": str(extraction_review_id),
+                "p_source_sha256": source_sha256,
+                "p_input_manifest": input_manifest,
+                "p_input_manifest_sha256": input_manifest_sha256,
+                "p_pipeline_version": pipeline_version,
+                "p_configuration_version": configuration_version,
+                "p_normalization_version": normalization_version,
+                "p_tokenizer_name": tokenizer_name,
+                "p_tokenizer_version": tokenizer_version,
+                "p_ocr_request_id": str(ocr_request_id) if ocr_request_id else None,
+                "p_ocr_review_id": str(ocr_review_id) if ocr_review_id else None,
+                "p_correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return rows[0] if rows else {}
+
+    def finalize_chunking_run(
+        self,
+        chunking_run_id: uuid.UUID,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        chunks: list[dict[str, Any]],
+        metrics: dict[str, Any],
+        warnings: list[str],
+        artifact_bucket: str,
+        artifact_path: str,
+        artifact_sha256: str,
+        artifact_size_bytes: int,
+        artifact_media_type: str,
+        correlation_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        rows = self._rpc(
+            "finalize_document_chunking_run",
+            {
+                "p_chunking_run_id": str(chunking_run_id),
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_chunks": chunks,
+                "p_metrics": metrics,
+                "p_warnings": warnings,
+                "p_artifact_bucket": artifact_bucket,
+                "p_artifact_path": artifact_path,
+                "p_artifact_sha256": artifact_sha256,
+                "p_artifact_size_bytes": artifact_size_bytes,
+                "p_artifact_media_type": artifact_media_type,
+                "p_correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return rows[0] if rows else {}
+
+    def fail_chunking_run(
+        self,
+        chunking_run_id: uuid.UUID,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        error_code: str,
+        error_class: str,
+        error_message_safe: str,
+        correlation_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        rows = self._rpc(
+            "fail_document_chunking_run",
+            {
+                "p_chunking_run_id": str(chunking_run_id),
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_error_code": error_code,
+                "p_error_class": error_class,
+                "p_error_message_safe": error_message_safe,
+                "p_correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return rows[0] if rows else {}
+
 
 def _jsonable(payload: dict[str, Any]) -> dict[str, Any]:
     return {k: (str(v) if isinstance(v, uuid.UUID) else v) for k, v in payload.items()}
