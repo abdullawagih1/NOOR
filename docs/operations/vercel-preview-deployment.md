@@ -1,5 +1,36 @@
 # Vercel Preview Deployment
 
+## ⚠ Deployment directory guard — read this first
+
+**Run every `vercel` CLI command from the repository root. Never from
+`apps/web/`.** This has caused a real, repeated mistake: running `vercel`
+from inside `apps/web/` silently creates (or deploys to) a **second,
+wrong Vercel project** scoped to just that subdirectory — it cannot see
+the workspace root, so `@noor/ui` fails to resolve and the build fails.
+This has now happened twice across two separate sessions (see
+`docs/verification/sprint-1-d3-chunking-verification.md` and
+`docs/verification/sprint-1-e1-retrieval-evaluation-verification.md`),
+creating a stray, empty, failed-build project named **"web"** in this
+Vercel org both times.
+
+Before running any `vercel` command, run the preflight check:
+
+```bash
+node scripts/preflight-vercel-deploy.mjs
+```
+
+It fails loudly (non-zero exit) unless: (1) the current working directory
+is the repository root (a `.vercel/project.json` exists directly in
+`cwd`, not in a subdirectory), and (2) that file's `projectName` is
+exactly `noor`. It never calls the Vercel API and reads no credentials —
+purely a local file/cwd check.
+
+**The stray "web" project has not been deleted** — per this mission's own
+explicit instruction ("do not delete Vercel projects automatically"),
+removing it is a manual dashboard action left for the project owner:
+Vercel dashboard → Settings → find the "web" project → delete. It holds
+no working credentials and never served real traffic.
+
 ## Status
 
 **Deployed and configured with hosted Development Supabase values.**
