@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     worker_lease_duration_seconds: int = 90
     worker_heartbeat_interval_seconds: int = 30
     worker_max_concurrent_jobs: int = 1
-    worker_processing_mode: str = "disabled"  # "disabled" | "noop" | "extraction" | "ocr" | "chunking"
+    worker_processing_mode: str = "disabled"  # "disabled" | "noop" | "extraction" | "ocr" | "chunking" | "retrieval_evaluation"
 
     # --- Deterministic PDF extraction (Sprint 1.2B) -------------------------
     worker_enabled_job_types: str = "document_parsing"
@@ -107,6 +107,14 @@ class Settings(BaseSettings):
     chunking_configuration_version: str | None = None
     chunking_normalization_version: str | None = None
 
+    # --- Retrieval evaluation lexical baseline (Sprint 1-E1) ----------------
+    # All fields default to None, meaning "use the pinned constant in
+    # app/retrieval/config.py" — mirrors chunking's fields above. No source
+    # download or temp directory is needed: the pipeline reads already-frozen
+    # search representations directly from the database.
+    retrieval_retriever_version: str | None = None
+    retrieval_configuration_version: str | None = None
+
     @field_validator("worker_internal_token")
     @classmethod
     def token_must_be_long_enough(cls, value: SecretStr) -> SecretStr:
@@ -120,8 +128,10 @@ class Settings(BaseSettings):
     @field_validator("worker_processing_mode")
     @classmethod
     def processing_mode_must_be_known(cls, value: str) -> str:
-        if value not in ("disabled", "noop", "extraction", "ocr", "chunking"):
-            raise ValueError('WORKER_PROCESSING_MODE must be "disabled", "noop", "extraction", "ocr", or "chunking"')
+        if value not in ("disabled", "noop", "extraction", "ocr", "chunking", "retrieval_evaluation"):
+            raise ValueError(
+                'WORKER_PROCESSING_MODE must be "disabled", "noop", "extraction", "ocr", "chunking", or "retrieval_evaluation"'
+            )
         return value
 
     @property

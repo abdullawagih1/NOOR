@@ -48,6 +48,7 @@ from app.ocr.processor import make_ocr_processor
 from app.orchestration_client import OrchestrationClient
 from app.pdf_extraction.config import EXTRACTION_CONFIGURATION_VERSION, EXTRACTION_PIPELINE_VERSION, PDF_EXTRACTOR_NAME, PDF_EXTRACTOR_VERSION, assert_pinned_extractor_version
 from app.pdf_extraction.processor import make_extraction_processor
+from app.retrieval.processor import make_retrieval_evaluation_processor
 from app.settings import get_settings
 from app.worker_loop import WorkerLoop
 
@@ -68,7 +69,7 @@ _worker_thread: threading.Thread | None = None
 async def lifespan(_: FastAPI):
     global _orchestration_client, _worker_loop, _worker_thread
 
-    if settings.worker_processing_mode in ("noop", "extraction", "ocr", "chunking"):
+    if settings.worker_processing_mode in ("noop", "extraction", "ocr", "chunking", "retrieval_evaluation"):
         if settings.supabase_url and settings.supabase_service_role_key:
             supabase_url = str(settings.supabase_url)
             service_role_key = settings.supabase_service_role_key.get_secret_value()
@@ -118,6 +119,13 @@ async def lifespan(_: FastAPI):
                     pipeline_version=settings.chunking_pipeline_version or CHUNKING_PIPELINE_VERSION,
                     configuration_version=settings.chunking_configuration_version or CHUNKING_CONFIGURATION_VERSION,
                     normalization_version=settings.chunking_normalization_version or NORMALIZATION_VERSION,
+                )
+            elif settings.worker_processing_mode == "retrieval_evaluation":
+                processor = make_retrieval_evaluation_processor(
+                    _orchestration_client,
+                    worker_instance_id=settings.worker_instance_id,  # type: ignore[arg-type]
+                    supabase_url=supabase_url,
+                    service_role_key=service_role_key,
                 )
 
             worker_loop_kwargs = dict(

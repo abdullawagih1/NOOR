@@ -40,7 +40,9 @@ class OrchestrationError(Exception):
 class ClaimedJob:
     job_id: uuid.UUID
     organization_id: uuid.UUID
-    source_document_id: uuid.UUID
+    # None for a dataset-scoped job (job_type='retrieval_evaluation',
+    # migration 0015) — every other job_type still always sets this.
+    source_document_id: uuid.UUID | None
     job_type: str
     pipeline_version: str
     correlation_id: uuid.UUID
@@ -120,7 +122,7 @@ class OrchestrationClient:
         return ClaimedJob(
             job_id=uuid.UUID(row["out_job_id"]),
             organization_id=uuid.UUID(row["out_organization_id"]),
-            source_document_id=uuid.UUID(row["out_source_document_id"]),
+            source_document_id=uuid.UUID(row["out_source_document_id"]) if row.get("out_source_document_id") else None,
             job_type=row["out_job_type"],
             pipeline_version=row["out_pipeline_version"],
             correlation_id=uuid.UUID(row["out_correlation_id"]),
@@ -656,6 +658,120 @@ class OrchestrationClient:
             "fail_document_chunking_run",
             {
                 "p_chunking_run_id": str(chunking_run_id),
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_error_code": error_code,
+                "p_error_class": error_class,
+                "p_error_message_safe": error_message_safe,
+                "p_correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return rows[0] if rows else {}
+
+    # -- Sprint 1-E1: retrieval evaluation (migration 0015) ------------------
+    # Same trust boundary as every method above — never granted to
+    # `authenticated`/`anon`. get_retrieval_evaluation_job_context is this
+    # Worker's dataset-scoped equivalent of get_chunking_job_context.
+
+    def get_retrieval_evaluation_job_context(
+        self, job_id: uuid.UUID, worker_instance_id: str, lease_token: str
+    ) -> list[dict[str, Any]]:
+        return self._rpc(
+            "get_retrieval_evaluation_job_context",
+            {
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+            },
+        )
+
+    def get_retrieval_candidates(
+        self,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        dataset_id: uuid.UUID,
+        normalized_query_text: str,
+    ) -> list[dict[str, Any]]:
+        return self._rpc(
+            "get_retrieval_candidates",
+            {
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_dataset_id": str(dataset_id),
+                "p_normalized_query_text": normalized_query_text,
+            },
+        )
+
+    def get_relevance_judgments(self, dataset_id: uuid.UUID) -> list[dict[str, Any]]:
+        """Plain trusted table read (service_role bypasses RLS) — the
+        Worker needs every judgment for the frozen dataset to compute
+        metrics; there is no RPC for this because it is not a mutation and
+        no Worker-specific validation is needed beyond the dataset already
+        being frozen (enforced by get_retrieval_evaluation_job_context)."""
+        url = f"{self._base_url}/rest/v1/retrieval_relevance_judgments"
+        params = {"dataset_id": f"eq.{dataset_id}", "select": "query_id,corpus_item_id,relevance_grade"}
+        try:
+            response = self._client.get(url, headers=self._headers, params=params)
+        except httpx.HTTPError as exc:
+            raise OrchestrationError(f"get_relevance_judgments: transport error: {exc.__class__.__name__}") from exc
+        if response.status_code >= 400:
+            raise OrchestrationError(f"get_relevance_judgments failed ({response.status_code})")
+        return response.json()
+
+    def finalize_retrieval_evaluation_run(
+        self,
+        run_id: uuid.UUID,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        results: list[dict[str, Any]],
+        metrics: list[dict[str, Any]],
+        failures: list[dict[str, Any]],
+        artifact_bucket: str,
+        artifact_path: str,
+        artifact_sha256: str,
+        artifact_size_bytes: int,
+        artifact_media_type: str,
+        correlation_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        rows = self._rpc(
+            "finalize_retrieval_evaluation_run",
+            {
+                "p_run_id": str(run_id),
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_results": results,
+                "p_metrics": metrics,
+                "p_failures": failures,
+                "p_artifact_bucket": artifact_bucket,
+                "p_artifact_path": artifact_path,
+                "p_artifact_sha256": artifact_sha256,
+                "p_artifact_size_bytes": artifact_size_bytes,
+                "p_artifact_media_type": artifact_media_type,
+                "p_correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return rows[0] if rows else {}
+
+    def fail_retrieval_evaluation_run(
+        self,
+        run_id: uuid.UUID,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        error_code: str,
+        error_class: str,
+        error_message_safe: str,
+        correlation_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        rows = self._rpc(
+            "fail_retrieval_evaluation_run",
+            {
+                "p_run_id": str(run_id),
                 "p_processing_job_id": str(job_id),
                 "p_worker_instance_id": worker_instance_id,
                 "p_lease_token": lease_token,
