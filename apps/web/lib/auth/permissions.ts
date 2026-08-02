@@ -77,6 +77,22 @@ export const PERMISSIONS = {
   GUIDELINE_CHUNKING_SUBMIT_REVIEW: "guideline_chunking.submit_review",
   GUIDELINE_CHUNKING_REOPEN_REVIEW: "guideline_chunking.reopen_review",
   GUIDELINE_CHUNKING_INVALIDATE: "guideline_chunking.invalidate",
+
+  // Retrieval evaluation foundation (Sprint 1-E1) — see
+  // docs/domain/retrieval-evaluation-dataset-lifecycle.md. A separate
+  // namespace again (ADR 0015): this is an internal Quality workspace
+  // feature, never exposed to clinicians/reviewers of guideline content.
+  RETRIEVAL_EVALUATION_READ: "retrieval_evaluation.read",
+  RETRIEVAL_EVALUATION_CREATE_DATASET: "retrieval_evaluation.create_dataset",
+  RETRIEVAL_EVALUATION_EDIT_DATASET: "retrieval_evaluation.edit_dataset",
+  RETRIEVAL_EVALUATION_REVIEW_DATASET: "retrieval_evaluation.review_dataset",
+  RETRIEVAL_EVALUATION_FREEZE_DATASET: "retrieval_evaluation.freeze_dataset",
+  RETRIEVAL_EVALUATION_ARCHIVE_DATASET: "retrieval_evaluation.archive_dataset",
+  RETRIEVAL_EVALUATION_RUN: "retrieval_evaluation.run",
+  RETRIEVAL_EVALUATION_CANCEL_RUN: "retrieval_evaluation.cancel_run",
+  RETRIEVAL_EVALUATION_READ_RESULTS: "retrieval_evaluation.read_results",
+  RETRIEVAL_EVALUATION_READ_ARTIFACTS: "retrieval_evaluation.read_artifacts",
+  RETRIEVAL_EVALUATION_ANNOTATE_FAILURES: "retrieval_evaluation.annotate_failures",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
