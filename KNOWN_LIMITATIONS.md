@@ -596,3 +596,60 @@ the same PR that resolves an item.
     routes has not been performed**, for the same reason as item 62 (OCR)
     — this Vercel team's SSO Deployment Protection blocks any headless
     browser check of a live Preview URL from this environment.
+
+77. **`noor-lexical-baseline-v1` uses no stemming, no Arabic root
+    matching, and no stop-word removal.** PostgreSQL's `simple` text-
+    search configuration is used identically for English and Arabic
+    (there is no built-in Arabic configuration, and `english` stemming
+    would unfairly bias results toward English content) — a query and a
+    relevant chunk that differ by inflection/conjugation/root form will
+    not match unless they share an exact normalized token. This is a
+    real, honestly-documented capability limit of the lexical baseline
+    itself (ADR 0015), not a bug to fix within this sprint's scope.
+
+78. **Only one deterministic lexical baseline exists — no second
+    baseline for comparison.** `noor-lexical-baseline-v1` is the only
+    `Retriever` implementation; `VectorRetriever`/`HybridRetriever`/
+    `RerankerRetriever` are declared as Protocol stubs only, with nothing
+    behind them. Every metric reported this sprint describes lexical
+    retrieval only, never embedding/hybrid/reranked retrieval.
+
+79. **Retrieval evaluation has not been benchmarked against real, complex
+    clinical content.** Verified against small synthetic English/Arabic/
+    negative-control fixtures only (local RLS suite, Worker unit tests,
+    and one real hosted 3-page synthetic PDF) — no real multi-hundred-
+    chunk corpus or realistic clinical query set has been evaluated yet.
+
+80. **The hosted end-to-end verification's Arabic query returned zero
+    candidates**, not because Arabic full-text matching is broken (it is
+    separately and directly proven correct by the local RLS suite, which
+    inserts real normalized Arabic text without going through PDF
+    extraction), but because the ad hoc verification script's hand-built
+    synthetic PDF embeds Arabic text using a Latin-only base font
+    (Helvetica), which `pypdf` cannot reliably extract as real Arabic
+    Unicode text. The system's own failure-detection pipeline correctly
+    flagged this as `query_too_narrow` rather than crashing or fabricating
+    a match — see `docs/verification/sprint-1-e1-retrieval-evaluation-verification.md`.
+
+81. **A real browser-rendered check of Sprint 1-E1's
+    `/quality/retrieval-evaluation/*` routes against the deployed Vercel
+    Preview has not been performed**, for the same reason as item 62
+    (OCR) and item 76 (chunking) — this Vercel team's SSO Deployment
+    Protection blocks any headless browser check of a live Preview URL
+    from this environment. Real, authenticated screenshots against real
+    hosted data *were* captured this sprint by running a local dev server
+    against the hosted Development database directly (see the
+    verification doc) — the gap is specifically the Preview *deployment*
+    URL, not the feature itself.
+
+82. **`npm run` (the npm CLI wrapper, not the underlying tools) hangs
+    indefinitely on this session's Windows/Git-Bash environment** —
+    observed for both `npm run test --workspace=apps/web` and `npm run
+    build --workspace=apps/web`, producing zero output for many minutes
+    before any real test/build output appeared. Root cause not fully
+    diagnosed (most plausibly npm's own background update-check network
+    call being blocked/stalled in this sandboxed environment) but
+    confirmed NOT to be a defect in this sprint's own code: calling the
+    underlying tools directly (`npx tsx <file>`, `npx next build`)
+    completes normally in seconds. A future session hitting the same
+    "nothing is happening" symptom should suspect `npm run` itself first.

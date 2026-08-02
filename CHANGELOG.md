@@ -1,5 +1,84 @@
 # Changelog
 
+## [Unreleased] — Sprint 1-E1: Retrieval Preparation and Evaluation Foundation
+
+Builds the reproducible foundation every future retrieval approach
+(lexical, embedding, hybrid, reranked) will be measured against: frozen
+evaluation corpora, a versioned 17-category query taxonomy, graded (0-3)
+relevance judgments, a two-person dataset review/freeze lifecycle, one
+deterministic lexical baseline, versioned metrics, deterministic + human
+failure analysis, provider-independent `Retriever` contracts, and an
+internal Quality workspace UI. No embeddings, vector storage, external AI
+calls, or production search anywhere in this workstream — see ADR 0015.
+
+### Added
+
+* `supabase/migrations/0014_retrieval_evaluation_foundation.sql` —
+  `retrieval_evaluation_datasets`/`_corpus_items`/`_queries`,
+  `retrieval_relevance_judgments`, `retrieval_evaluation_search_documents`,
+  `normalize_retrieval_text()` (the single implementation of
+  `retrieval_text_normalization_v1`), the full
+  draft→ready_for_review→frozen→archived dataset lifecycle with
+  two-person review (a dataset's own creator cannot mark it reviewed),
+  deterministic SQL-computed freeze checksums, 11 new
+  `retrieval_evaluation.*` permissions, RLS.
+* `supabase/migrations/0015_lexical_baseline_and_evaluation_runs.sql` —
+  `retrieval_evaluation_runs`/`_results`/`_metrics`/`_failures`,
+  `document_processing_jobs` extended with a nullable `dataset_id` (the
+  first job type scoped to something other than one document) and a
+  re-declared `claim_next_document_processing_job` adding the
+  dataset/frozen eligibility branch, the client-facing run/cancel/
+  failure-annotation functions, and the Worker-only context/candidate-
+  recall (`ts_rank_cd`/`websearch_to_tsquery('simple', ...)`)/finalize/
+  fail functions.
+* `apps/worker/app/retrieval/*` — `noor-lexical-baseline-v1`: pure-Python
+  scoring (`final_score = w_full_text * full_text_rank + w_coverage *
+  token_coverage + exact_phrase_bonus`) and deterministic tie-breaking
+  (score → matched-token-count → display-order → checksum), Precision/
+  Recall/Hit-Rate/MRR/nDCG metrics (negative controls always excluded
+  from aggregates), a 12-category deterministic failure-detection
+  pipeline, a provider-independent `Retriever` Protocol (`LexicalRetriever`
+  the only implementation; `VectorRetriever`/`HybridRetriever`/
+  `RerankerRetriever` declared as stubs only), canonical artifact
+  construction/upload, and the `retrieval_evaluation` processor mode.
+* `apps/web/lib/retrieval-evaluation/{queries,schemas,errors,actions,ui}.ts(x)`
+  and `apps/web/app/quality/retrieval-evaluation/*` — a dataset queue,
+  dataset detail (corpus/query authoring, lifecycle actions), a
+  relevance-judgment workspace, a run dashboard (metrics broken out by
+  scope), and a failure-analysis view (system + human annotations).
+* `docs/architecture/adr/0015-retrieval-evaluation-before-embeddings.md`,
+  `docs/domain/retrieval-evaluation-dataset-lifecycle.md`,
+  `docs/domain/relevance-judgments-and-query-taxonomy.md`,
+  `docs/domain/retrieval-metrics.md`,
+  `docs/domain/retrieval-failure-analysis.md`,
+  `docs/database/retrieval-evaluation-schema.md`,
+  `docs/security/retrieval-evaluation-authorization.md`,
+  `docs/operations/retrieval-evaluation-worker-runbook.md`,
+  `docs/operations/evaluation-dataset-versioning.md`,
+  `docs/verification/sprint-1-e1-retrieval-evaluation-verification.md`.
+
+### Fixed (found during this sprint's own development, not pre-existing)
+
+* `claim_next_document_processing_job` could never claim a dataset-scoped
+  `retrieval_evaluation` job — migration 0007's original eligibility
+  check assumed every job resolves to a `source_document_id`. Caught by
+  the local RLS suite before any hosted attempt.
+* `get_retrieval_candidates` had a `real`/`numeric` return-type mismatch
+  (`ts_rank_cd()` returns `real`).
+* Two hosted-only `search_path` bugs: `freeze_retrieval_evaluation_dataset`
+  and `create_retrieval_evaluation_run` both call `digest()` directly but
+  were missing `extensions` in their `search_path` — invisible locally
+  (pgcrypto lives in `public` there), real on hosted Supabase (pgcrypto
+  lives in `extensions`). Caught by the first real hosted freeze/run
+  attempt.
+* A real ordering bug in `toRetrievalEvaluationError` — a generic
+  `"immutable"` catch-all shadowed a more specific failure-annotation
+  check below it, making the specific case unreachable.
+* A real logic-inversion bug in the Worker's `_non_relevant_ranked_high`
+  failure detector, caught before any test ran.
+* Two synthetic-fixture SHA-256 collisions with prior test files' own
+  fixture hashes, while writing the new local RLS test file.
+
 ## [Unreleased] — Sprint 1-D3: Deterministic Page-Aware Chunking
 
 Turns canonical, accepted per-page text into deterministic, page-aware

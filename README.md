@@ -6,8 +6,8 @@ retrieves and cites only approved, versioned guideline text, and refuses to
 answer when evidence is insufficient. Noor is not an autonomous diagnostician
 — the clinician always retains final clinical authority.
 
-This repository is at **Sprint 1, workstream S1-D3 — Deterministic
-Page-Aware Chunking**. Sprint 0.5's
+This repository is at **Sprint 1, workstream S1-E1 — Retrieval
+Preparation and Evaluation Foundation**. Sprint 0.5's
 hosted infrastructure foundation (identity/tenancy/RLS, real Supabase
 Auth, the Noor Design System, the worker scaffold, the shared clinical
 schema contract) is unchanged and remains verified — against plain
@@ -151,8 +151,33 @@ build pass) and on real hosted Development infrastructure. See
 `docs/verification/sprint-1-d3-chunking-verification.md` for the full
 record.
 
+**S1-E1 — retrieval preparation and evaluation foundation:** the
+reproducible foundation every future retrieval approach (lexical,
+embedding, hybrid, reranked) will be measured against — never embeddings,
+vector storage, or an external AI call (ADR 0015). A frozen evaluation
+dataset bundles a curated corpus of `eligible_for_embedding` chunks, a
+versioned 17-category query taxonomy, and graded (0-3) relevance
+judgments, with a two-person draft → ready_for_review → frozen →
+archived lifecycle (a dataset's own creator cannot mark it reviewed for
+freezing). One deterministic lexical baseline
+(`noor-lexical-baseline-v1`) uses real PostgreSQL full-text search for
+candidate recall and a documented, versioned ranking formula plus
+deterministic tie-breaking, entirely in pure Python, for final scoring —
+never described as a proxy for future embedding/hybrid/reranking quality.
+Versioned Precision/Recall/Hit-Rate/MRR/nDCG metrics are computed
+per-run, always excluding negative-control queries from every aggregate;
+a 12-category deterministic failure-detection pipeline (plus 5
+human-only categories) surfaces exactly what went wrong for a given
+query. Verified locally (a genuinely fresh Postgres 16 container, 214
+cumulative RLS assertions, a 41-assertion Worker unit-test suite, and a
+clean Web typecheck/test/lint/build pass) and on real hosted Development
+infrastructure using the actual, unmodified Worker code end to end. See
+`docs/architecture/adr/0015-retrieval-evaluation-before-embeddings.md`
+and `docs/verification/sprint-1-e1-retrieval-evaluation-verification.md`
+for the full record.
+
 The repository is pushed to GitHub with CI passing on real GitHub Actions
-runs, including Sprint 1-D3's changes.
+runs, including Sprint 1-E1's changes.
 
 **UX-1 — NOOR brand and design system alignment:** the user's officially
 approved NOOR logo is now the single source of truth for Noor's visual

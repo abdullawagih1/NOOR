@@ -1,84 +1,92 @@
-# Sprint Current: S1-D3 — Deterministic Page-Aware Chunking
+# Sprint Current: S1-E1 — Retrieval Preparation and Evaluation Foundation
 
-**Status:** S1-D3 — Complete and Verified. See
-`docs/verification/sprint-1-d3-chunking-verification.md` for the full
-record.
+**Status:** S1-E1 — Complete and Verified. See
+`docs/verification/sprint-1-e1-retrieval-evaluation-verification.md` for
+the full record.
 
-Workstreams `S1-A`/`S1-B`/`S1-C1`/`S1-C2`/`S1-D1`/`S1-D2`/`UX-1`/`UX-1.1`
-closed in prior sessions. UX-1.1 was accepted by the user before this
-sprint began (this sprint's own mission brief recorded it as "Complete
-and Visually Accepted"). This sprint is workstream `S1-D3`.
+Workstreams `S1-A`/`S1-B`/`S1-C1`/`S1-C2`/`S1-D1`/`S1-D2`/`S1-D3`/`UX-1`/
+`UX-1.1` closed in prior sessions. This sprint is workstream `S1-E1`.
 
 ## What this sprint does
 
-Turns canonical, accepted per-page text
-(`get_document_page_text_readiness()`, migration 0011) into
-deterministic, page-aware chunks with exact provenance, immutable chunk
-records, a private canonical JSON artifact, human technical chunk
-review, and a derived `eligible_for_embedding` boolean. See ADR 0014
-for the full architectural rationale.
+Builds the reproducible foundation every future retrieval approach
+(lexical, embedding, hybrid, reranked) will be measured against: frozen
+evaluation corpora, a versioned 17-category query taxonomy, graded (0-3)
+relevance judgments, a two-person dataset review/freeze lifecycle, one
+deterministic lexical baseline (`noor-lexical-baseline-v1`, real
+PostgreSQL full-text search + a documented ranking formula + deterministic
+tie-breaking), versioned Precision/Recall/Hit-Rate/MRR/nDCG metrics,
+deterministic + human failure analysis, provider-independent `Retriever`
+contracts, and an internal Quality workspace UI. See ADR 0015 for the
+full architectural rationale.
 
 ## Explicitly out of scope this sprint
 
-Embeddings, embedding-provider selection, vector columns/pgvector,
-full-text search, retrieval, reranking, RAG, clinical Q&A, LLM calls of
-any kind, semantic/generative chunking, table reconstruction, clinical
-section classification, chunk text editing, cross-document/cross-
-guideline chunks, real clinical documents.
+Embeddings, embedding-provider selection/credentials, vector columns,
+`pgvector`, vector similarity queries, external AI calls, reranking,
+cross-encoders, RRF/hybrid retrieval, query rewriting/expansion via AI,
+LLM calls, RAG, citation/answer generation, production search, automated
+or LLM-generated relevance judgments, real guideline ingestion,
+regulatory/clinical validation claims.
 
 ## Objectives
 
-- [x] Migration 0012 — `document_chunking_runs`/`document_chunks`/
-      `document_chunk_source_spans`, `create_document_chunking_job`,
-      Worker-only run creation/finalization/failure functions, the
-      mandatory 100%-coverage/0%-duplication gate, seven new
-      `guideline_chunking.*` permissions, RLS.
-- [x] Migration 0013 — `document_chunking_reviews`/
-      `document_chunk_reviews`/`document_chunk_findings`/
-      `document_chunking_review_events`, the full review lifecycle,
-      `get_document_embedding_readiness()`, and the extraction-review
-      reopen/invalidate cascade extended to invalidate dependent
-      chunking runs.
-- [x] ADR 0014 (renumbered from the mission's suggested 0013, which
-      UX-1 already used — verified against the actual repository state).
-- [x] Worker chunking pipeline (`apps/worker/app/chunking/*`):
-      `noor-simple-tokenizer` v1, deterministic block segmentation, the
-      strict oversized-block fallback cascade, coverage/duplication
-      verification, canonical artifact construction and upload.
-- [x] Web application layer (`apps/web/lib/chunking/*`) and UI
-      (`/reviewer/chunking` queue + workspace, guideline detail page
-      integration).
-- [x] Documentation set (domain, database, security, operations,
-      verification).
-- [x] Full local verification — RLS suite (202/202), Worker pytest
-      (149/149), Web typecheck/test/lint/build.
-- [x] Hosted Development verification and cleanup.
+- [x] Migration 0014 — dataset lifecycle (`retrieval_evaluation_datasets`/
+      `_corpus_items`/`_queries`, `retrieval_relevance_judgments`,
+      `retrieval_evaluation_search_documents`), `normalize_retrieval_text()`,
+      the full draft→ready_for_review→frozen→archived lifecycle with
+      two-person review, 11 new `retrieval_evaluation.*` permissions, RLS.
+- [x] Migration 0015 — `retrieval_evaluation_runs`/`_results`/`_metrics`/
+      `_failures`, `document_processing_jobs` extended for dataset-scoped
+      jobs, the client-facing run/cancel/failure-annotation functions, and
+      the Worker-only context/candidate-recall/finalize/fail functions.
+- [x] ADR 0015.
+- [x] Worker retrieval module (`apps/worker/app/retrieval/*`): scoring,
+      deterministic tie-breaking, metrics, failure analysis, artifact
+      construction, and the `retrieval_evaluation` processor — 155/155
+      Worker pytest tests passing (114 pre-existing + 41 new).
+- [x] Web application layer (`apps/web/lib/retrieval-evaluation/*`) and UI
+      (`/quality/retrieval-evaluation/*`: dataset queue, dataset detail,
+      judgment workspace, run dashboard, failure analysis).
+- [x] Documentation set (4 domain docs, 1 database doc, 1 security doc,
+      2 operations docs, 1 verification doc — 9 total).
+- [x] Full local verification — RLS suite (214/214), Worker pytest
+      (155/155), Web typecheck/lint/test(19 files)/build all clean.
+- [x] Hosted Development verification (real Worker, real two-person
+      review, real frozen dataset, real lexical run, real Playwright
+      screenshots) and zero-residual cleanup.
 
 ## Real bugs found and fixed this sprint
 
-1. A Worker-only function would have called permission-gated helper
-   functions (`get_document_page_text_readiness`,
-   `get_document_extraction_review_eligibility`) that always reject
-   `service_role`'s `auth.uid()`-less JWT — caught before any test ran,
-   fixed with a dedicated Worker-only context function.
-2. Migration 0013's `reopen_extraction_review` override was drafted from
-   the wrong base (migration 0009's original, not migration 0011's
-   already-cascade-extended version) — would have silently reverted the
-   OCR-request invalidation cascade. Caught only by a full, fresh-
-   container 001–013 suite run, not the new file in isolation.
-3. `information_schema.roles` used instead of the established `pg_roles`
-   pattern in both new migrations — caught by the first migration-apply
-   attempt.
-4. A chunking-run-creation parameter ordering bug that would have broken
-   every native-only (non-OCR) chunking run via PostgREST.
-5. A block-boundary-tiling bug and a chunk-grouping bug in the Worker's
-   segmentation/bin-packing logic, both caught by the Worker's own unit
-   tests before any database was involved.
+1. `claim_next_document_processing_job` could never claim a dataset-scoped
+   `retrieval_evaluation` job — migration 0007's original eligibility
+   check assumed every job resolves to a `source_document_id`. Caught by
+   the local RLS suite before any hosted attempt; fixed via a migration
+   0015 re-declaration adding a dataset/frozen eligibility branch.
+2. `get_retrieval_candidates` had a `real`/`numeric` return-type mismatch
+   (`ts_rank_cd()` returns `real`) — caught by the same local suite run.
+3. Two hosted-only `search_path` bugs: `freeze_retrieval_evaluation_dataset`
+   and `create_retrieval_evaluation_run` both call `digest()` directly but
+   were missing `extensions` in their `search_path` — invisible locally
+   (pgcrypto lives in `public` there), real on hosted Supabase (pgcrypto
+   lives in `extensions`). Caught by the first real hosted freeze/run
+   attempt; fixed and re-verified locally + on hosted.
+4. A real ordering bug in the web error-mapper (`toRetrievalEvaluationError`):
+   a generic "immutable" check shadowed a more specific failure-annotation
+   check below it. Caught by the new web error-mapping test file.
+5. A real logic-inversion bug in `_non_relevant_ranked_high` (Worker
+   failure-analysis detector) — caught before any test ran, by re-reading
+   the detector against its own docstring.
+6. Two synthetic-fixture SHA-256 collisions while writing the new local
+   RLS test file, reusing hashes already used by `009`/`011` — the same
+   documented "content-addressed identity is keyed on hash, not row id"
+   gotcha from Sprint 1-D3, recurring here.
 
 ## Next step
 
 ```text
-Begin S1-E — Retrieval Preparation and Evaluation Foundation
+Begin S1-E2 — Embedding and Vector Index Foundation
 ```
 
-See `MASTER_BACKLOG.md` for the full workstream breakdown.
+Do not mark S1-E2, S1-E3, or S1-F complete. See `MASTER_BACKLOG.md` for
+the full workstream breakdown.

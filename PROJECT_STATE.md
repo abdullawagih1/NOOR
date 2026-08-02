@@ -1,8 +1,78 @@
 # PROJECT_STATE.md
 
-**Last updated:** Sprint 1-D3 — Deterministic Page-Aware Chunking session
-(Claude Code, this environment)
+**Last updated:** Sprint 1-E1 — Retrieval Preparation and Evaluation
+Foundation session (Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code)
+
+---
+
+## -13. This session: Sprint 1-E1 — Retrieval Preparation and Evaluation Foundation
+
+Implemented workstream `S1-E1`: the reproducible foundation every future
+retrieval approach (lexical, embedding, hybrid, reranked) will be measured
+against — frozen evaluation corpora built from Sprint 1-D3's
+`eligible_for_embedding` chunks, a versioned 17-category query taxonomy,
+graded (0-3) relevance judgments, a two-person dataset draft→
+ready_for_review→frozen→archived lifecycle, one deterministic lexical
+baseline (`noor-lexical-baseline-v1`: real PostgreSQL full-text search
+for candidate recall, a documented and versioned ranking formula plus
+deterministic tie-breaking in pure Python), versioned Precision/Recall/
+Hit-Rate/MRR/nDCG metrics (negative controls always excluded from
+aggregates, evaluated separately via failure detection), deterministic +
+human failure analysis (17 categories), provider-independent `Retriever`
+contracts (only the lexical adapter implemented), and an internal Quality
+workspace UI — no embeddings, no vector storage, no external AI calls, no
+production search anywhere in this sprint (ADR 0015).
+
+**Schema (migrations 0014 + 0015, ADR 0015):**
+`retrieval_evaluation_datasets`/`_corpus_items`/`_queries`/
+`retrieval_relevance_judgments`/`retrieval_evaluation_search_documents`
+(dataset lifecycle and frozen corpus/query/judgment content — full
+immutability after freeze enforced by triggers, not just application
+logic; `normalize_retrieval_text()` implements
+`retrieval_text_normalization_v1` in exactly one place, called by both
+query authoring and freeze); `retrieval_evaluation_runs`/`_results`/
+`_metrics`/`_failures` (durable run execution, immutable ranked results,
+versioned metrics, system+human failure analysis);
+`document_processing_jobs` extended with a nullable `dataset_id` (the
+first job type in this codebase scoped to something other than one
+document) and a re-declared `claim_next_document_processing_job` adding
+the dataset/frozen eligibility branch.
+
+**Worker (`apps/worker/app/retrieval/*`):** candidate recall via a
+Worker-only PostgreSQL full-text-search RPC; final scoring, deterministic
+tie-breaking, every metric, and failure detection are pure Python, fully
+unit-testable with zero network/database access (155/155 Worker pytest
+tests passing).
+
+**Web (`apps/web/lib/retrieval-evaluation/*`, `/quality/retrieval-evaluation/*`):**
+dataset queue, dataset detail, judgment workspace, run dashboard, and
+failure analysis, gated by 11 new `retrieval_evaluation.*` permissions,
+following the exact conventions `lib/chunking/*`/`/reviewer/chunking/*`
+already established.
+
+**Real bugs found and fixed** (6 total — see
+`SPRINT_CURRENT.md` and `docs/verification/sprint-1-e1-retrieval-evaluation-verification.md`
+for full detail): a dataset-scoped job claim gap, a `real`/`numeric`
+type mismatch, two hosted-only `search_path` gaps (`pgcrypto` lives in
+`extensions` on hosted Supabase, `public` locally), a web error-mapper
+ordering bug, a failure-detector logic inversion, and two recurring
+synthetic-fixture SHA-256 collisions.
+
+**Verification:** local RLS suite 214/214 (fresh `postgres:16`, twice —
+once before and once after the hosted `search_path` fixes), Worker
+pytest 155/155, Web typecheck/lint/19-file-test-suite/build all clean.
+Hosted Development verification used the actual, unmodified Worker code
+against a real 3-page PDF (English/Arabic/unrelated content), a real
+`clinical_reviewer` and two distinct real `quality_manager` users (to
+exercise the two-person review rule for real), and produced a real
+succeeded evaluation run with correct metrics (negative control
+correctly excluded) and correct failure detection — followed by a
+verified zero-residual cleanup (database rows, 9 synthetic GoTrue users,
+7 orphaned Storage objects).
+
+**Recommended next step:** Begin S1-E2 — Embedding and Vector Index
+Foundation. Do not mark S1-E2, S1-E3, or S1-F complete.
 
 ---
 

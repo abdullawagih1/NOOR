@@ -239,6 +239,27 @@ exists.
   override exists for direct deletion of either table (unlike finding
   tables), a documented gap to revisit only if a real operational need
   arises.
+* **Retrieval evaluation foundation (Sprint 1-E1): another deliberately
+  separate permission namespace, one layer deeper than chunking.**
+  `retrieval_evaluation.*` is distinct from every guideline-pipeline
+  namespace; clinicians hold none of it — this is a purely internal
+  Quality-workspace feature, never exposed as a clinician-facing search
+  endpoint. The four Worker-only retrieval functions
+  (`get_retrieval_evaluation_job_context`/`get_retrieval_candidates`/
+  `finalize_retrieval_evaluation_run`/`fail_retrieval_evaluation_run`)
+  authenticate purely via lease ownership, never via organization
+  permissions, explicitly revoked from `authenticated`/`anon`. A dataset's
+  own creator is blocked at the database level from marking it reviewed
+  for freezing (two-person separation) — enforced in SQL, not just a UI
+  convention, so it holds even against a direct RPC call. Two real,
+  hosted-only bugs were found and fixed this sprint: a dataset-scoped job
+  could never be claimed by the Worker (migration 0007's original
+  eligibility check assumed every job resolves to one document), and two
+  functions computing checksums via `digest()` were missing `extensions`
+  in their `search_path` (pgcrypto lives in a different schema on hosted
+  Supabase than on local plain Postgres) — both are now documented
+  permanent lessons (`docs/database/retrieval-evaluation-schema.md`,
+  `docs/security/retrieval-evaluation-authorization.md`).
 
 ## Known gaps (Sprint 1+)
 
