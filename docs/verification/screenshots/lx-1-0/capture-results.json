@@ -1,0 +1,109 @@
+{
+  "screenshots": [
+    [
+      "01-narrative-overview-desktop.png",
+      "1440x900",
+      "motion-enabled"
+    ],
+    [
+      "02-hero-prototype-desktop.png",
+      "1440x900",
+      "motion-enabled, mid-sequence"
+    ],
+    [
+      "03-source-verification-prototype-desktop.png",
+      "1440x900",
+      "motion-enabled, mid-sequence"
+    ],
+    [
+      "04-human-review-prototype-desktop.png",
+      "1440x900",
+      "motion-enabled, mid-sequence"
+    ],
+    [
+      "05-structured-knowledge-prototype-desktop.png",
+      "1440x900",
+      "motion-enabled, mid-sequence"
+    ],
+    [
+      "06-retrieval-prototype-desktop.png",
+      "1440x900",
+      "motion-enabled, mid-sequence"
+    ],
+    [
+      "07-reverse-traceability-desktop.png",
+      "1440x900",
+      "motion-enabled, mid-sequence"
+    ],
+    [
+      "08-reduced-motion-view-desktop.png",
+      "1440x900",
+      "prefers-reduced-motion: reduce (real emulation)"
+    ],
+    [
+      "09-traceability-stage-1-of-5.png",
+      "1440x900",
+      "reduced-motion, manual stage sequence"
+    ],
+    [
+      "09-traceability-stage-2-of-5.png",
+      "1440x900",
+      "reduced-motion, manual stage sequence"
+    ],
+    [
+      "09-traceability-stage-3-of-5.png",
+      "1440x900",
+      "reduced-motion, manual stage sequence"
+    ],
+    [
+      "09-traceability-stage-4-of-5.png",
+      "1440x900",
+      "reduced-motion, manual stage sequence"
+    ],
+    [
+      "09-traceability-stage-5-of-5.png",
+      "1440x900",
+      "reduced-motion, manual stage sequence"
+    ],
+    [
+      "10-mobile-prototype-390.png",
+      "390x844",
+      "motion-enabled"
+    ],
+    [
+      "11-rtl-structural-prototype-desktop.png",
+      "1440x900",
+      "isolated dir=rtl structural preview"
+    ]
+  ],
+  "axe": [
+    [
+      "desktop-motion-enabled",
+      0,
+      []
+    ],
+    [
+      "desktop-reduced-motion",
+      0,
+      []
+    ],
+    [
+      "mobile-390",
+      0,
+      []
+    ],
+    [
+      "rtl-structural-preview",
+      0,
+      []
+    ]
+  ],
+  "bundle": {
+    "totalScriptBytesTransferred": 13780748,
+    "scriptCount": 9,
+    "gsapChunkFound": true,
+    "gsapChunkBytes": 366118,
+    "note": "Measured against the dev server (webpack dev bundles are larger/less optimized than a production build) — see verification report for the caveat and the separate production `next build` route-size table."
+  },
+  "notes": []
+}
