@@ -1,16 +1,17 @@
 """
 Provider-independent retrieval contracts (mission §31-§34, ADR 0015). A
 `Retriever` is anything that turns a normalized query into a ranked list of
-`RetrievalCandidate` objects for a given `RetrievalConfiguration`. Only
-`LexicalRetriever` is implemented this sprint — `VectorRetriever`,
-`HybridRetriever`, and `RerankerRetriever` are declared as stubs so future
-sprints slot into this same contract, but they compute nothing here.
+`RetrievalCandidate` objects for a given `RetrievalConfiguration`.
+`LexicalRetriever` (Sprint 1-E1) and `VectorRetriever` (Sprint 1-E2, ADR
+0016) are both implemented — `HybridRetriever` and `RerankerRetriever`
+remain stubs so a future sprint slots into this same contract, but they
+compute nothing here (mission's explicit hybrid/reranking boundary).
 
-`LexicalRetriever` takes an injected candidate-fetch callable rather than
-calling PostgREST/httpx itself, so the entire scoring/tie-break pipeline is
-unit-testable with a fake in-memory fetcher — no network or database
-access required (matching CI's `Worker` job, which has no Postgres
-service).
+Both retrievers take an injected candidate-fetch callable rather than
+calling PostgREST/httpx themselves, so the entire scoring/tie-break
+pipeline is unit-testable with a fake in-memory fetcher — no network or
+database access required (matching CI's `Worker` job, which has no
+Postgres service).
 """
 from __future__ import annotations
 
@@ -71,17 +72,51 @@ def _to_retrieval_candidate(candidate: ScoredCandidate, rank: int) -> RetrievalC
     )
 
 
+@dataclass(frozen=True)
+class VectorCandidateRow:
+    corpus_item_id: str
+    distance: float
+    similarity: float
+    display_order: int
+    chunk_checksum: str
+
+
+VectorCandidateFetcher = Callable[[], list[VectorCandidateRow]]
+
+
+class VectorRetriever:
+    """noor-vector-baseline-v1 (Sprint 1-E2, ADR 0016). Unlike
+    `LexicalRetriever`, the fetch callable takes no query-text argument —
+    the SQL layer (`get_vector_search_candidates`, migration 0017) already
+    resolves the stored query embedding and performs the cosine-distance
+    ordering (including tie-break) server-side; this class only assigns
+    ranks and top-K clips, mirroring the exact same ordering the SQL
+    query already produced rather than re-sorting in Python."""
+
+    def __init__(self, fetch_candidates: VectorCandidateFetcher) -> None:
+        self._fetch_candidates = fetch_candidates
+
+    def retrieve(self, normalized_query_text: str, configuration: RetrievalConfiguration) -> list[RetrievalCandidate]:
+        rows = self._fetch_candidates()
+        top_k = rows[: configuration.top_k]
+        return [
+            RetrievalCandidate(
+                corpus_item_id=row.corpus_item_id,
+                rank=rank,
+                final_score=row.similarity,
+                score_components={"distance": row.distance, "similarity": row.similarity},
+                matched_terms=(),
+            )
+            for rank, row in enumerate(top_k, start=1)
+        ]
+
+
 # ----------------------------------------------------------------------------
 # Future retrieval strategies — explicitly out of scope this sprint (no
-# embeddings, no vector columns, no external AI calls, no reranking; ADR
-# 0015 "Boundaries"). Declared only so a future sprint's implementation
-# slots into the same `Retriever` contract; nothing here is implemented.
+# fusion, no external AI calls, no reranking; ADR 0015/0016 "Boundaries").
+# Declared only so a future sprint's implementation slots into the same
+# `Retriever` contract; nothing here is implemented.
 # ----------------------------------------------------------------------------
-
-
-class VectorRetriever(Protocol):  # pragma: no cover - stub, not implemented
-    def retrieve(self, normalized_query_text: str, configuration: RetrievalConfiguration) -> list[RetrievalCandidate]:
-        ...
 
 
 class HybridRetriever(Protocol):  # pragma: no cover - stub, not implemented

@@ -32,6 +32,9 @@ from app.chunking.config import (
     NORMALIZATION_VERSION,
 )
 from app.chunking.processor import make_chunking_processor
+from app.embedding.processor import make_embedding_processor
+from app.embedding.provider import SentenceTransformerProvider
+from app.embedding.query_processor import make_query_embedding_processor
 from app.ocr.config import (
     DEFAULT_TESSDATA_DIR,
     OCR_CONFIGURATION_VERSION,
@@ -55,6 +58,12 @@ from app.worker_loop import WorkerLoop
 APP_START_TIME = time.time()
 logger = logging.getLogger("noor.worker")
 
+
+def _sentence_transformers_version() -> str:
+    import importlib.metadata
+
+    return importlib.metadata.version("sentence-transformers")
+
 # Eager, not lazy: a missing/weak WORKER_INTERNAL_TOKEN must crash the
 # process at startup, not surface as a confusing 401/403 the first time
 # something calls /jobs.
@@ -69,7 +78,10 @@ _worker_thread: threading.Thread | None = None
 async def lifespan(_: FastAPI):
     global _orchestration_client, _worker_loop, _worker_thread
 
-    if settings.worker_processing_mode in ("noop", "extraction", "ocr", "chunking", "retrieval_evaluation"):
+    if settings.worker_processing_mode in (
+        "noop", "extraction", "ocr", "chunking", "retrieval_evaluation",
+        "document_embedding", "query_embedding_generation",
+    ):
         if settings.supabase_url and settings.supabase_service_role_key:
             supabase_url = str(settings.supabase_url)
             service_role_key = settings.supabase_service_role_key.get_secret_value()
@@ -126,6 +138,25 @@ async def lifespan(_: FastAPI):
                     worker_instance_id=settings.worker_instance_id,  # type: ignore[arg-type]
                     supabase_url=supabase_url,
                     service_role_key=service_role_key,
+                )
+            elif settings.worker_processing_mode == "document_embedding":
+                # Real model load happens here, once, at process startup —
+                # never per-job — matching assert_pinned_*'s own
+                # fail-closed-at-startup discipline (app/ocr/config.py).
+                embedding_provider = SentenceTransformerProvider(provider_version=_sentence_transformers_version())
+                processor = make_embedding_processor(
+                    _orchestration_client,
+                    provider=embedding_provider,
+                    worker_instance_id=settings.worker_instance_id,  # type: ignore[arg-type]
+                    supabase_url=supabase_url,
+                    service_role_key=service_role_key,
+                )
+            elif settings.worker_processing_mode == "query_embedding_generation":
+                embedding_provider = SentenceTransformerProvider(provider_version=_sentence_transformers_version())
+                processor = make_query_embedding_processor(
+                    _orchestration_client,
+                    provider=embedding_provider,
+                    worker_instance_id=settings.worker_instance_id,  # type: ignore[arg-type]
                 )
 
             worker_loop_kwargs = dict(

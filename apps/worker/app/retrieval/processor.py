@@ -20,7 +20,9 @@ from app.orchestration_client import ClaimedJob, OrchestrationClient, Orchestrat
 from app.processing import Processor, ProcessingOutcome
 from app.retrieval.errors import RetrievalEvaluationError
 from app.retrieval.pipeline import run_evaluation_pipeline, upload_evaluation_artifact
+from app.retrieval.retriever import VectorCandidateRow
 from app.retrieval.scoring import CandidateRow
+from app.retrieval.vector_pipeline import run_vector_evaluation_pipeline
 
 logger = logging.getLogger("noor.worker.retrieval")
 
@@ -73,6 +75,8 @@ def make_retrieval_evaluation_processor(
                 error_message_safe="this dataset's relevance judgments could not be read",
             )
 
+        retriever_name = first_row["out_retriever_name"]
+
         def fetch_candidates(normalized_query_text: str) -> list[CandidateRow]:
             rows = client.get_retrieval_candidates(job.job_id, worker_instance_id, job.lease_token, dataset_id, normalized_query_text)
             return [
@@ -87,26 +91,59 @@ def make_retrieval_evaluation_processor(
                 for r in rows
             ]
 
+        def fetch_vector_candidates(query_id: str, search_mode: str) -> list[VectorCandidateRow]:
+            rows = client.get_vector_search_candidates(job.job_id, worker_instance_id, job.lease_token, dataset_id, uuid.UUID(query_id), search_mode)
+            return [
+                VectorCandidateRow(
+                    corpus_item_id=str(r["out_corpus_item_id"]),
+                    distance=float(r["out_distance"]),
+                    similarity=float(r["out_similarity"]),
+                    display_order=int(r["out_display_order"]),
+                    chunk_checksum=r["out_chunk_checksum"],
+                )
+                for r in rows
+            ]
+
         heartbeat()
 
         try:
-            outcome = run_evaluation_pipeline(
-                organization_id=str(job.organization_id),
-                dataset_id=str(dataset_id),
-                dataset_sha256=first_row["out_dataset_sha256"],
-                evaluation_run_id=str(run_id),
-                query_rows=context_rows,
-                judgment_rows=judgment_rows,
-                fetch_candidates=fetch_candidates,
-                retriever_name=first_row["out_retriever_name"],
-                retriever_version=first_row["out_retriever_version"],
-                retrieval_configuration_version=first_row["out_retrieval_configuration_version"],
-                query_normalization_version=first_row["out_query_normalization_version"],
-                metric_definition_version=first_row["out_metric_definition_version"],
-                evaluation_runner_version="1",
-                top_k_values=list(first_row["out_top_k_values"]),
-                relevance_threshold=int(first_row["out_relevance_threshold"]),
-            )
+            if retriever_name == "noor-vector-baseline":
+                outcome = run_vector_evaluation_pipeline(
+                    organization_id=str(job.organization_id),
+                    dataset_id=str(dataset_id),
+                    dataset_sha256=first_row["out_dataset_sha256"],
+                    evaluation_run_id=str(run_id),
+                    query_rows=context_rows,
+                    judgment_rows=judgment_rows,
+                    fetch_exact_candidates=lambda qid: fetch_vector_candidates(qid, "exact"),
+                    fetch_indexed_candidates=lambda qid: fetch_vector_candidates(qid, "indexed"),
+                    retriever_name=retriever_name,
+                    retriever_version=first_row["out_retriever_version"],
+                    embedding_configuration_key=first_row["out_retrieval_configuration_version"],
+                    query_normalization_version=first_row["out_query_normalization_version"],
+                    metric_definition_version=first_row["out_metric_definition_version"],
+                    evaluation_runner_version="1",
+                    top_k_values=list(first_row["out_top_k_values"]),
+                    relevance_threshold=int(first_row["out_relevance_threshold"]),
+                )
+            else:
+                outcome = run_evaluation_pipeline(
+                    organization_id=str(job.organization_id),
+                    dataset_id=str(dataset_id),
+                    dataset_sha256=first_row["out_dataset_sha256"],
+                    evaluation_run_id=str(run_id),
+                    query_rows=context_rows,
+                    judgment_rows=judgment_rows,
+                    fetch_candidates=fetch_candidates,
+                    retriever_name=retriever_name,
+                    retriever_version=first_row["out_retriever_version"],
+                    retrieval_configuration_version=first_row["out_retrieval_configuration_version"],
+                    query_normalization_version=first_row["out_query_normalization_version"],
+                    metric_definition_version=first_row["out_metric_definition_version"],
+                    evaluation_runner_version="1",
+                    top_k_values=list(first_row["out_top_k_values"]),
+                    relevance_threshold=int(first_row["out_relevance_threshold"]),
+                )
             heartbeat()
             upload_evaluation_artifact(supabase_url=supabase_url, service_role_key=service_role_key, outcome=outcome)
         except RetrievalEvaluationError as exc:
@@ -160,7 +197,7 @@ def make_retrieval_evaluation_processor(
         return ProcessingOutcome(
             kind="succeeded",
             result_summary={
-                "processor": "noor-lexical-baseline",
+                "processor": retriever_name,
                 "evaluation_run_id": str(run_id),
                 "result_count": finalize_row.get("out_result_count", len(outcome.results_payload)),
                 "artifact_sha256": outcome.artifact_sha256,

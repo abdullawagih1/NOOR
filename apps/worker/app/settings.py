@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     worker_lease_duration_seconds: int = 90
     worker_heartbeat_interval_seconds: int = 30
     worker_max_concurrent_jobs: int = 1
-    worker_processing_mode: str = "disabled"  # "disabled" | "noop" | "extraction" | "ocr" | "chunking" | "retrieval_evaluation"
+    worker_processing_mode: str = "disabled"  # "disabled" | "noop" | "extraction" | "ocr" | "chunking" | "retrieval_evaluation" | "document_embedding" | "query_embedding_generation"
 
     # --- Deterministic PDF extraction (Sprint 1.2B) -------------------------
     worker_enabled_job_types: str = "document_parsing"
@@ -128,9 +128,13 @@ class Settings(BaseSettings):
     @field_validator("worker_processing_mode")
     @classmethod
     def processing_mode_must_be_known(cls, value: str) -> str:
-        if value not in ("disabled", "noop", "extraction", "ocr", "chunking", "retrieval_evaluation"):
+        if value not in (
+            "disabled", "noop", "extraction", "ocr", "chunking", "retrieval_evaluation",
+            "document_embedding", "query_embedding_generation",
+        ):
             raise ValueError(
-                'WORKER_PROCESSING_MODE must be "disabled", "noop", "extraction", "ocr", "chunking", or "retrieval_evaluation"'
+                'WORKER_PROCESSING_MODE must be "disabled", "noop", "extraction", "ocr", "chunking", '
+                '"retrieval_evaluation", "document_embedding", or "query_embedding_generation"'
             )
         return value
 

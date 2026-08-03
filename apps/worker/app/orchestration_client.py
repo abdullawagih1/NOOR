@@ -783,6 +783,212 @@ class OrchestrationClient:
         )
         return rows[0] if rows else {}
 
+    # -- Sprint 1-E2: embedding and pgvector foundation (migrations 0016/0017) ---
+    # Same Worker-only trust boundary as every wrapper above.
+
+    def get_document_embedding_job_context(
+        self, job_id: uuid.UUID, worker_instance_id: str, lease_token: str
+    ) -> list[dict[str, Any]]:
+        return self._rpc(
+            "get_document_embedding_job_context",
+            {
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+            },
+        )
+
+    def create_document_embedding_run(
+        self,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        chunking_run_id: uuid.UUID,
+        chunking_review_id: uuid.UUID | None,
+        embedding_configuration_id: uuid.UUID,
+        chunk_manifest: dict[str, Any],
+        chunk_manifest_sha256: str,
+        total_chunk_count: int,
+        correlation_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        rows = self._rpc(
+            "create_document_embedding_run",
+            {
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_chunking_run_id": str(chunking_run_id),
+                "p_chunking_review_id": str(chunking_review_id) if chunking_review_id else None,
+                "p_embedding_configuration_id": str(embedding_configuration_id),
+                "p_chunk_manifest": chunk_manifest,
+                "p_chunk_manifest_sha256": chunk_manifest_sha256,
+                "p_total_chunk_count": total_chunk_count,
+                "p_correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return rows[0] if rows else {}
+
+    def record_document_chunk_embedding(
+        self,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        embedding_run_id: uuid.UUID,
+        chunk_id: uuid.UUID,
+        embedding_identity_sha256: str,
+        input_text_checksum: str,
+        input_token_count: int,
+        vector_literal: str,
+        vector_checksum: str,
+        vector_norm: float,
+        provider_metadata_safe: dict[str, Any] | None = None,
+        correlation_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        rows = self._rpc(
+            "record_document_chunk_embedding",
+            {
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_embedding_run_id": str(embedding_run_id),
+                "p_chunk_id": str(chunk_id),
+                "p_embedding_identity_sha256": embedding_identity_sha256,
+                "p_input_text_checksum": input_text_checksum,
+                "p_input_token_count": input_token_count,
+                "p_vector_value": vector_literal,
+                "p_vector_checksum": vector_checksum,
+                "p_vector_norm": vector_norm,
+                "p_provider_metadata_safe": provider_metadata_safe or {},
+                "p_correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return rows[0] if rows else {}
+
+    def finalize_document_embedding_run(
+        self,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        embedding_run_id: uuid.UUID,
+        artifact_bucket: str,
+        artifact_path: str,
+        artifact_sha256: str,
+        artifact_size_bytes: int,
+        artifact_media_type: str,
+        correlation_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        rows = self._rpc(
+            "finalize_document_embedding_run",
+            {
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_embedding_run_id": str(embedding_run_id),
+                "p_artifact_bucket": artifact_bucket,
+                "p_artifact_path": artifact_path,
+                "p_artifact_sha256": artifact_sha256,
+                "p_artifact_size_bytes": artifact_size_bytes,
+                "p_artifact_media_type": artifact_media_type,
+                "p_correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return rows[0] if rows else {}
+
+    def fail_document_embedding_run(
+        self,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        embedding_run_id: uuid.UUID,
+        error_code: str,
+        error_class: str,
+        error_message_safe: str,
+        correlation_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        rows = self._rpc(
+            "fail_document_embedding_run",
+            {
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_embedding_run_id": str(embedding_run_id),
+                "p_error_code": error_code,
+                "p_error_class": error_class,
+                "p_error_message_safe": error_message_safe,
+                "p_correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return rows[0] if rows else {}
+
+    def get_query_embedding_job_context(
+        self, job_id: uuid.UUID, worker_instance_id: str, lease_token: str
+    ) -> list[dict[str, Any]]:
+        return self._rpc(
+            "get_query_embedding_job_context",
+            {
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+            },
+        )
+
+    def record_query_embedding(
+        self,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        dataset_id: uuid.UUID,
+        query_id: uuid.UUID,
+        embedding_configuration_id: uuid.UUID,
+        embedding_identity_sha256: str,
+        input_text_checksum: str,
+        input_token_count: int,
+        vector_literal: str,
+        vector_checksum: str,
+        vector_norm: float,
+        correlation_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        rows = self._rpc(
+            "record_query_embedding",
+            {
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_dataset_id": str(dataset_id),
+                "p_query_id": str(query_id),
+                "p_embedding_configuration_id": str(embedding_configuration_id),
+                "p_embedding_identity_sha256": embedding_identity_sha256,
+                "p_input_text_checksum": input_text_checksum,
+                "p_input_token_count": input_token_count,
+                "p_vector_value": vector_literal,
+                "p_vector_checksum": vector_checksum,
+                "p_vector_norm": vector_norm,
+                "p_correlation_id": str(correlation_id) if correlation_id else None,
+            },
+        )
+        return rows[0] if rows else {}
+
+    def get_vector_search_candidates(
+        self,
+        job_id: uuid.UUID,
+        worker_instance_id: str,
+        lease_token: str,
+        dataset_id: uuid.UUID,
+        query_id: uuid.UUID,
+        search_mode: str,
+    ) -> list[dict[str, Any]]:
+        return self._rpc(
+            "get_vector_search_candidates",
+            {
+                "p_processing_job_id": str(job_id),
+                "p_worker_instance_id": worker_instance_id,
+                "p_lease_token": lease_token,
+                "p_dataset_id": str(dataset_id),
+                "p_query_id": str(query_id),
+                "p_search_mode": search_mode,
+            },
+        )
+
 
 def _jsonable(payload: dict[str, Any]) -> dict[str, Any]:
     return {k: (str(v) if isinstance(v, uuid.UUID) else v) for k, v in payload.items()}
