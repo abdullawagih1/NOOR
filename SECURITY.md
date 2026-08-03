@@ -260,6 +260,33 @@ exists.
   Supabase than on local plain Postgres) — both are now documented
   permanent lessons (`docs/database/retrieval-evaluation-schema.md`,
   `docs/security/retrieval-evaluation-authorization.md`).
+* **Embedding and pgvector foundation (Sprint 1-E2): raw vectors never
+  reach the browser, and there is no client-supplied-vector code path at
+  all.** `document_chunk_embeddings.vector_value`/
+  `retrieval_evaluation_query_embeddings.vector_value` are never selected
+  by any web-application query — only checksums, norms, dimensions, and
+  status. Every vector persisted through `record_document_chunk_embedding`/
+  `record_query_embedding` (both Worker-only, lease-authenticated, never
+  via organization permissions, explicitly revoked from
+  `authenticated`/`anon`) originates from the Worker's own
+  `EmbeddingProvider.embed()` call — there is no code path from an
+  `authenticated` JWT to either function, and no client can submit a
+  vector, dimension, similarity expression, distance metric, index
+  parameter, provider model name, or provider credential. The provider
+  itself is fully self-hosted (`intfloat/multilingual-e5-base` via
+  `sentence-transformers`), so there is no provider API key or bearer
+  token to leak by construction — a real, deliberate difference from a
+  future external-API provider, which would need the same
+  Worker-only/environment-managed/never-logged discipline already
+  applied to `SUPABASE_SERVICE_ROLE_KEY`/`WORKER_INTERNAL_TOKEN`. A
+  cross-tenant vector search is structurally impossible, not merely
+  discouraged: `get_vector_search_candidates` scopes its join by both
+  `dataset_id` and the claiming job's own `organization_id` together.
+  Two real, local-only bugs were found and fixed this sprint (a missing
+  CHECK-constraint branch for the new job type, a `real`/`numeric`
+  return-type mismatch) — see
+  `docs/database/embedding-and-vector-schema.md`,
+  `docs/security/embedding-and-vector-authorization.md`.
 
 ## Known gaps (Sprint 1+)
 

@@ -1,5 +1,58 @@
 # Changelog
 
+## [Unreleased] — Sprint 1-E2: Embedding and Vector Index Foundation
+
+Turns Sprint 1-D3's accepted, embedding-ready chunks into immutable,
+checksum-verified vectors under one approved, self-hosted embedding
+configuration (`noor-multilingual-e5-base-v1`), stores them in
+tenant-scoped `pgvector` tables, builds one approved HNSW index
+validated against an exact sequential-scan reference path, adds a
+second `Retriever` implementation to Sprint 1-E1's existing evaluation
+framework, and compares it honestly against the lexical baseline. No
+hybrid retrieval, reranking, or LLM calls anywhere in this workstream —
+see ADR 0016.
+
+### Added
+
+* `supabase/migrations/0016_embedding_and_pgvector_foundation.sql` —
+  `pgvector` extension (schema-qualified consistently across local and
+  hosted), `embedding_configurations` (one seeded, approved row:
+  self-hosted `intfloat/multilingual-e5-base`, MIT-licensed, 768
+  dimensions, cosine distance), `document_embedding_runs`,
+  `document_chunk_embeddings` (fixed `vector(768)` column, HNSW index),
+  Worker-only chunk-embedding functions, 5 new `embedding_configurations.*`/
+  `document_embeddings.*` permissions, RLS.
+* `supabase/migrations/0017_vector_retrieval_evaluation.sql` —
+  `retrieval_evaluation_query_embeddings`, `get_vector_search_candidates`
+  (one function, exact/indexed modes sharing all tenant/dataset-boundary
+  logic), `create_vector_evaluation_run`/`create_query_embeddings_for_dataset`,
+  extended `retrieval_evaluation_runs`/`_metrics`/`_failures` for the
+  vector baseline.
+* `apps/worker/app/embedding/*` — provider adapter wrapping the real
+  pinned model (`SentenceTransformerProvider`), identity computation,
+  checksums (`vector_serialization_v1`), chunk manifest, batching
+  pipeline, and both the chunk-embedding and query-embedding processors.
+* `apps/worker/app/retrieval/vector_pipeline.py` — the exact-vs-indexed
+  comparison pipeline, reusing Sprint 1-E1's metrics/failure-analysis/
+  artifact code completely unmodified.
+* `apps/web/lib/embeddings/*`, `/quality/embeddings`,
+  `/quality/embeddings/configuration`, `/quality/embeddings/runs/[runId]`,
+  plus vector-aware extensions to the existing Sprint 1-E1 dataset/run/
+  failure pages and a new lexical-vs-vector comparison page.
+* ADR 0016 and 7 new documentation files (2 domain, 1 database, 1
+  security, 2 operations, 1 verification).
+
+### Fixed
+
+* A missing CHECK-constraint branch for the new `document_embedding`
+  job type in migration 0016's first draft.
+* A `real`/`numeric` return-type mismatch in `get_vector_search_candidates`.
+* A pre-existing (Sprint 1-E1) unpopulated `retrieval_evaluation_queries.query_sha256`
+  column, worked around by computing the checksum fresh from canonical
+  text rather than editing the already-shipped migration.
+* A CSS overlap bug on the embedding-run detail page (two checksum
+  values colliding in a 2-column grid).
+
 ## [Unreleased] — Sprint 1-E1: Retrieval Preparation and Evaluation Foundation
 
 Builds the reproducible foundation every future retrieval approach

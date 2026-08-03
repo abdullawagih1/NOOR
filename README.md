@@ -6,8 +6,8 @@ retrieves and cites only approved, versioned guideline text, and refuses to
 answer when evidence is insufficient. Noor is not an autonomous diagnostician
 — the clinician always retains final clinical authority.
 
-This repository is at **Sprint 1, workstream S1-E1 — Retrieval
-Preparation and Evaluation Foundation**. Sprint 0.5's
+This repository is at **Sprint 1, workstream S1-E2 — Embedding and
+Vector Index Foundation**. Sprint 0.5's
 hosted infrastructure foundation (identity/tenancy/RLS, real Supabase
 Auth, the Noor Design System, the worker scaffold, the shared clinical
 schema contract) is unchanged and remains verified — against plain
@@ -176,8 +176,33 @@ infrastructure using the actual, unmodified Worker code end to end. See
 and `docs/verification/sprint-1-e1-retrieval-evaluation-verification.md`
 for the full record.
 
+**S1-E2 — embedding and vector index foundation:** turns S1-D3's
+accepted, embedding-ready chunks into immutable, checksum-verified
+vectors under one approved, self-hosted embedding configuration
+(`noor-multilingual-e5-base-v1` — `intfloat/multilingual-e5-base`,
+MIT-licensed, 768 dimensions, cosine distance), stored in tenant-scoped
+`pgvector` tables with one approved HNSW index validated against an
+exact sequential-scan reference path. A second `Retriever`
+implementation (`noor-vector-baseline-v1`) extends S1-E1's evaluation
+framework — not a fork of it — and is evaluated against the same frozen
+human judgments, compared honestly against the lexical baseline
+(regressions reported, never hidden). No hybrid retrieval, reranking, or
+LLM calls anywhere in this workstream (ADR 0016). Verified locally (a
+genuinely fresh `pgvector/pgvector:pg16` container, 218 cumulative RLS
+assertions, a 206-assertion Worker pytest suite including 4 tests that
+load and run the real pinned model, and a clean Web typecheck/test/lint/
+build pass) and on real hosted Development infrastructure using the
+actual, unmodified Worker code and the actual pinned model end to end.
+See `docs/architecture/adr/0016-embedding-and-vector-index-foundation.md`
+and `docs/verification/sprint-1-e2-embedding-and-vector-verification.md`
+for the full record, including an honestly documented open item (Arabic
+vector ranking was smoke-tested locally against the real model but not
+re-verified against hosted infrastructure after a verification-tooling
+fixture bug fix) and a small residual of hosted synthetic test data left
+as a manual cleanup item.
+
 The repository is pushed to GitHub with CI passing on real GitHub Actions
-runs, including Sprint 1-E1's changes.
+runs, including Sprint 1-E2's changes.
 
 **UX-1 — NOOR brand and design system alignment:** the user's officially
 approved NOOR logo is now the single source of truth for Noor's visual

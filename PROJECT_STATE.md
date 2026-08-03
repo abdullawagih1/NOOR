@@ -1,10 +1,86 @@
 # PROJECT_STATE.md
 
-**Last updated:** Sprint 1-E1 — Retrieval Preparation and Evaluation
-Foundation session (Claude Code, this environment)
+**Last updated:** Sprint 1-E2 — Embedding and Vector Index Foundation
+session (Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code)
 
 ---
+
+## -14. This session: Sprint 1-E2 — Embedding and Vector Index Foundation
+
+Implemented workstream `S1-E2`: turns Sprint 1-D3's accepted,
+embedding-ready chunks into immutable, checksum-verified vectors under
+one approved, self-hosted embedding configuration
+(`noor-multilingual-e5-base-v1` — `intfloat/multilingual-e5-base`,
+MIT-licensed, 768 dimensions, cosine distance, revision pinned against
+the live Hugging Face Hub API), stores them in tenant-scoped `pgvector`
+tables, builds one approved HNSW index (validated against an exact
+sequential-scan reference path), adds a second `Retriever`
+implementation (`noor-vector-baseline-v1`) to S1-E1's existing
+evaluation framework, evaluates it against S1-E1's frozen human
+judgments, and compares it honestly against the lexical baseline —
+regressions reported, never hidden. No hybrid retrieval, reranking, or
+LLM calls anywhere in this sprint (ADR 0016).
+
+A real, user-facing environmental blocker was hit and resolved before
+any code was written: the development machine's `C:` drive was at
+~800MB free, which would have broken installing PyTorch + the model
+weights. Surfaced directly to the user (with concrete disk-usage
+findings) rather than silently worked around; the user freed space
+themselves.
+
+**Provider selection (ADR 0016):** a background research pass evaluated
+`multilingual-e5-small`, `multilingual-e5-base`, `BAAI/bge-m3`, and
+OpenAI `text-embedding-3-small`, grounded and cited. `multilingual-e5-base`
+won on the strongest first-party Arabic evidence (a vendor-published Mr.
+TyDi Arabic MRR@10 of 72.3) plus MIT licensing and single dense-vector
+output; self-hosted was preferred over external API so no data ever
+leaves Noor's infrastructure.
+
+**Schema (migrations 0016 + 0017, ADR 0016):** `embedding_configurations`
+(exactly one approved row, server-managed, no client mutation function);
+`document_embedding_runs`/`document_chunk_embeddings` (fixed-dimension
+`vector(768)` column, HNSW index, one succeeded vector per identity
+ever); `retrieval_evaluation_query_embeddings`; `get_vector_search_candidates`
+(one function, `'exact'`/`'indexed'` modes, sharing all tenant/dataset-
+boundary logic); `create_vector_evaluation_run`/`create_query_embeddings_for_dataset`.
+`retrieval_evaluation_runs`/`_metrics`/`_failures` extended for the
+vector baseline — `finalize_retrieval_evaluation_run`,
+`fail_retrieval_evaluation_run`, `cancel_evaluation_run`, and
+`get_retrieval_evaluation_job_context` (all migration 0015) needed zero
+changes, already fully retriever-agnostic. `pgvector` (0.8.2 on hosted)
+installed into the pre-existing `extensions` schema on both local and
+hosted, avoiding the divergence a bare `create extension` would have
+caused.
+
+**Worker (`apps/worker/app/embedding/*`, `apps/worker/app/retrieval/vector_pipeline.py`):**
+a real dependency-footprint change for this Worker — `torch` (CPU-only
+wheel) and `sentence-transformers` are now real dependencies, pinned
+with `assert_pinned_embedding_model()` fail-closed-at-startup discipline
+matching `app/ocr/config.py`'s existing pattern. Candidate vector search
+happens via the Worker-only RPC; final vector-retriever ranking, the
+exact-vs-indexed comparison, and every metric are pure Python (206/206
+Worker pytest tests passing, including 4 that load and run the real
+pinned model — see `test_embedding_provider_real_model.py`).
+
+**Web (`apps/web/lib/embeddings/*`, `/quality/embeddings/*`, plus
+vector-aware extensions to the existing S1-E1 pages and a new
+lexical-vs-vector comparison page):** gated by 5 new
+`embedding_configurations.*`/`document_embeddings.*` permissions;
+`document_chunk_embeddings.vector_value`/
+`retrieval_evaluation_query_embeddings.vector_value` are never selected
+by any web query — raw vectors never reach the browser.
+
+**Real bugs found and fixed** (5 total — see `SPRINT_CURRENT.md` and
+`docs/verification/sprint-1-e2-embedding-and-vector-verification.md`
+for full detail): a missing CHECK-constraint branch for the new
+`document_embedding` job type, a `real`/`numeric` type mismatch, a
+pre-existing (Sprint 1-E1) unpopulated checksum column with no prior
+consumer, a CSS overlap bug on the embedding-run detail page found
+during screenshot capture, and a hosted-verification-tooling PDF
+fixture bug (Arabic text corruption) diagnosed and fixed for future use
+but not re-verified against hosted infrastructure before this sprint's
+time budget ended — documented as open, not silently skipped.
 
 ## -13. This session: Sprint 1-E1 — Retrieval Preparation and Evaluation Foundation
 

@@ -1,92 +1,121 @@
-# Sprint Current: S1-E1 — Retrieval Preparation and Evaluation Foundation
+# Sprint Current: S1-E2 — Embedding and Vector Index Foundation
 
-**Status:** S1-E1 — Complete and Verified. See
-`docs/verification/sprint-1-e1-retrieval-evaluation-verification.md` for
-the full record.
+**Status:** S1-E2 — Complete and Verified. See
+`docs/verification/sprint-1-e2-embedding-and-vector-verification.md` for
+the full record, including two real schema bugs found and fixed, a real
+verification-tooling fixture bug found and fixed, a real CSS bug found
+and fixed, and an honestly documented small residual of hosted synthetic
+test data left as a manual cleanup item.
 
-Workstreams `S1-A`/`S1-B`/`S1-C1`/`S1-C2`/`S1-D1`/`S1-D2`/`S1-D3`/`UX-1`/
-`UX-1.1` closed in prior sessions. This sprint is workstream `S1-E1`.
+Workstreams `S1-A`/`S1-B`/`S1-C1`/`S1-C2`/`S1-D1`/`S1-D2`/`S1-D3`/`S1-E1`/
+`UX-1`/`UX-1.1` closed in prior sessions. This sprint is workstream
+`S1-E2`.
 
 ## What this sprint does
 
-Builds the reproducible foundation every future retrieval approach
-(lexical, embedding, hybrid, reranked) will be measured against: frozen
-evaluation corpora, a versioned 17-category query taxonomy, graded (0-3)
-relevance judgments, a two-person dataset review/freeze lifecycle, one
-deterministic lexical baseline (`noor-lexical-baseline-v1`, real
-PostgreSQL full-text search + a documented ranking formula + deterministic
-tie-breaking), versioned Precision/Recall/Hit-Rate/MRR/nDCG metrics,
-deterministic + human failure analysis, provider-independent `Retriever`
-contracts, and an internal Quality workspace UI. See ADR 0015 for the
-full architectural rationale.
+Turns S1-D3's accepted, embedding-ready chunks into immutable,
+checksum-verified vectors under one approved, self-hosted embedding
+configuration (`noor-multilingual-e5-base-v1` — `intfloat/multilingual-e5-base`,
+MIT-licensed, 768 dimensions, cosine distance), stores them in
+tenant-scoped `pgvector` tables, builds one approved HNSW index, adds a
+second `Retriever` implementation (`noor-vector-baseline-v1`) to S1-E1's
+existing evaluation framework, validates the index against an exact
+sequential-scan reference path, evaluates the vector baseline against
+S1-E1's frozen human judgments, and compares it honestly against the
+lexical baseline (regressions reported, never hidden). See ADR 0016 for
+the full architectural rationale, including the real disk-space blocker
+resolved with the user before any embedding code was written.
 
 ## Explicitly out of scope this sprint
 
-Embeddings, embedding-provider selection/credentials, vector columns,
-`pgvector`, vector similarity queries, external AI calls, reranking,
-cross-encoders, RRF/hybrid retrieval, query rewriting/expansion via AI,
-LLM calls, RAG, citation/answer generation, production search, automated
-or LLM-generated relevance judgments, real guideline ingestion,
-regulatory/clinical validation claims.
+Hybrid retrieval, reciprocal-rank fusion, reranking, cross-encoders, LLM
+calls, query rewriting/expansion, generative answers, citation
+generation, production/clinician-facing search, automated model
+selection, multiple simultaneous production providers, real clinical
+document ingestion, regulatory/clinical validation claims.
 
 ## Objectives
 
-- [x] Migration 0014 — dataset lifecycle (`retrieval_evaluation_datasets`/
-      `_corpus_items`/`_queries`, `retrieval_relevance_judgments`,
-      `retrieval_evaluation_search_documents`), `normalize_retrieval_text()`,
-      the full draft→ready_for_review→frozen→archived lifecycle with
-      two-person review, 11 new `retrieval_evaluation.*` permissions, RLS.
-- [x] Migration 0015 — `retrieval_evaluation_runs`/`_results`/`_metrics`/
-      `_failures`, `document_processing_jobs` extended for dataset-scoped
-      jobs, the client-facing run/cancel/failure-annotation functions, and
-      the Worker-only context/candidate-recall/finalize/fail functions.
-- [x] ADR 0015.
-- [x] Worker retrieval module (`apps/worker/app/retrieval/*`): scoring,
-      deterministic tie-breaking, metrics, failure analysis, artifact
-      construction, and the `retrieval_evaluation` processor — 155/155
-      Worker pytest tests passing (114 pre-existing + 41 new).
-- [x] Web application layer (`apps/web/lib/retrieval-evaluation/*`) and UI
-      (`/quality/retrieval-evaluation/*`: dataset queue, dataset detail,
-      judgment workspace, run dashboard, failure analysis).
-- [x] Documentation set (4 domain docs, 1 database doc, 1 security doc,
-      2 operations docs, 1 verification doc — 9 total).
-- [x] Full local verification — RLS suite (214/214), Worker pytest
-      (155/155), Web typecheck/lint/test(19 files)/build all clean.
-- [x] Hosted Development verification (real Worker, real two-person
-      review, real frozen dataset, real lexical run, real Playwright
-      screenshots) and zero-residual cleanup.
+- [x] Provider/model evaluation spike (self-hosted vs. external,
+      grounded and cited) — `intfloat/multilingual-e5-base` selected,
+      revision-pinned against the live Hugging Face Hub API.
+- [x] ADR 0016.
+- [x] Migration 0016 — `pgvector` extension (schema-qualified
+      consistently across local/hosted), `embedding_configurations`
+      (one seeded, approved row), `document_embedding_runs`,
+      `document_chunk_embeddings` (fixed `vector(768)` column, HNSW
+      index), Worker-only chunk-embedding functions, `document_embeddings.*`
+      permissions, RLS.
+- [x] Migration 0017 — `retrieval_evaluation_query_embeddings`,
+      `get_vector_search_candidates` (one function, exact/indexed modes),
+      `create_vector_evaluation_run`/`create_query_embeddings_for_dataset`,
+      extended `retrieval_evaluation_runs`/`_metrics`/`_failures` for the
+      vector baseline — `finalize_retrieval_evaluation_run` and friends
+      reused completely unmodified.
+- [x] CI workflow updated to `pgvector/pgvector:pg16` (plain `postgres:16`
+      has no `vector` extension binary).
+- [x] Local RLS/SQL suite `014_embedding_and_vector_evaluation.sql` —
+      16/16, on a genuinely fresh container.
+- [x] Worker `app/embedding/*` (provider adapter wrapping the real
+      pinned model, identity, checksums, manifest, pipeline, processor,
+      query-embedding processor) and `app/retrieval/vector_pipeline.py`
+      (exact-vs-indexed comparison, reusing S1-E1's metrics/failure-
+      analysis/artifact code unmodified).
+- [x] Worker pytest — 206/206 (51 new, including 4 tests that load and
+      run the real pinned model).
+- [x] Quality workspace UI: `/quality/embeddings`,
+      `/quality/embeddings/configuration`, `/quality/embeddings/runs/[runId]`,
+      plus vector-aware extensions to the existing S1-E1 dataset/run/
+      failure pages and a new lexical-vs-vector comparison page.
+- [x] Web verification — typecheck/lint/21 test files/build all clean.
+- [x] 9 documentation files (ADR + 2 domain + database + security + 2
+      operations + verification), all cross-referenced.
+- [x] Hosted verification against the real "Noor Development" project,
+      using the real Worker code and the real pinned model — chunk
+      embeddings, query embeddings, and a vector evaluation run all
+      succeeded end to end; RLS/trust-boundary checks passed.
+- [x] Playwright screenshots — 9/9, all real hosted data, including a
+      real CSS overlap bug found and fixed during capture.
+- [x] Status docs updated (this file, PROJECT_STATE, MASTER_BACKLOG,
+      CHANGELOG, KNOWN_LIMITATIONS, SECURITY, README).
 
 ## Real bugs found and fixed this sprint
 
-1. `claim_next_document_processing_job` could never claim a dataset-scoped
-   `retrieval_evaluation` job — migration 0007's original eligibility
-   check assumed every job resolves to a `source_document_id`. Caught by
-   the local RLS suite before any hosted attempt; fixed via a migration
-   0015 re-declaration adding a dataset/frozen eligibility branch.
-2. `get_retrieval_candidates` had a `real`/`numeric` return-type mismatch
-   (`ts_rank_cd()` returns `real`) — caught by the same local suite run.
-3. Two hosted-only `search_path` bugs: `freeze_retrieval_evaluation_dataset`
-   and `create_retrieval_evaluation_run` both call `digest()` directly but
-   were missing `extensions` in their `search_path` — invisible locally
-   (pgcrypto lives in `public` there), real on hosted Supabase (pgcrypto
-   lives in `extensions`). Caught by the first real hosted freeze/run
-   attempt; fixed and re-verified locally + on hosted.
-4. A real ordering bug in the web error-mapper (`toRetrievalEvaluationError`):
-   a generic "immutable" check shadowed a more specific failure-annotation
-   check below it. Caught by the new web error-mapping test file.
-5. A real logic-inversion bug in `_non_relevant_ranked_high` (Worker
-   failure-analysis detector) — caught before any test ran, by re-reading
-   the detector against its own docstring.
-6. Two synthetic-fixture SHA-256 collisions while writing the new local
-   RLS test file, reusing hashes already used by `009`/`011` — the same
-   documented "content-addressed identity is keyed on hash, not row id"
-   gotcha from Sprint 1-D3, recurring here.
+1. `document_processing_jobs_subject_check` was never extended for the
+   new `document_embedding` job type in migration 0016's first draft —
+   would have rejected every embedding-job insert with a CHECK
+   violation. Caught by the local RLS suite before any hosted attempt.
+2. `get_vector_search_candidates` had a `real`/`numeric` return-type
+   mismatch (the pgvector `<=>` cosine-distance operator returns `real`).
+   Caught by the same local suite run.
+3. `retrieval_evaluation_queries.query_sha256` (migration 0014, already
+   shipped) was never actually populated by
+   `freeze_retrieval_evaluation_dataset` — a real, pre-existing gap with
+   no prior consumer until this sprint's query-embedding pipeline tried
+   to read it. Worked around, not edited around: the checksum is now
+   computed fresh from canonical `query_text` in migration 0017's own
+   functions.
+4. A real CSS overlap bug on the embedding-run detail page: two
+   64-character checksum values shared a 2-column grid cell with no
+   `break-all`, visually colliding. Found during Playwright screenshot
+   capture (the automated typecheck/lint/build suite doesn't catch
+   visual overlap); fixed with `sm:col-span-2` + `break-all`.
+5. A real bug in this sprint's own hosted-verification tooling (not
+   product code): the ad hoc hand-rolled PDF fixture used since Sprint
+   0.5 cannot correctly carry Arabic text through `pypdf`'s single-byte
+   string decoding — multi-byte UTF-8 characters silently corrupt to
+   double-encoded mojibake. Diagnosed by direct byte inspection, fixed
+   for future verification scripts (`reportlab` + a Unicode TTF font +
+   pre-reversing the source string to compensate for `pypdf`'s RTL
+   extraction order), but not re-run to completion against hosted
+   infrastructure before this sprint's time budget ended — see the
+   verification doc's "what remains open" section.
 
 ## Next step
 
 ```text
-Begin S1-E2 — Embedding and Vector Index Foundation
+Begin S1-E3 — Hybrid Retrieval
 ```
 
-Do not mark S1-E2, S1-E3, or S1-F complete. See `MASTER_BACKLOG.md` for
-the full workstream breakdown.
+Do not mark S1-E3 or S1-F complete. See `MASTER_BACKLOG.md` for the full
+workstream breakdown.

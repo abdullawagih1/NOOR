@@ -653,3 +653,45 @@ the same PR that resolves an item.
     underlying tools directly (`npx tsx <file>`, `npx next build`)
     completes normally in seconds. A future session hitting the same
     "nothing is happening" symptom should suspect `npm run` itself first.
+
+83. **The Arabic-vector-ranking case was not re-verified against hosted
+    infrastructure after the underlying fixture bug (item 80) was
+    diagnosed and fixed.** Sprint 1-E2 confirmed the exact byte-level
+    mechanism (Arabic text drawn via a Latin-only-encoded PDF string
+    literal double-UTF-8-corrupts through `pypdf`'s single-byte
+    decoding — not fixable by font choice alone, since multi-byte
+    Arabic code points cannot survive a single-byte string literal at
+    all) and verified a real fix (`reportlab` + a registered Unicode TTF
+    font + pre-reversing the source string to compensate for `pypdf`'s
+    RTL extraction order — confirmed byte-for-byte round-trip locally).
+    Time constraints ended this sprint's hosted-verification pass before
+    re-running the full pipeline with the corrected fixture. The English
+    case, the chunk-embedding pipeline, the query-embedding pipeline, and
+    exact-vs-indexed correctness were all proven correct with real hosted
+    data and the real model; a real Arabic query/passage pair *was*
+    smoke-tested locally against the real model (cosine similarity 0.888)
+    but not through the full hosted pipeline. See
+    `docs/verification/sprint-1-e2-embedding-and-vector-verification.md`.
+
+84. **A small residual of Sprint 1-E2 hosted synthetic test data was not
+    cleaned up** — one synthetic guideline/document/chunk/embedding-run
+    chain and three synthetic GoTrue accounts, all clearly labeled
+    "S1-E2 Verify"/`e2-*`, containing zero real content. The three
+    accounts could not be deleted via the GoTrue admin API because
+    `audit_events.actor_id` references them (a real, by-design FK —
+    audit history is append-only and cannot reference a deleted actor);
+    deleting them requires the same `noor.allow_audit_maintenance`
+    override pattern applied to `audit_events` specifically, which this
+    session did not complete. Documented here rather than forced through
+    with a broader/riskier operation — the same "flag it, don't force
+    it" precedent Sprint 1-D3 set for its stray Vercel project. See the
+    verification doc for the exact IDs.
+
+85. **This Worker now depends on `torch` and `sentence-transformers`
+    (Sprint 1-E2)** — a real, deliberate departure from every prior
+    sprint's near-zero-dependency Worker image. The CPU-only wheel keeps
+    the added footprint to ~1.2GB (model weights + PyTorch), but this is
+    still the single largest dependency change in this codebase's
+    history. A future sprint changing the approved embedding model
+    should re-read ADR 0016's provider-selection reasoning before adding
+    a second heavy ML dependency casually.
