@@ -85,7 +85,13 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        # pgvector/pgvector:pg16 (Sprint 1-E2, migration 0016) — a drop-in
+        # postgres:16 build with the pgvector extension pre-compiled in.
+        # Plain postgres:16 has no `vector` extension binary at all, so
+        # `create extension if not exists vector` would fail here — this
+        # exact image is also what local verification now uses (see
+        # docs/verification/sprint-1-e2-embedding-and-vector-verification.md).
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: noor_test
