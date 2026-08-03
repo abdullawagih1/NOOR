@@ -19,3 +19,22 @@ body {
 a {
   color: var(--noor-color-primary);
 }
+
+/*
+ * LX-1.0 baseline reduced-motion rule (docs/landing/
+ * NOOR_LANDING_ACCESSIBILITY_PLAN.md). Framer Motion's useReducedMotion
+ * hook covers JS-driven animation; this covers anything expressed in
+ * plain CSS (e.g. a hover scale) so the guarantee holds even before
+ * hydration. Landing-specific, but scoped globally since no existing
+ * page relies on motion this rule would otherwise suppress.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
