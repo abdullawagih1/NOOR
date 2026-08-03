@@ -695,3 +695,35 @@ the same PR that resolves an item.
     history. A future sprint changing the approved embedding model
     should re-read ADR 0016's provider-selection reasoning before adding
     a second heavy ML dependency casually.
+
+86. **LX-1.0's prototype performance measurements are a dev-mode spike,
+    not a production budget claim.** The bundle/main-thread numbers
+    recorded in `docs/verification/lx-1-0-narrative-motion-prototype.md`
+    §10 were measured against `next dev` (webpack dev bundles are
+    deliberately unminified/uncompressed) specifically to compare
+    Framer Motion vs. GSAP vs. CSS/SVG for the signature scene — they
+    are not evidence that the eventual production landing page (LX-1.2)
+    will meet the targets in `docs/landing/NOOR_LANDING_PERFORMANCE_BUDGET.md`.
+    Real production-build and Vercel-Preview measurement is explicitly
+    deferred to LX-1.3.
+
+87. **LX-1.0's mobile Lighthouse baseline reading inherited the same
+    localhost-throttling artifact documented for Sprint 1-E2** — see
+    `docs/landing/LX-1-0_BASELINE.md` §4.4. The desktop numbers (perfect
+    Lighthouse scores, 0.5s LCP, 189 KiB) are the trustworthy baseline
+    figures; the mobile Performance score of 0.45 almost certainly
+    overstates real mobile latency given the page ships near-zero
+    client JS. Re-verification against a real Vercel Preview URL is
+    deferred to LX-1.3.
+
+88. **`npm run test --workspace=apps/web` can hang indefinitely on this
+    Windows/git-bash development setup** if orphaned `npm`/`next dev`
+    processes from an earlier session step are still running — the
+    `npm-cli.js` wrapper appears to buffer/block on process contention
+    rather than failing loudly. Confirmed during LX-1.0 verification:
+    killing the orphaned processes (identified via `Get-CimInstance
+    Win32_Process`) resolved it immediately, and the identical test
+    command chain run directly (bypassing `npm-cli.js`) always completes
+    cleanly. Not a CI risk (GitHub Actions runners don't accumulate
+    cross-session orphans), but worth knowing if a future local session
+    sees the same hang.

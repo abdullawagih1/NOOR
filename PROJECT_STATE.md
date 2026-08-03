@@ -1,10 +1,91 @@
 # PROJECT_STATE.md
 
-**Last updated:** Sprint 1-E2 — Embedding and Vector Index Foundation
-session (Claude Code, this environment)
+**Last updated:** LX-1.0 — Immersive Landing Narrative and Motion
+Blueprint session (Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code)
 
 ---
+
+## -15. This session: LX-1.0 — Immersive Landing Narrative and Motion Blueprint
+
+A separate, dedicated landing-experience workstream — not a platform
+sprint. Produced a complete narrative/design-definition/technical-
+prototyping package for a *future* landing redesign without touching
+the production `/` page, the database, RLS, permissions, or the
+Worker. Status: **LX-1.0 — Narrative and Motion Blueprint Complete,
+Pending User Approval** (explicitly not "Complete and Approved" —
+LX-1.1 requires the user's explicit review before any production
+implementation begins).
+
+Repository audit first: confirmed no animation library
+(`framer-motion`/`gsap`/`motion`/`three`) existed anywhere in the
+codebase before this session, captured a real baseline for the current
+`/` page (real `next build` + `next start`, real Lighthouse desktop run
+— 1.00/1.00/1.00/1.00, 0.5s LCP, 189 KiB — and a real mobile run flagged
+with an honest localhost-throttling-artifact caveat), and identified
+`/design-system`'s `notFound()`-when-production gating pattern as the
+one to reuse for a new prototype route. Installed `framer-motion`,
+`gsap`, and `@axe-core/playwright` only after the audit was written;
+`three` was evaluated and explicitly **not** installed — no concept in
+this mission's storyboard (a strictly linear 5-stage reversal, not a
+topology/network) justified it.
+
+Wrote 14 planning documents to `docs/landing/`: a Capability Truth
+Matrix (every landing claim mapped to real repository evidence and
+classified Available/In development/Future vision/Not planned — S1-E1/
+S1-E2's retrieval and embedding work is explicitly labeled an internal
+evaluation framework, never a clinician-facing feature), the final
+narrative (audiences, 5-act structure, CTA strategy), a 10-section
+information architecture and content system, a full storyboard (every
+scene's motion carries explicit narrative meaning), a motion system
+(tokens/hierarchy/pin-scrub rules), visual language/RTL rules, a
+performance budget, an accessibility plan, a technical architecture
+(Server Component root + small client animation islands + Framer
+Motion for 5 scenes + GSAP only for the signature scene), a Three.js
+decision record, an SEO/metadata plan, and a 4-phase production plan
+(LX-1.1 → LX-1.4).
+
+Built a Development-only prototype gallery at
+`/design/landing-experience` (6 working prototypes — 5 Framer Motion,
+1 GSAP + ScrollTrigger signature "reverse traceability" scene with a
+real scroll-scrubbed sequence inside a self-contained scroller — plus
+an isolated RTL structural preview), gated identically to
+`/design-system`. Verified for real: `curl` against a real production
+server confirmed `/` returns 200 and the prototype route (and
+`/design-system`) return 404; 15 Playwright screenshots across desktop/
+mobile/reduced-motion/RTL; `@axe-core/playwright` scans across all 4
+states, initially finding 5 distinct real WCAG contrast violations and
+1 keyboard-focusability violation.
+
+**Real bugs found and fixed:** opacity-driven text dimming in 4 scenes
+dropped WCAG contrast as low as 1.36:1 (fixed by never fading text
+itself, only decorative elements); `text-muted` failed contrast
+(4.31:1) specifically against the teal-tinted `accent-soft` background
+used for "active" states (fixed with `text-body`); two scrollable
+containers weren't keyboard-focusable (fixed with `tabIndex`/`role`);
+and — caught by the mobile accessibility scan, not by review — the
+signature scene branched only on the reduced-motion preference, not
+viewport width, contradicting this mission's own documented rule that
+mobile never gets the pinned/scrubbed timeline (fixed with a real
+`matchMedia` check). Also root-caused a real environment quirk (not a
+product bug): `npm run test --workspace=apps/web` hung indefinitely via
+the `npm-cli.js` wrapper on this Windows/git-bash setup due to orphaned
+processes from earlier steps in this same long session; the identical
+command chain run directly passed cleanly, all 21 files, 141
+assertions.
+
+Full `apps/web` verification (typecheck/lint/build/tests) and
+`packages/ui`/`packages/clinical-schemas` all clean.
+`git diff --stat -- apps/web/app/page.tsx apps/web/app/PublicShell.tsx
+apps/web/app/layout.tsx` returned empty — the production landing page
+is confirmed byte-for-byte unchanged. See
+`docs/verification/lx-1-0-narrative-motion-prototype.md` for the full
+record.
+
+The platform's own next step is unaffected and remains
+`S1-E3 — Hybrid Retrieval`. LX-1.1 (user review of this session's
+output) is the next step for the landing workstream specifically — not
+started automatically.
 
 ## -14. This session: Sprint 1-E2 — Embedding and Vector Index Foundation
 

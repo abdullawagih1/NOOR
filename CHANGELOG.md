@@ -1,5 +1,60 @@
 # Changelog
 
+## [Unreleased] — LX-1.0: Immersive Landing Narrative and Motion Blueprint
+
+A separate, dedicated landing-experience workstream (not a platform
+sprint): a Capability Truth Matrix, narrative, information
+architecture, content system, storyboard, and motion system for a
+*future* landing redesign, plus a Development-only browser-verified
+prototype gallery. Does not replace the production `/` page, does not
+begin production implementation, and touches no database/RLS/
+permissions/Worker code.
+
+### Added
+
+* `docs/landing/LX-1-0_BASELINE.md`, `NOOR_LANDING_CAPABILITY_TRUTH_MATRIX.md`,
+  `NOOR_LANDING_NARRATIVE.md`, `NOOR_LANDING_INFORMATION_ARCHITECTURE.md`,
+  `NOOR_LANDING_CONTENT_SYSTEM.md`, `NOOR_LANDING_STORYBOARD.md`,
+  `NOOR_LANDING_MOTION_SYSTEM.md`, `NOOR_LANDING_VISUAL_LANGUAGE.md`,
+  `NOOR_LANDING_THREEJS_DECISION.md`, `NOOR_LANDING_TECHNICAL_ARCHITECTURE.md`,
+  `NOOR_LANDING_PERFORMANCE_BUDGET.md`, `NOOR_LANDING_ACCESSIBILITY_PLAN.md`,
+  `NOOR_LANDING_SEO_AND_METADATA.md`, `NOOR_LANDING_PRODUCTION_PLAN.md` —
+  the full narrative/design/technical-prototyping package.
+* `docs/verification/lx-1-0-narrative-motion-prototype.md` and
+  `docs/verification/screenshots/lx-1-0/` (15 real Playwright screenshots).
+* `apps/web/app/design/landing-experience/` — a Development-only
+  prototype gallery (404s in production, same gating pattern as
+  `/design-system`): `HeroEvidenceFlowScene`, `SourceVerificationScene`,
+  `HumanReviewScene`, `StructuredKnowledgeScene`, `RetrievalScene`,
+  `TraceabilityTimelineScene` (the signature reverse-traceability scene,
+  GSAP + ScrollTrigger, dynamically imported), `RtlStructuralPreview`,
+  plus shared `PrototypeFrame`/`useEffectiveReducedMotion`/`useStepSequence`
+  infrastructure.
+* `framer-motion`, `gsap` (dependencies), `@axe-core/playwright`
+  (devDependency) added to `apps/web`. `three` was evaluated and
+  explicitly **not** installed — see `NOOR_LANDING_THREEJS_DECISION.md`.
+* A baseline reduced-motion CSS rule in `apps/web/app/globals.css`
+  (`@media (prefers-reduced-motion: reduce)`).
+
+### Fixed
+
+* Four prototype scenes dimmed "unresolved" state text via `opacity`
+  on a wrapping element that also contained the label, dropping WCAG
+  contrast as low as 1.36:1 against a 4.5:1 requirement — caught by a
+  real `@axe-core/playwright` scan. Fixed by animating only decorative
+  elements, never text.
+* `text-muted` failed contrast (4.31:1) against the teal-tinted
+  `accent-soft` background used for "active" states in two scenes —
+  fixed by switching those labels to `text-body`.
+* Two scrollable prototype containers were not keyboard-focusable
+  (`scrollable-region-focusable`) — fixed with `tabIndex`/`role`/
+  `aria-label`.
+* The signature traceability scene branched only on the reduced-motion
+  preference, not viewport width, contradicting this workstream's own
+  documented rule that mobile never gets the pinned/scrubbed timeline —
+  caught by a mobile accessibility scan, fixed with a real `matchMedia`
+  viewport check.
+
 ## [Unreleased] — Sprint 1-E2: Embedding and Vector Index Foundation
 
 Turns Sprint 1-D3's accepted, embedding-ready chunks into immutable,
