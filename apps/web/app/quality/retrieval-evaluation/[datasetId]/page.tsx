@@ -28,6 +28,8 @@ import {
   removeCorpusItemAction,
   createEvaluationQueryAction,
   createEvaluationRunAction,
+  createQueryEmbeddingsForDatasetAction,
+  createVectorEvaluationRunAction,
 } from "@/lib/retrieval-evaluation/actions";
 import { PageHeader, Card, Section, Badge, TextInput, Textarea, Select, Checkbox, Button, Alert, EmptyState } from "@noor/ui";
 
@@ -306,6 +308,28 @@ export default async function RetrievalEvaluationDatasetDetailPage({
                     Run evaluation
                   </Button>
                 </form>
+              ) : null}
+              {canRun ? (
+                <div className="flex flex-col gap-sm border-t border-border pt-sm">
+                  <p className="text-sm text-body">
+                    Sprint 1-E2 — vector baseline (noor-vector-baseline). Query embeddings must be generated before a vector evaluation run can succeed; a run also requires every corpus item to have a succeeded chunk
+                    embedding at the approved configuration.
+                  </p>
+                  <form action={createQueryEmbeddingsForDatasetAction} className="flex flex-wrap items-end gap-xs">
+                    <input type="hidden" name="datasetId" value={dataset.id} />
+                    <Button type="submit" size="sm" variant="secondary">
+                      Generate query embeddings
+                    </Button>
+                  </form>
+                  <form action={createVectorEvaluationRunAction} className="flex flex-wrap items-end gap-xs">
+                    <input type="hidden" name="datasetId" value={dataset.id} />
+                    <TextInput label="Top-K values" name="topKValues" defaultValue="1,3,5,10" hint="Comma-separated" />
+                    <TextInput label="Relevance threshold" name="relevanceThreshold" type="number" min={0} max={3} defaultValue={2} />
+                    <Button type="submit" size="sm">
+                      Run vector evaluation
+                    </Button>
+                  </form>
+                </div>
               ) : null}
               {canArchive ? (
                 <form action={archiveDatasetAction}>

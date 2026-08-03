@@ -134,6 +134,25 @@ export const FAILURE_CATEGORY_LABELS: Record<FailureCategory, string> = {
   negative_control_false_positive: "Negative-control false positive",
   judgment_gap: "Judgment gap",
   corpus_gap: "Corpus gap",
+  semantic_false_positive: "Semantic false positive",
+  semantic_false_negative: "Semantic false negative",
+  lexical_exact_match_lost: "Lexical exact match lost",
+  arabic_embedding_failure: "Arabic embedding failure",
+  mixed_language_embedding_failure: "Mixed-language embedding failure",
+  numeric_semantics_failure: "Numeric semantics failure",
+  abbreviation_embedding_failure: "Abbreviation embedding failure",
+  short_query_failure: "Short query failure",
+  long_chunk_dilution: "Long chunk dilution",
+  similar_chunk_confusion: "Similar chunk confusion",
+  query_passage_mode_mismatch: "Query/passage mode mismatch",
+  model_input_limit: "Model input limit exceeded",
+  vector_dimension_error: "Vector dimension error",
+  vector_norm_anomaly: "Vector norm anomaly",
+  exact_index_disagreement: "Exact/indexed disagreement",
+  index_recall_failure: "Index recall failure",
+  dataset_embedding_gap: "Dataset embedding gap",
+  stale_embedding: "Stale embedding",
+  configuration_mismatch: "Configuration mismatch",
   other: "Other",
 };
 
@@ -156,3 +175,6 @@ export const NO_CLINICAL_USE_NOTICE = "Synthetic evaluation content — not for 
 
 export const LEXICAL_BASELINE_DISCLAIMER =
   "This is a deterministic lexical baseline (PostgreSQL full-text search) — never a proxy for embedding, hybrid, or reranked retrieval quality. No embeddings, no vector search, and no external AI calls are used anywhere in this evaluation.";
+
+export const VECTOR_BASELINE_DISCLAIMER =
+  "This is the self-hosted vector baseline (noor-multilingual-e5-base-v1, cosine distance) — never a proxy for hybrid or reranked retrieval quality, and never exposed to production search or clinicians. No external AI calls are made anywhere in this evaluation (ADR 0016).";

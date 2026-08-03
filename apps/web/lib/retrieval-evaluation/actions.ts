@@ -409,6 +409,53 @@ export async function createEvaluationRunAction(formData: FormData): Promise<voi
   redirect(returnTo);
 }
 
+export async function createQueryEmbeddingsForDatasetAction(formData: FormData): Promise<void> {
+  await requirePermission(PERMISSIONS.RETRIEVAL_EVALUATION_RUN);
+  const parsed = datasetIdSchema.safeParse({ datasetId: text(formData, "datasetId") });
+  if (!parsed.success) withError(QUEUE_PATH, "Invalid request.");
+  const returnTo = datasetDetailPath(parsed.data.datasetId);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("create_query_embeddings_for_dataset", {
+    p_dataset_id: parsed.data.datasetId,
+    p_correlation_id: randomUUID(),
+  });
+  if (error) withError(returnTo, toRetrievalEvaluationError(error).message);
+
+  revalidatePath(returnTo);
+  redirect(returnTo);
+}
+
+export async function createVectorEvaluationRunAction(formData: FormData): Promise<void> {
+  await requirePermission(PERMISSIONS.RETRIEVAL_EVALUATION_RUN);
+  const parsed = createRunSchema.safeParse({
+    datasetId: text(formData, "datasetId"),
+    topKValues: optionalText(formData, "topKValues"),
+    relevanceThreshold: optionalText(formData, "relevanceThreshold"),
+  });
+  if (!parsed.success) withError(QUEUE_PATH, parsed.error.issues[0]?.message ?? "Invalid request.");
+  const returnTo = datasetDetailPath(parsed.data.datasetId);
+
+  const topKValues = parseTopKValues(parsed.data.topKValues);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_vector_evaluation_run", {
+    p_dataset_id: parsed.data.datasetId,
+    p_top_k_values: topKValues ?? [1, 3, 5, 10],
+    p_relevance_threshold: parsed.data.relevanceThreshold ?? 2,
+    p_correlation_id: randomUUID(),
+  });
+  if (error) withError(returnTo, toRetrievalEvaluationError(error).message);
+
+  const rows = data as { out_run_id: string; out_job_id: string; out_status: string; out_reused: boolean }[];
+  const run = rows[0];
+  revalidatePath(returnTo);
+  if (run) {
+    redirect(runDetailPath(parsed.data.datasetId, run.out_run_id));
+  }
+  redirect(returnTo);
+}
+
 export async function cancelEvaluationRunAction(formData: FormData): Promise<void> {
   await requirePermission(PERMISSIONS.RETRIEVAL_EVALUATION_CANCEL_RUN);
   const parsed = cancelRunSchema.safeParse({

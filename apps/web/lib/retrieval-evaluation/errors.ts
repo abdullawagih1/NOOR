@@ -49,6 +49,24 @@ export function toRetrievalEvaluationError(error: PostgrestErrorLike): Retrieval
   if (raw.includes("requires a frozen dataset") || raw.includes("require a frozen dataset")) {
     return new RetrievalEvaluationError("An evaluation run requires a frozen dataset.", "dataset_not_frozen");
   }
+  if (raw.includes("query_embedding_dataset_not_frozen")) {
+    return new RetrievalEvaluationError("Query embeddings require a frozen dataset.", "dataset_not_frozen");
+  }
+  if (raw.includes("embedding_configuration_not_approved")) {
+    return new RetrievalEvaluationError("No approved embedding configuration exists. Contact an administrator.", "embedding_configuration_not_approved");
+  }
+  if (raw.includes("dataset_embedding_gap")) {
+    return new RetrievalEvaluationError(
+      "One or more corpus items in this dataset do not yet have a succeeded chunk embedding at the approved configuration — generate embeddings for the source documents first.",
+      "dataset_embedding_gap"
+    );
+  }
+  if (raw.includes("query_embedding_coverage_incomplete")) {
+    return new RetrievalEvaluationError(
+      "One or more active queries do not yet have a succeeded query embedding — generate query embeddings for this dataset first.",
+      "query_embedding_coverage_incomplete"
+    );
+  }
   if (raw.includes("no longer embedding-ready")) {
     return new RetrievalEvaluationError("A corpus item is no longer embedding-ready — remove it before submitting for review or freezing.", "not_embedding_ready");
   }

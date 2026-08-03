@@ -7,7 +7,7 @@ export type RetrievalEvaluationRepresentationType = "native" | "ocr" | "unknown"
 export type RelevanceJudgmentReviewStatus = "pending_review" | "confirmed";
 export type RetrievalEvaluationFailureSource = "system" | "human";
 export type RetrievalEvaluationFailureStatus = "open" | "acknowledged" | "resolved";
-export type RetrievalEvaluationMetricScopeType = "overall" | "language" | "category" | "difficulty";
+export type RetrievalEvaluationMetricScopeType = "overall" | "language" | "category" | "difficulty" | "exact_vs_indexed";
 
 /** CHECK-constrained in migration 0014 — encoded here verbatim, never a separate invented list. */
 export const QUERY_CATEGORIES = [
@@ -36,7 +36,11 @@ export type QueryDifficulty = (typeof QUERY_DIFFICULTIES)[number];
 
 export const RETRIEVAL_EVALUATION_LANGUAGES = ["en", "ar", "mixed"] as const;
 
-/** CHECK-constrained in migration 0015 — encoded here verbatim. */
+/**
+ * CHECK-constrained in migration 0015, extended by migration 0017 with the
+ * vector-specific failure taxonomy (mission §42) — encoded here verbatim,
+ * never a separate invented list.
+ */
 export const FAILURE_CATEGORIES = [
   "missed_relevant_item",
   "relevant_below_k",
@@ -54,10 +58,34 @@ export const FAILURE_CATEGORIES = [
   "negative_control_false_positive",
   "judgment_gap",
   "corpus_gap",
+  "semantic_false_positive",
+  "semantic_false_negative",
+  "lexical_exact_match_lost",
+  "arabic_embedding_failure",
+  "mixed_language_embedding_failure",
+  "numeric_semantics_failure",
+  "abbreviation_embedding_failure",
+  "short_query_failure",
+  "long_chunk_dilution",
+  "similar_chunk_confusion",
+  "query_passage_mode_mismatch",
+  "model_input_limit",
+  "vector_dimension_error",
+  "vector_norm_anomaly",
+  "exact_index_disagreement",
+  "index_recall_failure",
+  "dataset_embedding_gap",
+  "stale_embedding",
+  "configuration_mismatch",
   "other",
 ] as const;
 export type FailureCategory = (typeof FAILURE_CATEGORIES)[number];
 
+/**
+ * CHECK-constrained in migration 0015, extended by migration 0017 with the
+ * exact-vs-indexed correctness metrics and the coverage/system-performance
+ * metrics (mission §43-44) — never merged with a retrieval-quality score.
+ */
 export const METRIC_NAMES = [
   "precision_at_1",
   "precision_at_3",
@@ -76,6 +104,18 @@ export const METRIC_NAMES = [
   "ndcg_at_3",
   "ndcg_at_5",
   "ndcg_at_10",
+  "exact_vs_indexed_recall_at_1",
+  "exact_vs_indexed_recall_at_3",
+  "exact_vs_indexed_recall_at_5",
+  "exact_vs_indexed_recall_at_10",
+  "exact_vs_indexed_rank_agreement",
+  "embedding_coverage",
+  "query_embedding_coverage",
+  "invalid_vector_count",
+  "reused_vector_count",
+  "provider_latency_ms",
+  "exact_search_latency_ms",
+  "indexed_search_latency_ms",
 ] as const;
 export type MetricName = (typeof METRIC_NAMES)[number];
 
@@ -185,6 +225,9 @@ export interface RetrievalEvaluationRunRow {
   top_k_values: number[];
   relevance_threshold: number;
   evaluation_runner_version: string;
+  /** Non-null only for retriever_name === 'noor-vector-baseline' (migration 0017). */
+  embedding_configuration_id: string | null;
+  vector_index_configuration_version: string | null;
   run_identity_sha256: string;
   status: RetrievalEvaluationRunStatus;
   started_at: string;
@@ -271,7 +314,8 @@ const JUDGMENT_COLUMNS =
 const RUN_COLUMNS =
   "id, organization_id, dataset_id, processing_job_id, processing_attempt_id, retriever_name, retriever_version, " +
   "retrieval_configuration_version, query_normalization_version, metric_definition_version, top_k_values, " +
-  "relevance_threshold, evaluation_runner_version, run_identity_sha256, status, started_at, completed_at, " +
+  "relevance_threshold, evaluation_runner_version, embedding_configuration_id, vector_index_configuration_version, " +
+  "run_identity_sha256, status, started_at, completed_at, " +
   "failed_at, invalidated_at, invalidation_reason, query_count, result_count, artifact_bucket, artifact_path, " +
   "artifact_sha256, artifact_size_bytes, artifact_media_type, created_at, created_by";
 

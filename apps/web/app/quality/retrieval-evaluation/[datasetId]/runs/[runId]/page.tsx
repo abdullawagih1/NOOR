@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/auth/context";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { getRetrievalEvaluationDataset, getRetrievalEvaluationRunDetail, type RetrievalEvaluationMetricRow } from "@/lib/retrieval-evaluation/queries";
-import { RetrievalEvaluationRunStatusBadge, LEXICAL_BASELINE_DISCLAIMER, METRIC_BASE_LABELS } from "@/lib/retrieval-evaluation/ui";
+import { RetrievalEvaluationRunStatusBadge, LEXICAL_BASELINE_DISCLAIMER, VECTOR_BASELINE_DISCLAIMER, METRIC_BASE_LABELS } from "@/lib/retrieval-evaluation/ui";
 import { cancelEvaluationRunAction } from "@/lib/retrieval-evaluation/actions";
 import { PageHeader, Card, Section, Alert, EmptyState, Button, TextInput } from "@noor/ui";
 
@@ -36,14 +36,16 @@ export default async function RetrievalEvaluationRunDashboardPage({
 
   const canCancel = run.status === "running" && context.permissionKeys.includes(PERMISSIONS.RETRIEVAL_EVALUATION_CANCEL_RUN);
 
-  const scopeGroups = groupMetricsByScope(metrics);
+  const isVectorRun = run.retriever_name === "noor-vector-baseline";
+  const scopeGroups = groupMetricsByScope(metrics.filter((m) => m.scope_type !== "exact_vs_indexed"));
+  const exactVsIndexedMetrics = metrics.filter((m) => m.scope_type === "exact_vs_indexed");
 
   return (
     <main className="flex flex-col gap-lg">
       <PageHeader
         eyebrow="Sprint 1-E1 — Evaluation Run Dashboard"
         title={`${run.retriever_name} v${run.retriever_version}`}
-        description={LEXICAL_BASELINE_DISCLAIMER}
+        description={isVectorRun ? VECTOR_BASELINE_DISCLAIMER : LEXICAL_BASELINE_DISCLAIMER}
         actions={<RetrievalEvaluationRunStatusBadge status={run.status} />}
       />
 
@@ -60,6 +62,11 @@ export default async function RetrievalEvaluationRunDashboardPage({
         <Link className="underline" href={`/quality/retrieval-evaluation/${datasetId}/runs/${runId}/failures`}>
           Open failure analysis
         </Link>
+        {isVectorRun ? (
+          <Link className="underline" href={`/quality/retrieval-evaluation/${datasetId}/runs/${runId}/comparison`}>
+            Compare against the lexical baseline
+          </Link>
+        ) : null}
       </div>
 
       <Section title="Run identity">
@@ -81,6 +88,18 @@ export default async function RetrievalEvaluationRunDashboardPage({
               <dt className="text-xs uppercase tracking-wide text-muted">Evaluation runner version</dt>
               <dd className="text-body">{run.evaluation_runner_version}</dd>
             </div>
+            {isVectorRun ? (
+              <>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted">Embedding configuration key</dt>
+                  <dd className="text-body">{run.retrieval_configuration_version}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted">Vector index configuration version</dt>
+                  <dd className="text-body">{run.vector_index_configuration_version ?? "—"}</dd>
+                </div>
+              </>
+            ) : null}
             <div>
               <dt className="text-xs uppercase tracking-wide text-muted">Top-K values</dt>
               <dd className="text-body">{run.top_k_values.join(", ")}</dd>
@@ -176,6 +195,40 @@ export default async function RetrievalEvaluationRunDashboardPage({
           </div>
         )}
       </Section>
+
+      {isVectorRun ? (
+        <Section
+          title="Exact vs. indexed correctness"
+          description="Compares the exact (sequential-scan) search path against the indexed (HNSW/ANN) path for the same query embeddings — a system-performance check, never merged with the retrieval-quality metrics above."
+        >
+          {exactVsIndexedMetrics.length === 0 ? (
+            <EmptyState title="No exact-vs-indexed metrics yet" description={run.status === "running" ? "This run has not finished yet." : "This run produced no exact-vs-indexed metric rows."} />
+          ) : (
+            <Card>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" style={{ fontVariantNumeric: "tabular-nums" }}>
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wide text-muted">
+                      <th className="py-xxs pr-sm">Metric</th>
+                      <th className="py-xxs pr-sm">Value</th>
+                      <th className="py-xxs pr-sm">Sample size</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {exactVsIndexedMetrics.map((m) => (
+                      <tr key={m.id} className="border-t border-border">
+                        <td className="py-xxs pr-sm text-body">{m.metric_name}</td>
+                        <td className="py-xxs pr-sm font-mono text-xs text-body">{m.metric_value.toFixed(3)}</td>
+                        <td className="py-xxs pr-sm text-body">{m.sample_size}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </Section>
+      ) : null}
     </main>
   );
 }

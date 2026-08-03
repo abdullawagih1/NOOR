@@ -93,6 +93,15 @@ export const PERMISSIONS = {
   RETRIEVAL_EVALUATION_READ_RESULTS: "retrieval_evaluation.read_results",
   RETRIEVAL_EVALUATION_READ_ARTIFACTS: "retrieval_evaluation.read_artifacts",
   RETRIEVAL_EVALUATION_ANNOTATE_FAILURES: "retrieval_evaluation.annotate_failures",
+
+  // Embedding and pgvector foundation (Sprint 1-E2) — see ADR 0016. Same
+  // internal Quality-workspace-only namespace as retrieval evaluation
+  // above; clinicians never see raw vectors or embedding-run internals.
+  EMBEDDING_CONFIGURATIONS_READ: "embedding_configurations.read",
+  DOCUMENT_EMBEDDINGS_READ: "document_embeddings.read",
+  DOCUMENT_EMBEDDINGS_CREATE: "document_embeddings.create",
+  DOCUMENT_EMBEDDINGS_CANCEL: "document_embeddings.cancel",
+  DOCUMENT_EMBEDDINGS_READ_ARTIFACTS: "document_embeddings.read_artifacts",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
