@@ -769,22 +769,83 @@ the same PR that resolves an item.
     Lighthouse Performance 0.94 desktop / 0.95 mobile, FPS 40–61 across
     all 7 scenes — see `docs/landing/NOOR_CINEMATIC_PERFORMANCE_BUDGET.md`.
 
-92. **Scene 5 (Retrieval) dips to ~40fps on real GPU hardware**, the
-    only scene below ~58fps in LX-1.1.1's real-GPU measurement pass —
-    every other scene holds at or near 60fps. Likely cause: 3
-    DOM-projected rank-badge anchors (`getScreenAnchors()` in
-    `EvidenceCoreScene.ts`) recomputing screen position every 2nd RAF
-    frame simultaneously with the query-beam animation. Not a
-    regression blocker (well above visible-stutter territory) but
-    worth a future optimization pass — e.g. widening the projection
-    interval further for this scene specifically. See
-    `docs/landing/NOOR_CINEMATIC_PERFORMANCE_BUDGET.md` §"What remains
-    for a future mission."
+92. ~~Scene 5 (Retrieval) dips to ~40fps on real GPU hardware.~~
+    **Resolved (LX-1.2).** Profiled via a new `EvidenceCoreScene.getDiagnostics()`
+    (real `renderer.info` counters) rather than guessed — found the
+    real cost to be simultaneity (particles + 5 blocks/threads + beam
+    + spine geometry all rendering together for the first time), not
+    the rank-badge projection this entry originally suspected. Fixed
+    with 5 concrete changes (eliminated 2 per-frame allocations,
+    shared materials across the 5 blocks/threads, cut provenance-tube
+    segment counts ~45%, targeted particle draw-range throttling
+    during Scene 5's own window, skipped redundant "settled" writes).
+    Re-measured twice on the same real GPU: 61fps and 56fps — no
+    longer a measurable outlier. See
+    `docs/landing/NOOR_CINEMATIC_PERFORMANCE_BUDGET.md` §"LX-1.2 —
+    Scene 5 optimization."
 
-93. **LX-1.1.1's mobile Lighthouse "mobile preset" run is still a
-    desktop-machine emulation of mobile viewport/network conditions,
-    not a measurement on physical mobile hardware.** The real-GPU
-    confirmation this mission covers the desktop machine's integrated
-    GPU only. A future mission should measure FPS/Lighthouse on an
-    actual mobile device before treating the cinematic route's mobile
-    performance as production-verified.
+93. **Mobile Lighthouse runs are still a desktop-machine emulation of
+    mobile viewport/network conditions, not a measurement on physical
+    mobile hardware** (real-GPU confirmation covers this desktop
+    machine's integrated GPU only) — still true after LX-1.2. A
+    future mission should measure FPS/Lighthouse on an actual mobile
+    device before treating the cinematic route's mobile performance
+    as production-verified.
+
+94. **`<meta name="description">` renders as a child of `<body>`, not
+    `<head>`, in the live DOM on every dynamically-rendered route in
+    this Next.js 15.5.21 app** — found during LX-1.2 while measuring
+    Lighthouse SEO scores against a real local production build, and
+    confirmed pre-existing (not introduced by LX-1.2): the same
+    misplacement already existed on `/login`, a route LX-1.2 never
+    touched, which has no page-level `generateMetadata` at all and
+    only inherits `layout.tsx`'s static metadata. A fully static route
+    (`/403`) does not exhibit this. Root-caused to Next.js's own
+    "streaming metadata" behavior for dynamically-rendered routes
+    (`node_modules/next/dist/server/lib/streaming-metadata.js`), which
+    deliberately exempts known simple/non-JS "HTML-limited" bot user
+    agents (they get synchronous, correctly `<head>`-placed metadata
+    unconditionally) but not ordinary browsers, Lighthouse, or
+    JS-executing crawlers. Neither making `generateMetadata`
+    synchronous nor removing the explicit `dynamic = "force-dynamic"`
+    export changed this (both tried against a real build). Not fixed
+    this mission — a real fix would require ejecting the route from
+    dynamic rendering, which would break the mandatory auth-aware CTA.
+    See `docs/landing/NOOR_CINEMATIC_SEO_METADATA.md` for the full
+    investigation. Lighthouse SEO consistently reads `0.92`, not
+    `1.00`, on every dynamic route in this app as a result — reported
+    honestly throughout LX-1.2's verification, not rounded up.
+
+95. **Direct HTTP verification of the real Vercel Preview URL's
+    content was not possible during LX-1.2** — Deployment Protection
+    (correctly left enabled, per mission instruction) returned a
+    `302` SSO redirect on every unauthenticated request, and no
+    "Protection Bypass for Automation" token was available in this
+    session (provisioning one is a one-time Vercel dashboard action,
+    not reachable via CLI/API — see `scripts/smoke-test-web.mjs`'s own
+    documented mechanism from an earlier sprint). Substituted with
+    authenticated `vercel inspect --logs` route-table matching (not
+    subject to Deployment Protection) plus exhaustive verification of
+    an identical local production build. A future mission with
+    dashboard access should provision a bypass token and re-verify the
+    Preview URL's actual HTTP responses directly.
+
+96. **No WebKit (Safari engine) or Firefox testing was performed
+    during LX-1.2** — neither browser binary was available in this
+    environment (Playwright's own WebKit/Firefox downloads were not
+    present and were not installed this mission). Every verification
+    this mission ran used real-GPU headless Chromium only. See
+    `docs/landing/NOOR_CINEMATIC_BROWSER_COMPATIBILITY.md`. A future
+    mission should install `npx playwright install webkit firefox`
+    and re-run the existing verification scripts against both before
+    treating this route as cross-browser-verified.
+
+97. **Recording #05 (the real authentication journey) was captured as
+    a scripted Playwright run + screenshot + JSON log, not as a
+    `.webm` video**, unlike recordings #01-#04/#06. The underlying
+    journey was genuinely exercised against the real hosted Supabase
+    project with a synthetic account (see
+    `docs/verification/screenshots/lx-1-2/auth-e2e-results.json`) —
+    only the video-capture step was skipped. See
+    `docs/verification/lx-1-2-media-index.md` for the honest
+    accounting of this gap.

@@ -1,5 +1,50 @@
 # Changelog
 
+## [Unreleased] — LX-1.2: Production Cinematic Landing Implementation and Controlled Integration
+
+Promotes the approved LX-1.1.1 cinematic prototype into
+production-integrated architecture behind a server-controlled feature
+flag. Production continues to serve the legacy landing throughout —
+the cinematic experience is not publicly enabled by this release.
+
+### Added
+
+* `apps/web/lib/publicLanding/getPublicLandingExperience.ts` — the `NOOR_PUBLIC_LANDING_EXPERIENCE` feature-flag resolver (server-only, fails closed to `legacy`).
+* `apps/web/lib/publicLanding/resolveLandingCta.ts`, `PublicLandingCta.ts` — resolves the public landing's auth-aware primary CTA server-side per request.
+* `apps/web/app/LegacyPublicLanding.tsx` — the pre-LX-1.2 landing, extracted verbatim out of `page.tsx` so `/` can select it explicitly.
+* `apps/web/app/design/cinematic-landing/CinematicPublicLanding.tsx` — the approved LX-1.1.1 scene markup, extracted out of the internal design route's page file into a real, reusable production component shared by both the public root route and the internal route.
+* `apps/web/app/robots.ts`, `apps/web/app/sitemap.ts` — the app's first `robots.txt`/`sitemap.xml`.
+* `EvidenceCoreScene.getDiagnostics()` + `window.__noorCinematicDiagnostics` — real `renderer.info` counters for Scene 5 profiling, same exposure pattern as `timelineStore`'s existing test-safe global.
+* `apps/web/tests/post-login-redirect.test.ts`, `public-landing-feature-flag.test.ts`, `public-root-integration.test.ts`.
+* `docs/landing/NOOR_CINEMATIC_PRODUCTION_ARCHITECTURE.md`, `NOOR_PUBLIC_LANDING_FEATURE_FLAG.md`, `NOOR_CINEMATIC_ROLLBACK_RUNBOOK.md`, `NOOR_CINEMATIC_SEO_METADATA.md`, `NOOR_CINEMATIC_AUTH_INTEGRATION.md`, `NOOR_CINEMATIC_OBSERVABILITY.md`, `NOOR_CINEMATIC_BROWSER_COMPATIBILITY.md`.
+* `docs/verification/lx-1-2-production-baseline.md`, `lx-1-2-production-integration.md`, `lx-1-2-media-index.md`, `docs/verification/screenshots/lx-1-2/`, `docs/verification/videos/lx-1-2/`.
+* `NOOR_PUBLIC_LANDING_EXPERIENCE` environment variable (`.env.example`).
+
+### Changed
+
+* `apps/web/app/page.tsx` — now resolves the feature flag and an auth-aware CTA server-side, renders exactly one of `LegacyPublicLanding`/`CinematicPublicLanding`; added `generateMetadata()`.
+* `apps/web/lib/auth/redirect.ts` — added `resolvePostLoginDestination()`, `resolveDefaultWorkspacePath()`; the canonical post-login/post-visit destination resolver, replacing the previous behavior of redirecting a successful sign-in to whatever `next` defaulted to (which defaulted to `/`).
+* `apps/web/lib/auth/context.ts` — added `toPostLoginAccess()`; `getAuthenticatedContext()` now calls the free, local-only `getSession()` before the network-validated `getUser()`, avoiding a real, measured mobile-Lighthouse performance cost for anonymous visitors.
+* `apps/web/lib/auth/actions.ts::signInWithPassword`, `apps/web/app/auth/callback/route.ts`, `apps/web/app/login/page.tsx` — all route through the new canonical resolver; the login page now redirects an already-authenticated visitor to their workspace instead of showing the credentials form.
+* `apps/web/app/PublicShell.tsx` — `PublicHeader`/`PublicFooter`/`PublicShell` now accept an optional `cta: PublicLandingCta` prop instead of hardcoding `href="/login"`.
+* `apps/web/app/AuthShell.tsx` — `AuthSplitShell`/`AuthCardShell` now wrap their content in `<main>`/`<header>` landmarks (fixes 2 real, pre-existing axe violations).
+* `apps/web/app/design/cinematic-landing/page.tsx` — now a thin Preview-gate wrapper around `CinematicPublicLanding`; added `noindex`/`nofollow` metadata.
+* `overlays/CinematicNav.tsx`, `overlays/FinalCta.tsx` — now accept `cta: PublicLandingCta` instead of hardcoding `href="/login"`.
+* `EvidenceCoreScene.ts`, `provenanceThread.ts` — Scene 5 performance pass: eliminated 2 per-frame allocations, shared materials across the 5 structured blocks/threads, reduced provenance-tube segment counts ~45%, added targeted particle draw-range throttling during Scene 5, skipped redundant "settled" node writes.
+* `docs/landing/NOOR_CINEMATIC_PERFORMANCE_BUDGET.md`, `NOOR_CINEMATIC_ACCESSIBILITY.md`, `NOOR_CINEMATIC_PREVIEW_DEPLOYMENT.md`, `NOOR_LANDING_CAPABILITY_TRUTH_MATRIX.md` — updated with LX-1.2's real numbers/findings, prior content preserved as history.
+* `apps/web/tests/public-pages-content.test.ts`, `cinematic-preview-gate.test.ts` — updated to target the new `LegacyPublicLanding.tsx`/`CinematicPublicLanding.tsx` extraction.
+
+### Fixed
+
+* The reported post-login redirect defect — a successful sign-in with no `next` parameter no longer defaults to `/`; confirmed fixed via a real end-to-end run against the hosted Supabase project with a synthetic test account.
+* Scene 5's real FPS outlier (40fps → 56-61fps on real GPU hardware, measured twice).
+* A real mobile Lighthouse Performance regression introduced by this mission's own auth-aware CTA (0.87 → 0.94) via a `getSession()` fast path.
+* `landmark-one-main`/`region` axe violations in `AuthShell.tsx`, pre-existing and unrelated to cinematic content.
+
+### Known limitation, documented not fixed
+
+* `<meta name="description">` renders as a child of `<body>`, not `<head>`, on every dynamically-rendered route in this Next.js 15.5.21 app (confirmed pre-existing on `/login`, not introduced by this release) — see `NOOR_CINEMATIC_SEO_METADATA.md` and `KNOWN_LIMITATIONS.md`.
+
 ## [Unreleased] — LX-1.1.1: Cinematic Art Direction, Mobile Choreography, and Motion Polish
 
 A corrective pass on LX-1.1 after the user rejected its real

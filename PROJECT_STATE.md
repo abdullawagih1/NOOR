@@ -1,11 +1,138 @@
 # PROJECT_STATE.md
 
-**Last updated:** LX-1.1.1 — Cinematic Art Direction, Mobile
-Choreography, and Motion Polish session (Claude Code, this
-environment)
+**Last updated:** LX-1.2 — Production Cinematic Landing Implementation
+and Controlled Integration session (Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code)
 
 ---
+
+## -18. This session: LX-1.2 — Production Cinematic Landing Implementation and Controlled Integration
+
+Promoted the user-approved LX-1.1.1 cinematic prototype into
+production-integrated architecture behind a server-controlled feature
+flag, without redesigning any approved visual/narrative decision and
+without enabling it publicly. Production stays on the legacy landing
+for the duration of this mission — only a protected Vercel Preview
+runs cinematic.
+
+**Feature flag.** `getPublicLandingExperience()` reads
+`NOOR_PUBLIC_LANDING_EXPERIENCE` server-only, fails closed to
+`"legacy"` on any value other than exactly `"cinematic"` (missing,
+empty, malformed, misspelled — all verified via a dedicated unit
+test). Never a `NEXT_PUBLIC_` variable. `apps/web/app/page.tsx`
+resolves it once per request and renders exactly one of
+`LegacyPublicLanding` (the pre-LX-1.2 page, extracted verbatim, byte-
+identical copy) or `CinematicPublicLanding` (the approved LX-1.1.1
+experience, extracted out of the internal design route's page file
+into a real, reusable component both routes now share) — no dual
+render-and-hide, no client-side switch.
+
+**The reported post-login redirect defect — confirmed and fixed.**
+Read the pre-mission code directly: `signInWithPassword` redirected
+every successful sign-in to whatever `next` resolved to, and an empty
+`next` resolved to `"/"` — so a plain sign-in bounced the user back to
+the public landing, never to their workspace. Fixed with one canonical
+resolver, `resolvePostLoginDestination()` (`lib/auth/redirect.ts`):
+priority is (1) a safe, authorized requested path, (2) the caller's
+own default workspace derived from their real permission set via the
+existing `getAuthenticatedContext()`, (3) `/access-denied`. Never
+returns `"/"` — verified by an exhaustive unit test crossing every
+access-state × requested-path combination, AND by a real end-to-end
+run: a synthetic organization-provisioned test account was created
+against the real hosted Supabase project, driven through a real
+browser sign-in with no `next` parameter, confirmed to land on
+`/clinician` (not `/`), then fully deleted with cleanup itself
+verified (0 residual rows). The public landing's CTA is now similarly
+auth-aware: "Sign in" for an anonymous visitor, "Open NOOR" resolving
+straight to the authorized workspace for an authenticated one — same
+resolver, same destination either path reaches.
+
+**Scene 5 (Retrieval) performance — profiled, then fixed for real.**
+LX-1.1.1's own real-GPU measurement found Scene 5 the one FPS outlier
+(40fps vs. 58-61fps elsewhere). Profiled first via a new
+`EvidenceCoreScene.getDiagnostics()` (real `renderer.info` counters),
+which showed simultaneity, not any one subsystem, as the real cost:
+particles + 5 structured blocks/threads + the query beam + still-
+visible spine/verification geometry all rendering together for the
+first time. Fixed with 5 concrete changes: eliminated 2 genuine
+per-frame allocations that had run for the whole page's lifetime (an
+array spread, a `Color.clone()`), shared materials across the 5
+identical blocks/threads instead of 10 redundant instances, cut
+provenance-tube segment counts ~45%, thinned the ambient particle
+field specifically during Scene 5's own window via `setDrawRange`
+(reversible, no reallocation), and skipped redundant "settled" writes.
+Result, measured twice independently on the same real GPU: 61fps and
+56fps — Scene 5 is no longer a measurable outlier, comfortably above
+the ≥45fps sustained-minimum target.
+
+**A real mobile performance regression found and fixed mid-mission.**
+Resolving the auth-aware CTA on every request to `/` meant every
+request now called `getAuthenticatedContext()`, which unconditionally
+called `supabase.auth.getUser()` — a call that, by Supabase's own
+design, always revalidates the JWT over the network, even when there
+is no session cookie to validate. This measurably cost a mobile
+Lighthouse Performance point (0.87, below the ≥0.90 target). Fixed by
+calling the free, local-only `getSession()` first and only paying for
+the network-validated `getUser()` when a session cookie actually
+exists — re-measured at 0.94 on the identical route, same machine,
+same throttling profile, a real isolated before/after.
+
+**A real, investigated (not chased-to-completion) framework
+limitation.** Lighthouse's SEO score reads 0.92, not 1.00, on every
+dynamically-rendered route in this app — including `/login`, which
+this mission never touched. Root-caused to Next.js 15.5.21's own
+"streaming metadata" behavior for any dynamic route: `<meta
+name="description">` renders as a live child of `<body>`, not
+`<head>`, confirmed directly via Playwright even after full hydration.
+Neither making `generateMetadata` synchronous nor removing the
+explicit `dynamic` export changed this. Documented honestly in
+`docs/landing/NOOR_CINEMATIC_SEO_METADATA.md` and
+`KNOWN_LIMITATIONS.md` rather than claimed fixed — ejecting the route
+from dynamic rendering (the only real workaround found) would break
+the mandatory auth-aware CTA.
+
+**Two real, pre-existing accessibility violations found and fixed.**
+A broader axe scan than any prior mission ran (covering `/login` and
+`/access-denied` alongside the cinematic route) found
+`landmark-one-main`/`region` violations in `AuthShell.tsx`'s
+`AuthSplitShell`/`AuthCardShell` — plain `<div>`s with no `<main>`
+landmark, predating this mission entirely. Fixed by promoting the
+form column to `<main>` and the brand/logo column to `<header>`.
+
+**Real Vercel Preview deployment and rollback rehearsal**, using the
+already-linked `noor` project and a real Vercel CLI session: deployed
+cinematic-enabled (`dpl_92fYPP9zUMxKT6fuMxBFGw6VzJa2`), confirmed
+Deployment Protection active throughout (a `302` on every
+unauthenticated request, never disabled), rolled the flag back to
+legacy and redeployed (~57 seconds total, zero code revert), then
+restored cinematic as the final state for user review
+(`dpl_9f5QMxk6G4NfSnSKrXXqexyUQXnz`). Direct HTTP content verification
+of the Preview URL was blocked by that same Deployment Protection (no
+bypass token available this session) — build logs (an authenticated
+CLI path, not subject to the HTTP-level protection) confirmed the
+deployed route table exactly matches the extensively-verified local
+production build.
+
+Added the app's first `robots.txt`/`sitemap.xml`, page-specific
+`generateMetadata()` for `/`, and defense-in-depth `noindex` on the
+Preview-reachable internal design route. Wrote 7 new planning docs
+(`NOOR_CINEMATIC_PRODUCTION_ARCHITECTURE.md`,
+`NOOR_PUBLIC_LANDING_FEATURE_FLAG.md`, `NOOR_CINEMATIC_ROLLBACK_RUNBOOK.md`,
+`NOOR_CINEMATIC_SEO_METADATA.md`, `NOOR_CINEMATIC_AUTH_INTEGRATION.md`,
+`NOOR_CINEMATIC_OBSERVABILITY.md`, `NOOR_CINEMATIC_BROWSER_COMPATIBILITY.md`)
+plus 2 verification reports and a media index; updated
+`NOOR_CINEMATIC_PERFORMANCE_BUDGET.md`, `NOOR_CINEMATIC_ACCESSIBILITY.md`,
+`NOOR_CINEMATIC_PREVIEW_DEPLOYMENT.md`, and
+`NOOR_LANDING_CAPABILITY_TRUTH_MATRIX.md`. Added 3 new committed tests
+and updated 2 existing ones to match the component extraction; all 25
+`apps/web` test files, typecheck, and lint pass. No backend/database/
+Worker file was touched, confirmed via `git status`.
+
+Status: **LX-1.2 — Production Cinematic Landing Integration Complete,
+Pending LX-1.3 Hardening and User Preview Approval** — explicitly not
+"publicly launched," not "production enabled," not "fully hardened."
+The platform's own next step remains `S1-E3 — Hybrid Retrieval`,
+unaffected.
 
 ## -17. This session: LX-1.1.1 — Cinematic Art Direction, Mobile Choreography, and Motion Polish
 
