@@ -1,5 +1,40 @@
 # Changelog
 
+## [Unreleased] — LX-1.1.1: Cinematic Art Direction, Mobile Choreography, and Motion Polish
+
+A corrective pass on LX-1.1 after the user rejected its real
+video/screenshot evidence. Same Development-only route, same plain-
+imperative-Three.js architecture (React Three Fiber not retried, per
+mission instruction). Does not replace the production `/` page, does
+not begin production implementation, and touches no database/RLS/
+permissions/Worker code.
+
+### Added
+
+* `apps/web/app/design/cinematic-landing/AnchorLabels.tsx`, `MotionActiveContext.tsx`, `ReducedMotionIllustrations.tsx`, `useActiveSceneIndex.ts`, `useVisibleSceneId.ts`.
+* `apps/web/tests/cinematic-preview-gate.test.ts` — committed regression test for the Preview gate's production-404/preview-200 behavior and its `force-dynamic` requirement.
+* `docs/landing/NOOR_CINEMATIC_ART_DIRECTION.md`, `NOOR_CINEMATIC_COMPOSITION_MAP.md`, `NOOR_CINEMATIC_MOBILE_CHOREOGRAPHY.md`, `NOOR_CINEMATIC_REDUCED_MOTION_SYSTEM.md`, `NOOR_CINEMATIC_PREVIEW_DEPLOYMENT.md`.
+* `NOOR_CINEMATIC_PREVIEW_ENABLED` environment variable (`.env.example`) — a narrow, server-side-gated exception letting the route be reached on a real production build (e.g. a Vercel Preview) for honest performance measurement, orthogonal to Vercel Deployment Protection.
+* `docs/verification/lx-1-1-1-cinematic-polish-verification.md`, `docs/verification/screenshots/lx-1-1-1/`, `docs/verification/videos/lx-1-1-1/` (7 clean recordings: full desktop journey, Human Review, Structured Knowledge, Reverse Traceability, mobile, reduced motion, static/WebGL fallback — none with `?debug=1`).
+
+### Changed
+
+* `EvidenceCoreScene.ts` — Evidence Core rebuilt as one persistent object: two page-layer towers forming the N-mark's two verticals, a diagonal evidence-bridge thread, a central aperture playing 3 narrative roles (review lock → query entry → workspace anchor), 4 sequential verification nodes, brighter lighting (ambient 0.55→0.85, key light 1.1→1.9, new fill light), a `traceabilityMarker` + `getScreenAnchors()` for Scene 7's 6 named layers.
+* `sceneConfig.ts` — `holdThenMove()` camera pattern (~55% hold / ~45% move per scene); desktop scroll distance widened 6→8.5 viewport-heights; `MOBILE_CAMERA_PATHS` now hand-authored independently of desktop, not derived by scaling; new `TRACEABILITY_LAYERS`.
+* `page.tsx` — added the `NOOR_CINEMATIC_PREVIEW_ENABLED` gate + `export const dynamic = "force-dynamic"`; removed the boxed/dashboard-style floating card in favor of fluid `clamp()` editorial typography and a directional gradient wash; `position: sticky` text wrapper replacing flex-centering; two-zone mobile layout (46vh visual zone + copy zone); Scene 1's headline is now the page's one `<h1>`.
+* `overlays/SceneSectionReveal.tsx` — universal single-scene exclusivity (previously nonexistent), gated by the new `MotionActiveContext` so reduced motion is never affected; native `inert` DOM property set imperatively on hidden sections.
+* `overlays/CinematicNav.tsx` — added a text wordmark + descriptor next to the logo, safe-area padding, and a `useVisibleSceneId()` fallback for reduced motion.
+* `StaticPoster.tsx` — now renders a complete per-scene SVG illustration (`ReducedMotionIllustrations.tsx`) via `useVisibleSceneId()`, replacing the previous empty gradient.
+* `timelineStore.ts` — exposes `window.__noorCinematicTimeline` unconditionally (harmless scroll-state numbers) so verification scripts can read real state against a production build where the `?debug=1` overlay is correctly hard-disabled.
+* `docs/landing/NOOR_CINEMATIC_CAMERA_MAP.md`, `NOOR_CINEMATIC_SCENE_TIMELINE.md`, `NOOR_CINEMATIC_PERFORMANCE_BUDGET.md` — updated with the new hold-then-move keyframes/percentages and real-GPU/real-production-build performance numbers (Lighthouse 0.94 desktop/0.95 mobile, superseding the prior dev-mode/SwiftShader numbers, kept as a historical record).
+
+### Fixed
+
+* Text overlap/clipping on **desktop**, not just mobile — `items-center` centering inside an oversized section; fixed with `position: sticky`.
+* `aria-hidden-focus` and `page-has-heading-one` axe violations (native `inert` property; Scene 1 promoted to `<h1>`).
+* A real `next build` failure (`useSearchParams()` needs a Suspense boundary for static export) and a build-time-baked Preview env var, both fixed by `export const dynamic = "force-dynamic"`.
+* A genuine Playwright bug: reusing one GPU-flagged `chromium.launch()` browser instance across sequential `recordVideo` contexts produced all-black video frames for 5 of 7 acceptance recordings, confirmed via `ffmpeg` frame extraction; fixed by giving each recording its own fresh browser launch.
+
 ## [Unreleased] — LX-1.1: High-Fidelity Cinematic Landing Prototype
 
 Replaces LX-1.0's rejected card-based prototype gallery with a real,

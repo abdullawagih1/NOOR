@@ -753,12 +753,38 @@ the same PR that resolves an item.
     surface hydration console errors). A future sprint should run the
     same check there before assuming it's clean.
 
-91. **LX-1.1's cinematic route performance numbers (FPS, Lighthouse
+91. ~~LX-1.1's cinematic route performance numbers (FPS, Lighthouse
     Performance/TBT/byte-weight) were measured against headless
     Chromium running SwiftShader (CPU software rendering, confirmed via
-    `WEBGL_debug_renderer_info`) and a `next dev` build** — the route
-    404s in production by design, so no production-build measurement
-    was possible before user approval. Real-GPU and production-build
-    re-measurement is a hard requirement before LX-1.2, not optional
-    polish — see `docs/landing/NOOR_CINEMATIC_PERFORMANCE_BUDGET.md`
-    §"What must be re-measured before production."
+    `WEBGL_debug_renderer_info`) and a `next dev` build.~~ **Resolved
+    (LX-1.1.1).** A `NOOR_CINEMATIC_PREVIEW_ENABLED` server-side gate
+    (see `docs/landing/NOOR_CINEMATIC_PREVIEW_DEPLOYMENT.md`) now lets
+    the route be reached on a real production build; headless Chromium
+    launched with `--use-gl=angle --use-angle=gl
+    --ignore-gpu-blocklist --enable-gpu-rasterization` was confirmed
+    via `WEBGL_debug_renderer_info` to reach this machine's real Intel
+    GPU (`ANGLE (Intel, Intel(R) RaptorLake-S Mobile Graphics
+    Controller, OpenGL 4.5.0)`), contradicting the earlier assumption
+    that headless always means software rendering. Real numbers:
+    Lighthouse Performance 0.94 desktop / 0.95 mobile, FPS 40–61 across
+    all 7 scenes — see `docs/landing/NOOR_CINEMATIC_PERFORMANCE_BUDGET.md`.
+
+92. **Scene 5 (Retrieval) dips to ~40fps on real GPU hardware**, the
+    only scene below ~58fps in LX-1.1.1's real-GPU measurement pass —
+    every other scene holds at or near 60fps. Likely cause: 3
+    DOM-projected rank-badge anchors (`getScreenAnchors()` in
+    `EvidenceCoreScene.ts`) recomputing screen position every 2nd RAF
+    frame simultaneously with the query-beam animation. Not a
+    regression blocker (well above visible-stutter territory) but
+    worth a future optimization pass — e.g. widening the projection
+    interval further for this scene specifically. See
+    `docs/landing/NOOR_CINEMATIC_PERFORMANCE_BUDGET.md` §"What remains
+    for a future mission."
+
+93. **LX-1.1.1's mobile Lighthouse "mobile preset" run is still a
+    desktop-machine emulation of mobile viewport/network conditions,
+    not a measurement on physical mobile hardware.** The real-GPU
+    confirmation this mission covers the desktop machine's integrated
+    GPU only. A future mission should measure FPS/Lighthouse on an
+    actual mobile device before treating the cinematic route's mobile
+    performance as production-verified.

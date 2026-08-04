@@ -1,10 +1,121 @@
 # PROJECT_STATE.md
 
-**Last updated:** LX-1.1 — High-Fidelity Cinematic Landing Prototype
-session (Claude Code, this environment)
+**Last updated:** LX-1.1.1 — Cinematic Art Direction, Mobile
+Choreography, and Motion Polish session (Claude Code, this
+environment)
 **Updated by:** Noor Delivery Council (Claude Code)
 
 ---
+
+## -17. This session: LX-1.1.1 — Cinematic Art Direction, Mobile Choreography, and Motion Polish
+
+A corrective pass, not a new feature: the user reviewed LX-1.1's real
+video/screenshot evidence and rejected it across every dimension
+(mission §3) — weak Evidence Core identity, the core too small/dark,
+dashboard-like typography, a mobile layout with real copy overlap and
+clipping, a reduced-motion path that was visually empty, and
+unverified real-GPU performance (LX-1.1's numbers came from headless
+SwiftShader software rendering, explicitly caveated at the time as
+unrepresentative).
+
+**Evidence Core redesign.** `EvidenceCoreScene.ts` no longer treats the
+document stack and the N-mark identity as separate ideas: two
+page-layer towers now form the N's two verticals, connected by one
+diagonal "evidence bridge" thread, with a central "aperture" that
+plays three different narrative roles across scenes (review lock →
+query entry → workspace anchor) — one persistent, recognizable object
+throughout, not three unrelated props. Camera starts closer (`z:4.6`,
+was `z:6.5`) and lighting intensity was raised substantially (ambient
+0.55→0.85, key light 1.1→1.9, a new fill light added).
+
+**A new `holdThenMove()` camera pattern** answers "recording too
+fast": every scene's camera now holds for ~55% of its scroll range
+before moving in the remaining ~45%, and total scroll distance widened
+(desktop 6→8.5 viewport-heights). Scene 7's reverse-traceability finale
+gained 6 real camera stops, each with its own moving marker and DOM
+label tracking a named layer (`intelligence-statement` →
+`supporting-evidence` → `retrieved-chunk` → `source-span` →
+`original-page` → `trusted-guideline`) — making it a genuine signature
+interaction rather than a label fade.
+
+**Mobile was rebuilt, not rescaled.** `MOBILE_CAMERA_PATHS` is
+hand-authored independently of the desktop paths (the literal defect
+named in the rejection). A two-zone layout (a fixed 46vh visual zone,
+a separate copy zone below it) replaces the previous full-viewport
+canvas. Two real bugs were found via screenshot, not assumed: text
+centered inside an oversized flex container clipped at the viewport
+edge for most of a section's scroll range (fixed with `position:
+sticky` replacing flex-centering — the standard scrollytelling
+technique); and this defect was present on **desktop too**, not just
+mobile, so single-scene exclusivity was generalized to every viewport,
+gated by a new `MotionActiveContext` so it never fires during reduced
+motion (where the timeline's `sceneIndex` never advances and would
+otherwise permanently hide scenes 2–7).
+
+**Reduced motion gained real content.** `StaticPoster.tsx` now renders
+one of 7 complete, hand-built SVG illustrations (`ReducedMotionIllustrations.tsx`)
+tracked by a new `useVisibleSceneId()` `IntersectionObserver` hook
+(GSAP never loads on this path at all). This surfaced a second real
+bug: the nav's scene-progress announcement stayed stuck on "Scene 1"
+forever in reduced motion while the illustration correctly advanced —
+fixed by having `CinematicNav` fall back to the same hook.
+
+**Two real accessibility violations found via `@axe-core/playwright`
+and fixed:** `aria-hidden-focus` (hidden sections' links stayed
+keyboard-focusable; fixed with the native `inert` DOM property, set
+imperatively since this TS/React version's JSX types don't expose it)
+and `page-has-heading-one` (every scene used `<h2>`; fixed by making
+Scene 1's headline the page's one real `<h1>`).
+
+**A Preview-only production-build gate** (`NOOR_CINEMATIC_PREVIEW_ENABLED`,
+server-side, orthogonal to Vercel Deployment Protection) was added so
+performance could finally be measured against a real production
+build. This surfaced a genuine `next build` failure
+(`useSearchParams()` needs a Suspense boundary for static export) and
+a genuine env-var-baked-at-build-time bug, both fixed with
+`export const dynamic = "force-dynamic"`. Real-GPU access from headless
+Chromium was then confirmed directly (`ANGLE (Intel, Intel(R)
+RaptorLake-S Mobile Graphics Controller, OpenGL 4.5.0)` via
+`WEBGL_debug_renderer_info` — not SwiftShader), contradicting the
+prior assumption that headless always means software rendering.
+Real-GPU, real-production-build results: Lighthouse Performance 0.94
+desktop / 0.95 mobile (both ≥ the 0.90 target, vs. LX-1.1's uncertain
+0.70 dev-mode number), 0 axe violations across 5 states, FPS 40–61
+across all 7 scenes (vs. LX-1.1's SwiftShader 1–54 range), 0.00MB
+memory delta over 5 mount/unmount cycles, route/bundle isolation
+reconfirmed by grepping the compiled chunk manifest.
+
+7 clean acceptance recordings (full desktop, Human Review, Structured
+Knowledge, Reverse Traceability, mobile, reduced motion, static/WebGL
+fallback) were made with **no** `?debug=1` in any of them (the literal
+defect named in mission §3.1 — the acceptance *recording script*, not
+the product code, had been leaking the debug overlay). A genuine
+Playwright bug was found and fixed en route: reusing one
+GPU-flagged `chromium.launch()` browser instance across sequential
+`recordVideo` contexts produced all-black frames for 5 of 7 videos,
+confirmed via `ffmpeg` frame extraction (not trusted from file size
+alone) both before and after the fix.
+
+Wrote/updated 8 planning docs under `docs/landing/`
+(`NOOR_CINEMATIC_ART_DIRECTION.md`, `NOOR_CINEMATIC_COMPOSITION_MAP.md`,
+`NOOR_CINEMATIC_CAMERA_MAP.md`, `NOOR_CINEMATIC_SCENE_TIMELINE.md`,
+`NOOR_CINEMATIC_MOBILE_CHOREOGRAPHY.md`,
+`NOOR_CINEMATIC_REDUCED_MOTION_SYSTEM.md`,
+`NOOR_CINEMATIC_PERFORMANCE_BUDGET.md`,
+`NOOR_CINEMATIC_PREVIEW_DEPLOYMENT.md`) and the master verification
+report at `docs/verification/lx-1-1-1-cinematic-polish-verification.md`.
+Added a committed Preview-gate regression test
+(`apps/web/tests/cinematic-preview-gate.test.ts`) — all 22 `apps/web`
+tests, 6 `packages/clinical-schemas` tests pass; `apps/web`/
+`packages/ui` typecheck clean; `next lint` clean on the touched
+directory. React Three Fiber was **not** retried, per the mission's
+explicit instruction — the plain-imperative-Three.js architecture from
+LX-1.1 is unchanged.
+
+Status: **LX-1.1.1 — Cinematic Polish Implementation Complete, Pending
+User Visual and Motion Approval** — explicitly not "complete and
+approved." The platform's own next step is unaffected and remains
+`S1-E3 — Hybrid Retrieval`.
 
 ## -16. This session: LX-1.1 — High-Fidelity Cinematic Landing Prototype
 
