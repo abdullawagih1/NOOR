@@ -12,6 +12,7 @@ import { CinematicNav } from "./overlays/CinematicNav";
 import { DebugOverlay } from "./DebugOverlay";
 import { StaticPoster } from "./StaticPoster";
 import { MotionActiveProvider } from "./MotionActiveContext";
+import type { PublicLandingCta } from "@/lib/publicLanding/PublicLandingCta";
 
 const CinematicCanvas = dynamic(() => import("./CinematicCanvas").then((mod) => mod.CinematicCanvas), {
   ssr: false,
@@ -20,6 +21,7 @@ const CinematicCanvas = dynamic(() => import("./CinematicCanvas").then((mod) => 
 
 export interface CinematicExperienceProps {
   children: ReactNode;
+  cta: PublicLandingCta;
 }
 
 /**
@@ -28,7 +30,7 @@ export interface CinematicExperienceProps {
  * accessible content passed down from page.tsx — this component never
  * duplicates or replaces it, only decides what renders behind it.
  */
-export function CinematicExperience({ children }: CinematicExperienceProps) {
+export function CinematicExperience({ children, cta }: CinematicExperienceProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useEffectiveReducedMotion();
   const initialTier = useInitialQualityTier();
@@ -82,7 +84,7 @@ export function CinematicExperience({ children }: CinematicExperienceProps) {
 
   return (
     <div className="relative bg-[#040F1C]">
-      <CinematicNav />
+      <CinematicNav cta={cta} />
 
       {/*
         Mobile (mission §22): the visual object lives in its own fixed

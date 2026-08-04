@@ -1,5 +1,13 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { SCENES, DESKTOP_VH_MULTIPLIER, MOBILE_VH_MULTIPLIER, MOBILE_BREAKPOINT_PX } from "./sceneConfig";
+import { CinematicPublicLanding } from "./CinematicPublicLanding";
+import { resolveLandingCta } from "@/lib/publicLanding/resolveLandingCta";
+
+// Defense-in-depth (mission §25/§33): the production 404 gate below is
+// the primary protection, but this route IS reachable on a Preview
+// deployment — noindex/nofollow there too, so a crawler that somehow
+// reaches a Preview URL never indexes it.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 /**
  * Forces per-request rendering rather than a build-time static export.
@@ -17,19 +25,18 @@ import { SCENES, DESKTOP_VH_MULTIPLIER, MOBILE_VH_MULTIPLIER, MOBILE_BREAKPOINT_
  *    so that alone would still work, but forcing dynamic rendering
  *    here makes the gate a genuine per-request check either way, which
  *    is the more literal reading of mission §5 ("gate at the
- *    server-route level").
+ *    server-route level"). LX-1.2: also required now that this route
+ *    resolves an auth-aware CTA (reads the request's session cookie).
  */
 export const dynamic = "force-dynamic";
-import { ReducedMotionOverrideProvider } from "../landing-experience/useEffectiveReducedMotion";
-import { CinematicExperience } from "./CinematicExperience";
-import { SceneSectionReveal } from "./overlays/SceneSectionReveal";
-import { SceneIllustration } from "./overlays/SceneIllustration";
-import { StatusChip } from "./overlays/StatusChip";
-import { FinalCta } from "./overlays/FinalCta";
 
 /**
- * LX-1.1.1 — Development-only cinematic prototype, with a narrow
- * Preview exception (mission §5). Gating, in order:
+ * LX-1.2 — this route is now a thin gate around the same
+ * `CinematicPublicLanding` production component the public root route
+ * (`app/page.tsx`) can render — see that component's own doc comment
+ * for why the two routes share one definition instead of two. This
+ * file's only remaining job is the Development/Preview-only gate
+ * (mission §33), unchanged from LX-1.1.1:
  *
  *   1. Local development (NODE_ENV !== "production"): always available.
  *   2. A real production build (NODE_ENV === "production") with
@@ -46,122 +53,17 @@ import { FinalCta } from "./overlays/FinalCta";
  *
  * The gate is server-side (this file never renders on the client
  * before the check), so there is no client-side-only hiding to bypass.
- *
- * Every scene's headline, supporting copy, and status label below is
- * real, server-rendered HTML present unconditionally — the fixed 3D
- * canvas (mounted client-side, only when motion is enabled) renders
- * BEHIND this content, it never replaces or duplicates it. See
- * docs/landing/NOOR_CINEMATIC_TECHNICAL_ARCHITECTURE.md.
- *
- * Typography (mission §9/§3.4): editorial scale (a fluid clamp() up to
- * 72px for scene headlines), no small floating backdrop-blur card —
- * text sits directly over the scene with a soft directional gradient
- * wash behind it for contrast, never boxed.
+ * `?debug=1` (handled inside CinematicExperience, unchanged) affects
+ * only this internal route — the public root route below never
+ * exposes it (mission §33: "Public root never enables debug UI").
  */
-export default function CinematicLandingPrototypePage() {
+export default async function CinematicLandingPrototypePage() {
   const isProduction = process.env.NODE_ENV === "production";
   const previewEnabled = process.env.NOOR_CINEMATIC_PREVIEW_ENABLED === "true";
   if (isProduction && !previewEnabled) {
     notFound();
   }
 
-  return (
-    <main className="text-white">
-      <style>{`
-        :root { --noor-cinematic-vh: ${DESKTOP_VH_MULTIPLIER}; }
-        @media (max-width: ${MOBILE_BREAKPOINT_PX - 1}px) {
-          :root { --noor-cinematic-vh: ${MOBILE_VH_MULTIPLIER}; }
-        }
-      `}</style>
-
-      <ReducedMotionOverrideProvider>
-        <CinematicExperience>
-          {SCENES.map((scene) => (
-            <section
-              key={scene.id}
-              id={`scene-${scene.id}`}
-              aria-labelledby={`scene-${scene.id}-heading`}
-              className="relative px-lg pt-[calc(46vh+1.5rem)] sm:px-xl sm:pt-32 lg:px-xxl"
-              style={{ minHeight: `calc((${scene.end} - ${scene.start}) * var(--noor-cinematic-vh) * 100vh)` }}
-            >
-              {/*
-                position: sticky, not flex-centering a point inside a
-                very tall section — the real bug a screenshot caught
-                (not assumed): a centered block inside an 8+-viewport-
-                tall flex container is only fully in frame for a brief
-                middle window of that section's scroll range; for most
-                of it, the block is clipped by the viewport edge or
-                off-screen entirely. Sticky keeps the copy in a stable,
-                fully-visible position for the section's ENTIRE scroll
-                duration — the standard scrollytelling technique, and
-                the actual fix "hold, then move" pacing needed.
-
-                The section's own top padding (matching the sticky
-                `top` offset below) matters specifically for Scene 1:
-                before any scrolling happens, a sticky element sits at
-                its natural flow position, not yet at its stuck offset
-                — without this padding, Scene 1's content starts flush
-                against the page top and collides with the fixed nav
-                for the first few percent of scroll (caught in a real
-                screenshot, not assumed).
-              */}
-              <div className="sticky top-[calc(46vh+1.5rem)] flex min-h-[calc(54vh-2.5rem)] items-center sm:top-32 sm:min-h-[calc(100vh-8rem)]">
-                <SceneSectionReveal sceneId={scene.id}>
-                  <div
-                    className="relative max-w-2xl py-lg pr-lg sm:pr-xxl"
-                    style={{
-                      background:
-                        "linear-gradient(105deg, rgba(5,15,30,0.86) 0%, rgba(5,15,30,0.62) 65%, rgba(5,15,30,0.2) 100%)",
-                    }}
-                  >
-                    <SceneIllustration sceneKey={scene.key} />
-                    <p className="mt-md text-xs font-semibold uppercase tracking-[0.16em] text-white/55">
-                      Scene {scene.id} of {SCENES.length}
-                    </p>
-                    {/*
-                      Scene 1's headline is the page's single required
-                      <h1> (a real axe scan flagged "page-has-heading-one"
-                      — every scene used <h2>, leaving the page with
-                      none) — it IS the page's thesis statement, so this
-                      is also the semantically correct choice, not just
-                      a rule-satisfying workaround. Scenes 2-7 stay <h2>.
-                    */}
-                    {scene.id === 1 ? (
-                      <h1
-                        id={`scene-${scene.id}-heading`}
-                        className="mt-sm font-semibold leading-[1.05] text-white text-[clamp(2.1rem,4.6vw,4rem)]"
-                      >
-                        {scene.headline}
-                      </h1>
-                    ) : (
-                      <h2
-                        id={`scene-${scene.id}-heading`}
-                        className="mt-sm font-semibold leading-[1.05] text-white text-[clamp(2.1rem,4.6vw,4rem)]"
-                      >
-                        {scene.headline}
-                      </h2>
-                    )}
-                    <p className="mt-md max-w-md text-[clamp(1.05rem,1.3vw,1.25rem)] leading-relaxed text-white/85">
-                      {scene.supportingCopy}
-                    </p>
-                    <div className="mt-lg">
-                      <StatusChip status={scene.status} label={scene.statusLabel} />
-                    </div>
-                    {scene.key === "product-vision" ? (
-                      <p className="mt-sm text-xs text-white/50">Synthetic demonstration — not clinical guidance.</p>
-                    ) : null}
-                    {scene.key === "reverse-traceability" ? (
-                      <div className="mt-xxl">
-                        <FinalCta />
-                      </div>
-                    ) : null}
-                  </div>
-                </SceneSectionReveal>
-              </div>
-            </section>
-          ))}
-        </CinematicExperience>
-      </ReducedMotionOverrideProvider>
-    </main>
-  );
+  const cta = await resolveLandingCta();
+  return <CinematicPublicLanding cta={cta} />;
 }

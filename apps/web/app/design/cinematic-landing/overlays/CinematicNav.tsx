@@ -9,6 +9,7 @@ import { useActiveSceneIndex } from "../useActiveSceneIndex";
 import { useVisibleSceneId } from "../useVisibleSceneId";
 import { useMotionActive } from "../MotionActiveContext";
 import { useReducedMotionOverrideControl } from "../../landing-experience/useEffectiveReducedMotion";
+import type { PublicLandingCta } from "@/lib/publicLanding/PublicLandingCta";
 
 /**
  * Minimal nav (mission §24/§35) — the navigation-safe NOOR symbol
@@ -45,7 +46,7 @@ import { useReducedMotionOverrideControl } from "../../landing-experience/useEff
  * motion. `mounted` defers the conditional hide until after hydration
  * completes, matching the server's first-paint output exactly.
  */
-export function CinematicNav() {
+export function CinematicNav({ cta }: { cta: PublicLandingCta }) {
   const timelineSceneIndex = useActiveSceneIndex();
   const visibleSceneId = useVisibleSceneId(SCENES.length);
   const motionActive = useMotionActive();
@@ -98,10 +99,10 @@ export function CinematicNav() {
           </label>
         ) : null}
         <Link
-          href="/login"
+          href={cta.href}
           className="rounded-sm bg-primary px-md py-xs text-sm font-medium text-on-primary transition-colors hover:bg-primary-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          Sign in
+          {cta.label}
         </Link>
       </div>
     </nav>
