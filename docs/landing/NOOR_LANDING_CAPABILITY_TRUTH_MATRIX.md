@@ -2,6 +2,15 @@
 
 Status: **LX-1.0 — In Progress**
 
+**LX-1.2 addendum:** every claim on both the legacy and cinematic
+landing variants was re-audited against this matrix as part of
+production integration (mission §12). No row's status changed — no
+repository evidence discovered this mission promotes any capability
+from `In development`/`Future vision` to `Available`. The cinematic
+Product Vision scene's "Synthetic demonstration — not clinical
+guidance" label and every retrieval/embedding-related status chip
+remain unchanged from LX-1.1.1's own truthful labeling.
+
 Every public claim in the future landing narrative must trace to a row
 in this table. If a claim has no row, it does not go on the landing
 page. This matrix was built by reading the actual migrations, RLS

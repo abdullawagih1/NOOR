@@ -1,0 +1,61 @@
+{
+  "runId": "d62f3d6e",
+  "email": "lx-1-2-verify-d62f3d6e@noor-internal.test",
+  "steps": [
+    {
+      "step": "create synthetic auth user",
+      "ok": true,
+      "detail": "8215c56f-1626-4caf-9469-63300c1ace2a"
+    },
+    {
+      "step": "create profile row",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "step": "create active clinician membership",
+      "ok": true,
+      "detail": "f3aeeb22-89a6-43e9-b2d5-4758173f2a62"
+    },
+    {
+      "step": "unauthenticated root CTA points to \"/login\"",
+      "ok": true,
+      "detail": "href=/login"
+    },
+    {
+      "step": "successful login redirects to \"/clinician\", never \"/\"",
+      "ok": true,
+      "detail": "landed on /clinician"
+    },
+    {
+      "step": "authenticated visitor visiting /login is redirected to their workspace, not shown the form",
+      "ok": true,
+      "detail": "landed on /clinician"
+    },
+    {
+      "step": "authenticated root CTA becomes \"Open NOOR\" -> \"/clinician\"",
+      "ok": true,
+      "detail": "href=/clinician"
+    },
+    {
+      "step": "cleanup: delete organization_membership row",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "step": "cleanup: delete profile row",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "step": "cleanup: delete auth user",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "step": "cleanup verification: zero residual rows for the synthetic user",
+      "ok": true,
+      "detail": "profiles=0 memberships=0"
+    }
+  ]
+}

@@ -1,10 +1,42 @@
 # NOOR Cinematic Preview Deployment
 
-Status: **LX-1.1.1 — Complete.** Records the narrow, env-var-gated
+Status: **LX-1.2 — Complete.** Records the narrow, env-var-gated
 exception that lets the cinematic route be measured against a real
 production build (mission §5/§28) — required because LX-1.1's
 performance numbers came entirely from `next dev` / headless
 SwiftShader and could not be trusted as production evidence.
+
+## LX-1.2 addendum — used together with `NOOR_PUBLIC_LANDING_EXPERIENCE`
+
+This mission's Preview deployment set **both** flags together in the
+Preview environment scope:
+
+```
+NOOR_CINEMATIC_PREVIEW_ENABLED=true    (unblocks /design/cinematic-landing)
+NOOR_PUBLIC_LANDING_EXPERIENCE=cinematic  (makes the public "/" root render it too)
+```
+
+They are independent and serve different purposes — the first is a
+narrow internal-route exception (LX-1.1.1), the second is the
+production feature flag (LX-1.2, see `NOOR_PUBLIC_LANDING_FEATURE_FLAG.md`).
+Both were confirmed scoped to `preview` only via `vercel env ls` —
+absent entirely from `production`. A real Preview deployment was
+created this mission (`dpl_92fYPP9zUMxKT6fuMxBFGw6VzJa2`, later
+`dpl_9f5QMxk6G4NfSnSKrXXqexyUQXnz` after the rollback rehearsal),
+confirmed `status: Ready`, `target: preview`, and Deployment
+Protection confirmed still active (a `302` on an unauthenticated
+`curl`) throughout. Direct HTTP content verification of the Preview
+URL itself was blocked by that same Deployment Protection — no
+bypass token was available in this session (provisioning one is a
+one-time Vercel dashboard action, not reachable via CLI/API — see
+`scripts/smoke-test-web.mjs`'s own documented `BYPASS_TOKEN`
+mechanism from an earlier sprint). Build logs (`vercel inspect
+--logs`, which are authenticated CLI calls, not subject to
+Deployment Protection) confirmed the deployed route table exactly
+matches the extensively-verified local production build
+(`/`, `/design/cinematic-landing`, `/robots.txt`, `/sitemap.xml`, all
+present) — see `docs/verification/lx-1-2-production-integration.md`
+for the full record.
 
 ## The gate
 

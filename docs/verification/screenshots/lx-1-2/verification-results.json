@@ -1,0 +1,122 @@
+{
+  "axe": [
+    {
+      "name": "legacy-desktop",
+      "violations": 0,
+      "ids": []
+    },
+    {
+      "name": "legacy-mobile-390",
+      "violations": 0,
+      "ids": []
+    },
+    {
+      "name": "login",
+      "violations": 0,
+      "ids": []
+    },
+    {
+      "name": "access-denied",
+      "violations": 0,
+      "ids": []
+    },
+    {
+      "name": "cinematic-mobile-390",
+      "violations": 0,
+      "ids": []
+    },
+    {
+      "name": "cinematic-reduced-motion",
+      "violations": 0,
+      "ids": []
+    },
+    {
+      "name": "cinematic-webgl-disabled",
+      "violations": 0,
+      "ids": []
+    }
+  ],
+  "gpu": "ANGLE (Intel, Intel(R) RaptorLake-S Mobile Graphics Controller, OpenGL 4.5.0)",
+  "sceneCheckpoints": [
+    {
+      "pct": 0.5,
+      "label": "scene4-structured-knowledge",
+      "timeline": {
+        "progress": 0.499926567777941,
+        "sceneIndex": 3,
+        "sceneLocalProgress": 0.39951045185293993
+      },
+      "diagnostics": {
+        "drawCalls": 26,
+        "triangles": 3838,
+        "points": 0,
+        "geometries": 18,
+        "textures": 2,
+        "activeParticles": 850
+      }
+    },
+    {
+      "pct": 0.62,
+      "label": "scene5-retrieval-mid",
+      "timeline": {
+        "progress": 0.6199148186224115,
+        "sceneIndex": 4,
+        "sceneLocalProgress": 0.213677275874368
+      },
+      "diagnostics": {
+        "drawCalls": 27,
+        "triangles": 3838,
+        "points": 467,
+        "geometries": 19,
+        "textures": 2,
+        "activeParticles": 467
+      }
+    },
+    {
+      "pct": 0.68,
+      "label": "scene5-retrieval-late",
+      "timeline": {
+        "progress": 0.6799823762667059,
+        "sceneIndex": 4,
+        "sceneLocalProgress": 0.6427312590478993
+      },
+      "diagnostics": {
+        "drawCalls": 28,
+        "triangles": 3850,
+        "points": 209,
+        "geometries": 20,
+        "textures": 2,
+        "activeParticles": 209
+      }
+    },
+    {
+      "pct": 0.78,
+      "label": "scene6-product-vision",
+      "timeline": {
+        "progress": 0.7799970627111177,
+        "sceneIndex": 5,
+        "sceneLocalProgress": 0.4545187519192519
+      },
+      "diagnostics": {
+        "drawCalls": 47,
+        "triangles": 6720,
+        "points": 380,
+        "geometries": 22,
+        "textures": 3,
+        "activeParticles": 380
+      }
+    }
+  ],
+  "mobile": {
+    "390x844": {
+      "checked": true
+    }
+  },
+  "webglDisabled": {
+    "canvasCount": 0,
+    "ctaVisible": true,
+    "pageErrors": 0,
+    "errors": []
+  },
+  "reducedMotionCanvasCount": 0
+}
