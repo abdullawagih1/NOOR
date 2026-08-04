@@ -42,13 +42,13 @@ check("cinematic-landing page 404s in production unless the Preview flag is exac
   assert.match(source, /notFound\(\)/);
 });
 
-check("the Preview gate check runs before any client-side experience is imported and rendered", () => {
+check("the Preview gate check runs before the production CinematicPublicLanding component is rendered", () => {
   const source = read("page.tsx");
   const gateIndex = source.indexOf("notFound()");
-  const experienceUsageIndex = source.indexOf("<CinematicExperience");
+  const componentUsageIndex = source.indexOf("<CinematicPublicLanding");
   assert.ok(gateIndex > -1, "notFound() call not found");
-  assert.ok(experienceUsageIndex > -1, "<CinematicExperience usage not found");
-  assert.ok(gateIndex < experienceUsageIndex, "gate must run before the experience is rendered");
+  assert.ok(componentUsageIndex > -1, "<CinematicPublicLanding usage not found");
+  assert.ok(gateIndex < componentUsageIndex, "gate must run before the component is rendered");
 });
 
 check(".env.example documents NOOR_CINEMATIC_PREVIEW_ENABLED", () => {

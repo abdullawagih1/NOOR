@@ -1,116 +1,83 @@
-import Link from "next/link";
-import { PublicShell } from "./PublicShell";
-import { Button } from "@noor/ui";
+import type { Metadata } from "next";
+import { LegacyPublicLanding } from "./LegacyPublicLanding";
+import { CinematicPublicLanding } from "./design/cinematic-landing/CinematicPublicLanding";
+import { getPublicLandingExperience } from "@/lib/publicLanding/getPublicLandingExperience";
+import { resolveLandingCta } from "@/lib/publicLanding/resolveLandingCta";
 
-const CAPABILITIES = [
-  {
-    title: "Guideline Governance",
-    description: "Controlled versions, review, approval, activation, supersession, and withdrawal.",
-  },
-  {
-    title: "Secure Document Intake",
-    description: "Private, checksum-verified source registration with tenant-safe access.",
-  },
-  {
-    title: "Deterministic Extraction",
-    description: "Reproducible page-level text and immutable artifacts.",
-  },
-  {
-    title: "Technical Quality Review",
-    description: "Human review, findings, and downstream eligibility decisions.",
-  },
-  {
-    title: "Controlled OCR",
-    description: "Page-scoped OCR only where explicitly approved by reviewers.",
-  },
-  {
-    title: "Auditable Processing",
-    description: "Durable jobs, attempts, retries, recovery, and traceable provenance.",
-  },
-] as const;
+/**
+ * LX-1.2 — the public "/" route now selects ONE experience per
+ * request, entirely server-side (mission §10):
+ *
+ *   getPublicLandingExperience() === "cinematic"
+ *     → CinematicPublicLanding  (the approved LX-1.1.1 experience)
+ *   otherwise ("legacy", or any invalid/missing flag value)
+ *     → LegacyPublicLanding     (byte-for-byte the pre-LX-1.2 page)
+ *
+ * There is no client-side variant switch, no dual render-and-hide, and
+ * no loading placeholder while choosing — the decision is made before
+ * any HTML is sent, so there is nothing to flash or hydrate
+ * inconsistently between server and client. Production stays on
+ * "legacy" for the duration of this mission (NOOR_PUBLIC_LANDING_FEATURE_FLAG.md);
+ * only a Vercel Preview with NOOR_PUBLIC_LANDING_EXPERIENCE=cinematic
+ * renders the cinematic branch.
+ *
+ * `dynamic = "force-dynamic"`: `resolveLandingCta()` calls `cookies()`
+ * internally (via the Supabase SSR client), which already opts this
+ * route into per-request dynamic rendering automatically even without
+ * this export (confirmed: removing it made no difference to the
+ * build output, still `ƒ /`) — kept explicit anyway to match this
+ * codebase's existing convention on every other route that depends on
+ * request-specific state (see /design/cinematic-landing, /knowledge's
+ * layout).
+ *
+ * Known, investigated, pre-existing limitation (not introduced by
+ * this mission): on ANY dynamically-rendered route in this Next.js
+ * 15.5.21 app — confirmed on /login too, which this mission never
+ * touched — the framework's own "streaming metadata" behavior
+ * (`next/dist/server/lib/streaming-metadata.js`) places `<head>`
+ * metadata tags as children of `<body>` in the live DOM for ordinary
+ * browser/crawler requests, confirmed directly via Playwright even
+ * after full network-idle hydration. Neither making `generateMetadata`
+ * synchronous nor removing the explicit `force-dynamic` export changed
+ * this (both were tried against a real build, not assumed) — the
+ * behavior is tied to Next's dynamic-rendering path itself, not to
+ * this function. Next.js deliberately exempts known simple/non-JS
+ * "HTML-limited" crawler user agents from this path (they get
+ * synchronous, correctly head-placed metadata unconditionally,
+ * built into the framework, regardless of this route) — the practical
+ * risk is narrower than it first appears, but not zero for a
+ * JS-executing crawler that reads `document.head` strictly. Recorded
+ * honestly in KNOWN_LIMITATIONS.md rather than claimed fixed.
+ */
+export const dynamic = "force-dynamic";
 
-const WORKFLOW = [
-  "Guideline",
-  "Verified Source",
-  "Extraction",
-  "Technical Review",
-  "Controlled OCR",
-  "Future Knowledge Preparation",
-] as const;
+// Deliberately synchronous (no `async`) — tried making it async during
+// investigation of the metadata-placement issue above; it made no
+// difference (the behavior is tied to dynamic rendering, not to this
+// function's sync/async-ness), but synchronous is still simpler and
+// correct here since nothing this function needs is actually
+// asynchronous.
+export function generateMetadata(): Metadata {
+  const experience = getPublicLandingExperience();
+  const description =
+    experience === "cinematic"
+      ? "See how NOOR verifies, reviews, and traces every piece of clinical evidence — from trusted source to reverse-traceable intelligence."
+      : "Evidence-grounded clinical decision support for healthcare organizations.";
+  return {
+    title: "Noor — Clinical Intelligence OS",
+    description,
+    alternates: { canonical: "/" },
+    openGraph: { description },
+    twitter: { description },
+  };
+}
 
-export default function HomePage() {
-  return (
-    <PublicShell>
-      {/* Hero */}
-      <section className="bg-surface-soft">
-        <div className="mx-auto grid max-w-6xl gap-xl px-lg py-xxl lg:grid-cols-2 lg:items-center">
-          <div className="flex flex-col gap-lg">
-            <div className="h-1 w-16 rounded-pill bg-brand-gradient" aria-hidden="true" />
-            <h1 className="text-3xl font-semibold text-ink sm:text-4xl">NOOR — Clinical Intelligence OS</h1>
-            <p className="text-lg text-body">Evidence-governed knowledge operations for clinical teams.</p>
-            <p className="text-sm text-muted">
-              Manage trusted clinical guidelines, verify source documents, extract page-level content
-              deterministically, and review technical quality through a controlled and auditable
-              workflow.
-            </p>
-            <div className="flex flex-wrap items-center gap-md">
-              <Link href="/login">
-                <Button variant="primary">Sign in to NOOR</Button>
-              </Link>
-              <a href="#how-it-works" className="text-sm font-medium text-primary hover:underline">
-                Learn how NOOR works
-              </a>
-            </div>
-          </div>
-          <div className="flex flex-col gap-sm rounded-lg border border-border bg-canvas p-lg shadow-card">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted">Controlled workflow</span>
-            <ol className="flex flex-col gap-xs">
-              {WORKFLOW.map((step, index) => (
-                <li key={step} className="flex items-center gap-sm rounded-md border border-border bg-surface-soft px-md py-sm">
-                  <span className="flex h-6 w-6 flex-none items-center justify-center rounded-pill bg-primary text-xs font-semibold text-on-primary">
-                    {index + 1}
-                  </span>
-                  <span className="text-sm text-ink">{step}</span>
-                </li>
-              ))}
-            </ol>
-            <p className="text-xs text-muted">
-              Retrieval and clinical answer generation are future work, not yet available.
-            </p>
-          </div>
-        </div>
-      </section>
+export default async function HomePage() {
+  const experience = getPublicLandingExperience();
+  const cta = await resolveLandingCta();
 
-      {/* Capabilities */}
-      <section id="how-it-works" className="mx-auto max-w-6xl px-lg py-xxl">
-        <div className="flex flex-col gap-xxs text-center">
-          <h2 className="text-2xl font-semibold text-ink">What NOOR does today</h2>
-          <p className="mx-auto max-w-2xl text-sm text-muted">
-            A controlled foundation for clinical guideline knowledge — built on explicit human review
-            and auditable provenance at every stage.
-          </p>
-        </div>
-        <div className="mt-xl grid gap-lg sm:grid-cols-2 lg:grid-cols-3">
-          {CAPABILITIES.map((capability) => (
-            <div key={capability.title} className="flex flex-col gap-xs rounded-lg border border-border bg-canvas p-lg shadow-card">
-              <span className="h-1.5 w-8 rounded-pill bg-accent" aria-hidden="true" />
-              <h3 className="text-base font-semibold text-ink">{capability.title}</h3>
-              <p className="text-sm text-muted">{capability.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Trust / safety */}
-      <section className="border-t border-border bg-surface-soft">
-        <div className="mx-auto max-w-3xl px-lg py-xxl text-center">
-          <h2 className="text-2xl font-semibold text-ink">Built on controlled evidence</h2>
-          <p className="mt-sm text-sm text-muted">
-            Every stage is built around controlled evidence, explicit human review, tenant isolation,
-            immutable provenance, and auditable lifecycle decisions.
-          </p>
-        </div>
-      </section>
-    </PublicShell>
-  );
+  if (experience === "cinematic") {
+    return <CinematicPublicLanding cta={cta} />;
+  }
+  return <LegacyPublicLanding cta={cta} />;
 }

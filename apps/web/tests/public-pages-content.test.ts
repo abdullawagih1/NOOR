@@ -37,37 +37,44 @@ const BANNED_STRINGS = [
   "Noor V1 — Sprint",
 ];
 
-check("root page contains none of the retired Sprint 0.5 / placeholder phrases", () => {
-  const source = read("page.tsx");
+// LX-1.2: the legacy landing's markup was extracted out of page.tsx
+// into LegacyPublicLanding.tsx so "/" can select between it and the
+// cinematic experience server-side (see public-root-integration.test.ts
+// for the selector itself) — these content checks now target that
+// extraction directly. The content is unchanged from before LX-1.2;
+// only its file location moved.
+check("legacy landing contains none of the retired Sprint 0.5 / placeholder phrases", () => {
+  const source = read("LegacyPublicLanding.tsx");
   for (const banned of BANNED_STRINGS) {
     assert.equal(source.includes(banned), false, `found banned phrase: "${banned}"`);
   }
 });
 
-check("root page has exactly one <h1>", () => {
-  assert.equal(h1Count(read("page.tsx")), 1);
+check("legacy landing has exactly one <h1>", () => {
+  assert.equal(h1Count(read("LegacyPublicLanding.tsx")), 1);
 });
 
-check("root page states the real product name and tagline", () => {
-  const source = read("page.tsx");
+check("legacy landing states the real product name and tagline", () => {
+  const source = read("LegacyPublicLanding.tsx");
   assert.match(source, /NOOR — Clinical Intelligence OS/);
   assert.match(source, /Evidence-governed knowledge operations for clinical teams/);
 });
 
-check("root page does not expose protected workspace routes as raw public links", () => {
-  const source = read("page.tsx");
+check("legacy landing does not expose protected workspace routes as raw public links", () => {
+  const source = read("LegacyPublicLanding.tsx");
   for (const route of ["/clinician\"", "/admin\"", "/reviewer\"", "/quality\""]) {
     assert.equal(source.includes(`href="${route.replace(/"/g, "")}"`), false, `found a raw link to ${route}`);
   }
 });
 
-check("root page's only call-to-action point is /login", () => {
-  const source = read("page.tsx");
-  assert.match(source, /href="\/login"/);
+check("legacy landing's primary CTA is resolved server-side (cta.href), never a hardcoded /login literal", () => {
+  const source = read("LegacyPublicLanding.tsx");
+  assert.match(source, /href=\{cta\.href\}/);
+  assert.equal(source.includes('href="/login"'), false);
 });
 
-check("root page does not claim retrieval or clinical answer generation is available", () => {
-  const source = read("page.tsx");
+check("legacy landing does not claim retrieval or clinical answer generation is available", () => {
+  const source = read("LegacyPublicLanding.tsx");
   assert.match(source, /Retrieval and clinical answer generation are future work, not yet available/);
 });
 
