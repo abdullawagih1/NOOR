@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { EvidenceCoreScene } from "./EvidenceCore/EvidenceCoreScene";
+import { AnchorLabels, type AnchorLabelsHandle } from "./AnchorLabels";
 import type { QualityTier } from "./useQualityTier";
 
 export interface CinematicCanvasProps {
@@ -20,10 +21,15 @@ export interface CinematicCanvasProps {
  * occur here. Imported only via next/dynamic from
  * CinematicExperience.tsx, never from a shared layout, so `three`
  * never reaches any other route's bundle.
+ *
+ * AnchorLabels (rank-number badges, the reverse-traceability layer
+ * label) is updated imperatively from the same RAF loop — no React
+ * state per frame (mission §26).
  */
 export function CinematicCanvas({ qualityTier, onContextLost }: CinematicCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<EvidenceCoreScene | null>(null);
+  const anchorLabelsRef = useRef<AnchorLabelsHandle>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -56,10 +62,15 @@ export function CinematicCanvas({ qualityTier, onContextLost }: CinematicCanvasP
 
     let rafId = 0;
     let lastTime = performance.now();
+    let frame = 0;
     const loop = (time: number) => {
       const deltaSeconds = Math.min(0.1, (time - lastTime) / 1000);
       lastTime = time;
       scene.update(deltaSeconds);
+      frame += 1;
+      if (frame % 2 === 0) {
+        anchorLabelsRef.current?.setAnchors(scene.getScreenAnchors(), scene.getCurrentTraceabilityLabel());
+      }
       rafId = requestAnimationFrame(loop);
     };
     rafId = requestAnimationFrame(loop);
@@ -81,5 +92,10 @@ export function CinematicCanvas({ qualityTier, onContextLost }: CinematicCanvasP
     sceneRef.current?.setQualityTier(qualityTier);
   }, [qualityTier]);
 
-  return <canvas ref={canvasRef} className="h-full w-full" aria-hidden="true" />;
+  return (
+    <div className="relative h-full w-full">
+      <canvas ref={canvasRef} className="h-full w-full" aria-hidden="true" />
+      <AnchorLabels ref={anchorLabelsRef} />
+    </div>
+  );
 }
