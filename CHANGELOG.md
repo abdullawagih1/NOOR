@@ -1,5 +1,30 @@
 # Changelog
 
+## [Unreleased] — LX-1.1: High-Fidelity Cinematic Landing Prototype
+
+Replaces LX-1.0's rejected card-based prototype gallery with a real,
+continuous, scroll-driven cinematic 3D experience at a new
+Development-only route. Does not replace the production `/` page, does
+not begin production implementation, and touches no database/RLS/
+permissions/Worker code.
+
+### Added
+
+* `apps/web/app/design/cinematic-landing/` — a new Development-only route (404s in production, same gating as `/design-system` and `/design/landing-experience`, which is preserved untouched): `EvidenceCoreScene.ts` (plain, imperative Three.js — geometry/materials/lighting/particles/camera, no custom React renderer), `CinematicCanvas.tsx` (ref+RAF-driven canvas host, dynamically imported), `CinematicExperience.tsx`, `useMasterTimeline.ts` (one GSAP `ScrollTrigger` bound to real content), `timelineStore.ts`/`useTimelineState.ts` (a small subscribable store bridging GSAP to React, no new state-management dependency), `useQualityTier.ts`, `webglSupport.ts`, `CanvasErrorBoundary.tsx`, `StaticPoster.tsx`, `DebugOverlay.tsx` (`?debug=1`, dev-only), and `overlays/` (`CinematicNav.tsx`, `StatusChip.tsx`, `FinalCta.tsx`, `SceneIllustration.tsx`, `SceneSectionReveal.tsx`).
+* `docs/landing/NOOR_CINEMATIC_CONCEPT.md`, `NOOR_EVIDENCE_CORE_DESIGN.md`, `NOOR_CINEMATIC_CAMERA_MAP.md`, `NOOR_CINEMATIC_SCENE_TIMELINE.md`, `NOOR_CINEMATIC_TECHNICAL_ARCHITECTURE.md`, `NOOR_CINEMATIC_PERFORMANCE_BUDGET.md`, `NOOR_CINEMATIC_ACCESSIBILITY.md`, `NOOR_CINEMATIC_MOBILE_STRATEGY.md`, `NOOR_CINEMATIC_FALLBACK_STRATEGY.md`.
+* `docs/verification/lx-1-1-cinematic-prototype-verification.md`, `docs/verification/screenshots/lx-1-1/` (14 screenshots), `docs/verification/videos/lx-1-1/` (3 real recordings: full desktop journey, mobile, reduced-motion).
+* `three` (dependency), `@types/three` (devDependency).
+
+### Removed
+
+* `@react-three/fiber`, `@react-three/drei` — installed, fully integrated, and found genuinely non-functional in this exact stack (a confirmed, researched, currently-unresolved upstream incompatibility with Next.js 15 — see Fixed below). Removed in favor of plain, imperative Three.js.
+
+### Fixed
+
+* A genuine upstream `@react-three/fiber` v8 + Next.js 15 incompatibility (`TypeError: Cannot read properties of undefined (reading 'ReactCurrentOwner')`), root-caused through 6 documented attempts and confirmed via multiple independent GitHub issues on the exact same dependency combination — resolved by rebuilding the Evidence Core with imperative Three.js instead of a custom React renderer.
+* Three hydration mismatches (`CinematicNav.tsx`, `CinematicExperience.tsx`, `SceneSectionReveal.tsx`), all caused by `useReducedMotion()` resolving synchronously on the client's first render while SSR assumes no preference — fixed with a `mounted`-gate pattern in each.
+* A missing `priority` hint on the nav logo (the route's actual LCP element).
+
 ## [Unreleased] — LX-1.0: Immersive Landing Narrative and Motion Blueprint
 
 A separate, dedicated landing-experience workstream (not a platform

@@ -1,10 +1,105 @@
 # PROJECT_STATE.md
 
-**Last updated:** LX-1.0 — Immersive Landing Narrative and Motion
-Blueprint session (Claude Code, this environment)
+**Last updated:** LX-1.1 — High-Fidelity Cinematic Landing Prototype
+session (Claude Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code)
 
 ---
+
+## -16. This session: LX-1.1 — High-Fidelity Cinematic Landing Prototype
+
+The user explicitly rejected LX-1.0's prototype gallery
+(`/design/landing-experience`) as insufficient — "card → Play button →
+step change → static frame," not the approved "continuous cinematic
+evidence journey with a fixed 3D world, scroll-controlled camera
+choreography." This session replaced it with a real, working cinematic
+3D experience at a new Development-only route
+(`/design/cinematic-landing`, 404s in production, LX-1.0's gallery
+preserved untouched as a technical reference).
+
+**The real story of this session is a genuine upstream blocker, root-
+caused rather than worked around.** The mission specified React Three
+Fiber. It was installed and fully integrated — every canvas mount
+crashed with `TypeError: Cannot read properties of undefined (reading
+'ReactCurrentOwner')`. Six fix attempts were tried and documented in
+order (react-reconciler version pinning, two webpack-alias attempts —
+one of which broke `react/jsx-runtime` entirely, the corrected version
+of which then broke every server-rendered page and had to be scoped to
+client-only — `transpilePackages`, and removing the dynamic-import
+boundary to rule out async-chunk timing) before turning to real web
+research (`WebSearch`/`WebFetch`, not guessing), which found multiple
+independent GitHub issues (`vercel/next.js#71836`/`#66468`,
+`pmndrs/react-three-fiber#3417`/`#3440`/`#3446`) reporting the exact
+same crash on the exact same React 18.3.1 + Next.js 15.x +
+`@react-three/fiber` 8.17–8.18 combination this repository uses — a
+confirmed, currently-unresolved upstream incompatibility. The
+library's own maintainer says the fix requires React 19, an
+unacceptable whole-app major-version risk for one prototype route.
+`@react-three/fiber`/`@react-three/drei` were removed; `three` was
+kept, and the entire Evidence Core was rewritten as plain, imperative
+Three.js (a class with `update()`/`dispose()` methods, zero dependency
+on `react-reconciler`) — every geometry/camera/lighting design
+decision is unchanged, only the rendering technique is different. The
+canvas was then confirmed genuinely rendering via a direct
+`gl.readPixels()` check and independent visual screenshot review at
+every one of the 7 scenes.
+
+**Three more real bugs found and fixed, all one root cause:**
+`useReducedMotion()` resolves synchronously on the client's very first
+render while server-side rendering always assumes no preference —
+caught via Next's dev overlay surfacing genuine hydration-mismatch
+errors, not by inspection. Found in `CinematicNav.tsx` (a structural
+DOM mismatch), `CinematicExperience.tsx` (the canvas-vs-static-poster
+branch), and `SceneSectionReveal.tsx` (an attribute mismatch,
+reproduced identically across all 7 scene sections since they share
+one component). All fixed with the same `mounted`-gate pattern; this
+pattern may exist elsewhere in `apps/web` and is recorded as a
+follow-up in `KNOWN_LIMITATIONS.md`, not silently left for later
+rediscovery.
+
+Wrote 9 new planning docs (`docs/landing/NOOR_CINEMATIC_*.md` +
+`NOOR_EVIDENCE_CORE_DESIGN.md`) and amended (not silently overwrote)
+`NOOR_LANDING_THREEJS_DECISION.md` to record the pivot. Built the full
+7-scene Evidence Core: a persistent document-stack object, a
+verification ring with an illustrative invalid-path object that
+visibly stops, a review gate whose lock only resolves once scroll
+passes a real threshold (never on a timer), structured blocks
+connected to their source by provenance-thread geometry, a ranked-
+retrieval arrangement with a query beam, a product-vision workspace
+panel, a representational particle field, and a reverse-traceability
+finale that is a literal camera retraversal of the same geometry built
+going forward — never new objects. One master `ScrollTrigger` bound to
+the real, server-rendered, always-present section content (no
+duplicate floating-text layer, no artificial scroll spacer).
+
+Verified for real: motion-state checkpoints were initially
+miscalibrated (targeting scroll percentage via `document.body.scrollHeight`
+drifted up to 16 percentage points from the actual `ScrollTrigger`
+progress) — caught and fixed with a binary-search calibration helper
+before trusting any checkpoint screenshot. 14 calibrated screenshots +
+3 real video recordings (full desktop journey, mobile, reduced-motion)
+via `playwright-core`; `@axe-core/playwright` scans at 0 violations
+across desktop/reduced-motion/mobile/RTL/WebGL-disabled; production
+route protection confirmed on a real server (`curl` 200/404); route
+isolation confirmed by grepping compiled chunk output, not inferred
+from bundle size; a real FPS-degradation finding investigated to its
+actual cause (headless SwiftShader software rendering, confirmed via
+`WEBGL_debug_renderer_info` — not real GPU hardware) rather than
+either hidden or accepted uncritically; a +150MB memory-growth finding
+investigated with a control experiment (bouncing between two
+non-Three.js routes reproduced the same growth) proving it was a
+Next.js dev-server artifact, not a real leak — the metric that
+actually matters (WebGL context disposal) was separately verified
+clean across 8 mount/unmount cycles. Full `apps/web`/`packages/ui`/
+`packages/clinical-schemas` verification all clean;
+`git diff -- apps/web/next.config.mjs` and the production page/shell/
+layout all confirmed byte-identical to their pre-mission state. See
+`docs/verification/lx-1-1-cinematic-prototype-verification.md`.
+
+Status: **LX-1.1 — High-Fidelity Cinematic Prototype Complete, Pending
+User Visual and Motion Approval** — explicitly not "complete and
+approved." The platform's own next step is unaffected and remains
+`S1-E3 — Hybrid Retrieval`.
 
 ## -15. This session: LX-1.0 — Immersive Landing Narrative and Motion Blueprint
 

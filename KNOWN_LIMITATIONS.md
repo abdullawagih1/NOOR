@@ -727,3 +727,38 @@ the same PR that resolves an item.
     cleanly. Not a CI risk (GitHub Actions runners don't accumulate
     cross-session orphans), but worth knowing if a future local session
     sees the same hang.
+
+89. **`@react-three/fiber` v8 does not work with Next.js 15.5.21 +
+    React 18.3.1 in this repository** — confirmed genuine and upstream,
+    not a local misconfiguration (see `docs/landing/
+    NOOR_LANDING_THREEJS_DECISION.md` §"LX-1.1 Amendment" and
+    `docs/verification/lx-1-1-cinematic-prototype-verification.md` §2
+    for the full root-cause chain and GitHub issue citations). LX-1.1's
+    cinematic prototype works around this entirely by using plain,
+    imperative Three.js instead — `@react-three/fiber`/`@react-three/drei`
+    are not installed in this repository. If a future sprint wants
+    React Three Fiber specifically, re-check whether v9 (which requires
+    React 19) has become viable, since v8 should not be re-attempted
+    against this stack without a new fix appearing upstream.
+
+90. **A `useReducedMotion()`-driven hydration-mismatch pattern was
+    found and fixed 3 times within LX-1.1's own new code** (`CinematicNav.tsx`,
+    `CinematicExperience.tsx`, `SceneSectionReveal.tsx`) but was not
+    audited across the rest of `apps/web` — in particular, LX-1.0's
+    prototype gallery (`/design/landing-experience`) uses the same
+    `useEffectiveReducedMotion` hook in several places and was never
+    specifically checked with a real reduced-motion-emulated Playwright
+    run monitoring console output for hydration errors (its own
+    verification relied on `@axe-core/playwright`, which does not
+    surface hydration console errors). A future sprint should run the
+    same check there before assuming it's clean.
+
+91. **LX-1.1's cinematic route performance numbers (FPS, Lighthouse
+    Performance/TBT/byte-weight) were measured against headless
+    Chromium running SwiftShader (CPU software rendering, confirmed via
+    `WEBGL_debug_renderer_info`) and a `next dev` build** — the route
+    404s in production by design, so no production-build measurement
+    was possible before user approval. Real-GPU and production-build
+    re-measurement is a hard requirement before LX-1.2, not optional
+    polish — see `docs/landing/NOOR_CINEMATIC_PERFORMANCE_BUDGET.md`
+    §"What must be re-measured before production."
