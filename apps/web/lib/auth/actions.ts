@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { sanitizeNextPath } from "@/lib/auth/redirect";
+import { sanitizeNextPath, resolvePostLoginDestination } from "@/lib/auth/redirect";
+import { getAuthenticatedContext, toPostLoginAccess } from "@/lib/auth/context";
 import { getPublicEnv } from "@/lib/env/public";
 
 export async function signInWithPassword(formData: FormData): Promise<void> {
@@ -21,7 +22,13 @@ export async function signInWithPassword(formData: FormData): Promise<void> {
     redirect(`/login?error=${encodeURIComponent("Invalid email or password.")}&next=${encodeURIComponent(next)}`);
   }
 
-  redirect(next);
+  // LX-1.2: a successful sign-in must never default to "/" — the
+  // reported defect (mission §3.3/§23). The session cookie was just
+  // set by signInWithPassword above, so getAuthenticatedContext() here
+  // resolves the caller's real membership/permissions, not a stale
+  // pre-login state.
+  const access = await getAuthenticatedContext();
+  redirect(resolvePostLoginDestination(next, toPostLoginAccess(access)));
 }
 
 export async function signOut(): Promise<void> {

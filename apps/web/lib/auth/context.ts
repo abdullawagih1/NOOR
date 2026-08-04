@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { PermissionKey } from "@/lib/auth/permissions";
+import type { PostLoginAccess } from "@/lib/auth/redirect";
 
 export type AuthenticatedContext = {
   userId: string;
@@ -50,6 +51,26 @@ function firstOrSelf<T>(value: T | T[] | null | undefined): T | null {
  */
 export async function getAuthenticatedContext(): Promise<ResolvedAccess> {
   const supabase = await createClient();
+
+  // LX-1.2 perf pass: `getSession()` only decodes the JWT already
+  // present in cookies (no network round trip); `getUser()` always
+  // revalidates against the Auth server (a real network call, by
+  // design — never trusted for the actual authorization decision
+  // below). For the overwhelmingly common case on a PUBLIC route —
+  // an anonymous visitor with no session cookie at all — skipping
+  // straight to the free local check avoids paying that network
+  // latency just to learn "no session," which was a measured,
+  // real contributor to a mobile Lighthouse LCP regression on "/"
+  // once it started resolving an auth-aware CTA on every request.
+  // Every actually-authenticated request still goes through the
+  // unchanged, network-validated getUser() call below — this only
+  // short-circuits the anonymous path.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) {
+    return { kind: "unauthenticated" };
+  }
 
   const {
     data: { user },
@@ -144,4 +165,18 @@ export async function requireRole(roleKey: string): Promise<AuthenticatedContext
     redirect("/403");
   }
   return context;
+}
+
+/**
+ * Adapts a `ResolvedAccess` result to the flat, structural shape
+ * `resolvePostLoginDestination()` needs — kept as a separate function
+ * (not inlined at each call site) so the 3 real call sites (password
+ * sign-in, the auth callback route, and the login page's
+ * already-authenticated short-circuit) can't drift from each other.
+ */
+export function toPostLoginAccess(result: ResolvedAccess): PostLoginAccess {
+  return {
+    kind: result.kind,
+    permissionKeys: result.kind === "authorized" ? result.context.permissionKeys : undefined,
+  };
 }
