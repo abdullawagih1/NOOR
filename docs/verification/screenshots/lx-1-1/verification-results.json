@@ -1,0 +1,180 @@
+{
+  "checkpoints": [
+    {
+      "pct": 0,
+      "label": "scene1-start",
+      "state": {
+        "scene": "1",
+        "progress": "0.004",
+        "sceneLocalProgress": "0.029",
+        "fps": "20"
+      }
+    },
+    {
+      "pct": 0.13,
+      "label": "scene1-end",
+      "state": {
+        "scene": "1",
+        "progress": "0.133",
+        "sceneLocalProgress": "0.949",
+        "fps": "16"
+      }
+    },
+    {
+      "pct": 0.2,
+      "label": "scene2-verified",
+      "state": {
+        "scene": "2",
+        "progress": "0.203",
+        "sceneLocalProgress": "0.451",
+        "fps": "14"
+      }
+    },
+    {
+      "pct": 0.35,
+      "label": "scene3-locked",
+      "state": {
+        "scene": "3",
+        "progress": "0.352",
+        "sceneLocalProgress": "0.477",
+        "fps": "14"
+      }
+    },
+    {
+      "pct": 0.41,
+      "label": "scene3-accepted",
+      "state": {
+        "scene": "3",
+        "progress": "0.406",
+        "sceneLocalProgress": "0.841",
+        "fps": "12"
+      }
+    },
+    {
+      "pct": 0.53,
+      "label": "scene4-chunks-formed",
+      "state": {
+        "scene": "4",
+        "progress": "0.531",
+        "sceneLocalProgress": "0.633",
+        "fps": "31"
+      }
+    },
+    {
+      "pct": 0.66,
+      "label": "scene5-ranked",
+      "state": {
+        "scene": "5",
+        "progress": "0.656",
+        "sceneLocalProgress": "0.473",
+        "fps": "28"
+      }
+    },
+    {
+      "pct": 0.8,
+      "label": "scene6-product-vision",
+      "state": {
+        "scene": "6",
+        "progress": "0.797",
+        "sceneLocalProgress": "0.515",
+        "fps": "3"
+      }
+    },
+    {
+      "pct": 0.92,
+      "label": "scene7-source-span",
+      "state": {
+        "scene": "7",
+        "progress": "0.922",
+        "sceneLocalProgress": "0.441",
+        "fps": "3"
+      }
+    },
+    {
+      "pct": 0.99,
+      "label": "scene7-final-cta",
+      "state": {
+        "scene": "7",
+        "progress": "0.992",
+        "sceneLocalProgress": "0.944",
+        "fps": "3"
+      }
+    },
+    {
+      "pct": 0.5,
+      "label": "mobile-midpoint",
+      "state": {
+        "scene": "4",
+        "progress": "0.503",
+        "sceneLocalProgress": "0.456",
+        "fps": "46"
+      }
+    },
+    {
+      "label": "reduced-motion-no-canvas",
+      "canvasCount": 0
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "docs/verification/screenshots/lx-1-1/scene1-start-desktop.png",
+      "viewport": "1440x900",
+      "state": "motion-enabled"
+    },
+    {
+      "file": "docs/verification/screenshots/lx-1-1/scene1-end-desktop.png",
+      "viewport": "1440x900",
+      "state": "motion-enabled"
+    },
+    {
+      "file": "docs/verification/screenshots/lx-1-1/scene2-verified-desktop.png",
+      "viewport": "1440x900",
+      "state": "motion-enabled"
+    },
+    {
+      "file": "docs/verification/screenshots/lx-1-1/scene3-locked-desktop.png",
+      "viewport": "1440x900",
+      "state": "motion-enabled"
+    },
+    {
+      "file": "docs/verification/screenshots/lx-1-1/scene3-accepted-desktop.png",
+      "viewport": "1440x900",
+      "state": "motion-enabled"
+    },
+    {
+      "file": "docs/verification/screenshots/lx-1-1/scene4-chunks-formed-desktop.png",
+      "viewport": "1440x900",
+      "state": "motion-enabled"
+    },
+    {
+      "file": "docs/verification/screenshots/lx-1-1/scene5-ranked-desktop.png",
+      "viewport": "1440x900",
+      "state": "motion-enabled"
+    },
+    {
+      "file": "docs/verification/screenshots/lx-1-1/scene6-product-vision-desktop.png",
+      "viewport": "1440x900",
+      "state": "motion-enabled"
+    },
+    {
+      "file": "docs/verification/screenshots/lx-1-1/scene7-source-span-desktop.png",
+      "viewport": "1440x900",
+      "state": "motion-enabled"
+    },
+    {
+      "file": "docs/verification/screenshots/lx-1-1/scene7-final-cta-desktop.png",
+      "viewport": "1440x900",
+      "state": "motion-enabled"
+    },
+    {
+      "file": "docs/verification/screenshots/lx-1-1/mobile-midpoint-390.png",
+      "viewport": "390x844",
+      "state": "motion-enabled"
+    },
+    {
+      "file": "docs/verification/screenshots/lx-1-1/reduced-motion-full.png",
+      "viewport": "1440x900",
+      "state": "reduced-motion"
+    }
+  ]
+}
