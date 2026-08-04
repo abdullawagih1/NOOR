@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { EvidenceCoreScene } from "./EvidenceCore/EvidenceCoreScene";
+import { EvidenceCoreScene, type RendererDiagnostics } from "./EvidenceCore/EvidenceCoreScene";
 import { AnchorLabels, type AnchorLabelsHandle } from "./AnchorLabels";
 import type { QualityTier } from "./useQualityTier";
+
+declare global {
+  interface Window {
+    __noorCinematicDiagnostics?: RendererDiagnostics;
+  }
+}
 
 export interface CinematicCanvasProps {
   qualityTier: QualityTier;
@@ -70,6 +76,14 @@ export function CinematicCanvas({ qualityTier, onContextLost }: CinematicCanvasP
       frame += 1;
       if (frame % 2 === 0) {
         anchorLabelsRef.current?.setAnchors(scene.getScreenAnchors(), scene.getCurrentTraceabilityLabel());
+      }
+      // Harmless aggregate renderer counters (LX-1.2 mission §16),
+      // same pattern as timelineStore's window.__noorCinematicTimeline
+      // — read by a verification script to profile Scene 5 against a
+      // real production build without needing the ?debug=1 overlay,
+      // which is hard-disabled in production by design.
+      if (frame % 10 === 0) {
+        window.__noorCinematicDiagnostics = scene.getDiagnostics();
       }
       rafId = requestAnimationFrame(loop);
     };

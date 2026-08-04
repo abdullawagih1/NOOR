@@ -92,6 +92,23 @@ export interface ScreenAnchor {
 }
 
 /**
+ * Real `renderer.info` counters (LX-1.2 mission §16 "profile the
+ * scene... record draw calls... record geometry count... record
+ * particle cost") — harmless aggregate numbers (no user data, no
+ * device fingerprinting), read by a verification script via
+ * `window.__noorCinematicDiagnostics` the same way `timelineStore`
+ * already exposes `window.__noorCinematicTimeline`.
+ */
+export interface RendererDiagnostics {
+  drawCalls: number;
+  triangles: number;
+  points: number;
+  geometries: number;
+  textures: number;
+  activeParticles: number;
+}
+
+/**
  * The Evidence Core (docs/landing/NOOR_EVIDENCE_CORE_DESIGN.md), built
  * and updated with plain, imperative Three.js — not
  * @react-three/fiber. See NOOR_CINEMATIC_TECHNICAL_ARCHITECTURE.md
@@ -114,6 +131,12 @@ export class EvidenceCoreScene {
   private readonly spineGroup = new THREE.Group();
   private readonly leftTowerPages: THREE.Mesh[] = [];
   private readonly rightTowerPages: THREE.Mesh[] = [];
+  // Built once in the constructor after both towers exist (LX-1.2
+  // mission §16 "reuse vectors and buffers") — updateSpineNodes()
+  // used to build `[...leftTowerPages, ...rightTowerPages]` fresh
+  // EVERY frame for the page's entire lifetime, a real, measured
+  // per-frame allocation with no scene-specific gate on it at all.
+  private readonly allTowerPages: THREE.Mesh[] = [];
   private readonly bridge: THREE.Mesh;
   private readonly aperture: THREE.Mesh;
   private readonly apertureShackle: THREE.Mesh;
@@ -140,6 +163,14 @@ export class EvidenceCoreScene {
   private qualityTier: QualityTier;
   private disposed = false;
   private readonly projectionVec = new THREE.Vector3();
+  // LX-1.2 Scene 5 perf pass — reused scratch objects instead of
+  // per-frame `.clone()`/array-spread allocation, and a cache of the
+  // last opacity written to each spine node so identical repeated
+  // writes (the node has fully settled — e.g. long after Scene 2 ends)
+  // are skipped rather than re-issued 60×/sec forever.
+  private readonly lightColorScratch = new THREE.Color();
+  private readonly nodeOpacityCache: number[] = [-1, -1, -1];
+  private currentParticleCount = 0;
 
   constructor(canvas: HTMLCanvasElement, qualityTier: QualityTier) {
     this.qualityTier = qualityTier;
@@ -188,6 +219,7 @@ export class EvidenceCoreScene {
     };
     buildTower(LEFT_TOWER_POS[0], this.leftTowerPages);
     buildTower(RIGHT_TOWER_POS[0], this.rightTowerPages);
+    this.allTowerPages = [...this.leftTowerPages, ...this.rightTowerPages];
 
     // The evidence bridge — the N's diagonal stroke, built from the
     // same reusable provenance-thread primitive used everywhere else,
@@ -266,17 +298,35 @@ export class EvidenceCoreScene {
     this.scene.add(this.findingMarker);
 
     // Scenes 4–5 — structured blocks + provenance threads + ranking.
+    // LX-1.2 Scene 5 perf pass (mission §16): all 5 blocks and all 5
+    // block-threads previously constructed an equivalent-but-distinct
+    // material each — 10 separate material instances with identical
+    // parameters, forcing redundant shader-program/uniform rebinds.
+    // One shared instance per mesh type (still 2 separate instances,
+    // since box vs. thread geometry need different material types)
+    // is visually identical and cuts those redundant binds to zero.
+    const blockMaterial = new THREE.MeshStandardMaterial({
+      color: "#5BE0DC",
+      roughness: 0.45,
+      emissive: "#0E4A48",
+      emissiveIntensity: 0.3,
+    });
+    const blockThreadMaterial = new THREE.MeshBasicMaterial({
+      color: "#1FD6D2",
+      transparent: true,
+      opacity: 0.65,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const blockGeometry = new THREE.BoxGeometry(0.26, 0.19, 0.055);
     for (const block of BLOCKS) {
       const group = new THREE.Group();
       group.position.set(block.origin[0], block.origin[1], block.origin[2]);
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.26, 0.19, 0.055),
-        new THREE.MeshStandardMaterial({ color: "#5BE0DC", roughness: 0.45, emissive: "#0E4A48", emissiveIntensity: 0.3 })
-      );
+      const mesh = new THREE.Mesh(blockGeometry, blockMaterial);
       group.add(mesh);
       this.blocksGroup.add(group);
       this.blockMeshes.push(group);
-      this.blocksGroup.add(buildProvenanceThreadMesh(block.origin, block.rest, 0.65, "#1FD6D2", 0.01));
+      this.blocksGroup.add(buildProvenanceThreadMesh(block.origin, block.rest, 0.65, "#1FD6D2", 0.01, blockThreadMaterial));
     }
     this.scene.add(this.blocksGroup);
 
@@ -355,6 +405,7 @@ export class EvidenceCoreScene {
     });
     this.particles = new THREE.Points(geometry, material);
     this.particles.visible = this.particlesVisible;
+    this.currentParticleCount = count;
     this.scene.add(this.particles);
   }
 
@@ -397,19 +448,32 @@ export class EvidenceCoreScene {
     this.camera.updateProjectionMatrix();
   }
 
-  /** Source-registered node (left tower base) lights on Scene 1 entry. */
+  /**
+   * Source-registered node (left tower base) lights on Scene 1 entry.
+   *
+   * LX-1.2 Scene 5 perf pass: reads the once-built `allTowerPages`
+   * array instead of spreading `[...leftTowerPages, ...rightTowerPages]`
+   * fresh every single frame (a real per-frame allocation that ran
+   * for the entire page's lifetime, not just while this scene's
+   * spread was visible — mission §16 "avoid per-frame allocations").
+   * Also skips re-writing a node's opacity/scale once it has fully
+   * settled (its value hasn't changed since the last frame) — mission
+   * §16 "stop updating settled nodes".
+   */
   private updateSpineNodes(progress: number) {
     const sourceLit = activation(progress, 0, 0.06);
     const reviewLit = activation(progress, ACCEPT_THRESHOLD, ACCEPT_THRESHOLD + 0.02);
     const rankLit = activation(progress, SCENE5.end - 0.03, SCENE5.end);
     const opacities = [sourceLit, reviewLit, rankLit];
     this.nodeMeshes.forEach((mesh, i) => {
+      if (this.nodeOpacityCache[i] === opacities[i]) return;
+      this.nodeOpacityCache[i] = opacities[i];
       (mesh.material as THREE.MeshBasicMaterial).opacity = opacities[i];
       mesh.scale.setScalar(0.8 + opacities[i] * 0.6);
     });
 
     const spread = 1 - activation(progress, 0, 0.08);
-    [...this.leftTowerPages, ...this.rightTowerPages].forEach((mesh, index) => {
+    this.allTowerPages.forEach((mesh, index) => {
       const layerIndex = index % LAYER_COUNT;
       mesh.position.z = layerIndex * 0.05 + spread * (layerIndex - LAYER_COUNT / 2) * 0.35;
     });
@@ -544,20 +608,46 @@ export class EvidenceCoreScene {
     const toVerified = activation(progress, SCENE2.start, SCENE2.end);
     const toAccepted = activation(progress, SCENE3.start, SCENE3.end);
     const toVision = activation(progress, SCENE6.start, SCENE6.end);
-    const color = PENDING_KEY.clone().lerp(VERIFIED_KEY, toVerified).lerp(ACCEPTED_KEY, toAccepted).lerp(VISION_KEY, toVision);
-    this.keyLight.color.copy(color);
+    // Reuses `lightColorScratch` instead of `PENDING_KEY.clone()` every
+    // frame (LX-1.2 mission §16 "reuse vectors and buffers") — this ran
+    // unconditionally for the entire page's lifetime, not gated to any
+    // one scene.
+    this.lightColorScratch
+      .copy(PENDING_KEY)
+      .lerp(VERIFIED_KEY, toVerified)
+      .lerp(ACCEPTED_KEY, toAccepted)
+      .lerp(VISION_KEY, toVision);
+    this.keyLight.color.copy(this.lightColorScratch);
 
     const warm = activation(progress, SCENE7.start, 1);
     this.ambientLight.intensity = 0.85 + warm * 0.25;
     this.rimLight.intensity = 0.85 + warm * 0.3;
   }
 
+  /**
+   * LX-1.2 Scene 5 perf pass (mission §16 "reduce particles during
+   * ranking"): Scene 5 is the one moment the ambient particle field,
+   * the 5 structured blocks + their provenance threads, the beam, and
+   * still-visible verification/spine geometry are ALL on screen
+   * together — measured as the single real FPS dip (see
+   * NOOR_CINEMATIC_PERFORMANCE_BUDGET.md §Scene 5). The particle
+   * field is pure ambient atmosphere, not a required story element
+   * (mission §16's preserve-list is about the blocks/ranks/markers,
+   * not the particles), so its point count is quietly thinned via
+   * `setDrawRange` — no geometry reallocation, fully reversible,
+   * restored to 100% by the time Scene 6 begins — specifically during
+   * Scene 5's own window, while every other scene keeps the full
+   * count unchanged.
+   */
   private updateParticles(progress: number, deltaSeconds: number) {
     const shouldShow = (progress >= SCENE5.start - 0.01 && progress < SCENE6.end) || progress >= SCENE7.start;
     this.particlesVisible = shouldShow;
     if (this.particles) {
       this.particles.visible = shouldShow;
       if (shouldShow) this.particles.rotation.y += deltaSeconds * 0.025;
+      const inScene5 = progress >= SCENE5.start && progress < SCENE5.end;
+      const fraction = inScene5 ? 0.55 : 1;
+      this.particles.geometry.setDrawRange(0, Math.floor(this.currentParticleCount * fraction));
     }
   }
 
@@ -585,6 +675,24 @@ export class EvidenceCoreScene {
       anchors["traceability-label"] = { x: 50, y: 50, visible: false };
     }
     return anchors;
+  }
+
+  /** Real renderer.info counters for this exact frame — see
+   * `RendererDiagnostics` doc comment. `renderer.info.reset()` is
+   * intentionally never called here: the counters this method reads
+   * (render.calls/triangles/points, memory.geometries/textures) are
+   * Three.js's own per-frame render-call/allocation counters, already
+   * reset automatically at the start of the next `render()` call. */
+  getDiagnostics(): RendererDiagnostics {
+    const info = this.renderer.info;
+    return {
+      drawCalls: info.render.calls,
+      triangles: info.render.triangles,
+      points: info.render.points,
+      geometries: info.memory.geometries,
+      textures: info.memory.textures,
+      activeParticles: this.particles?.geometry.drawRange.count ?? 0,
+    };
   }
 
   dispose() {

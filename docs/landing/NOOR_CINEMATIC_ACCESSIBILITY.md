@@ -4,6 +4,27 @@ Status: **LX-1.1 — In Progress** (checklist below is verified against
 real `@axe-core/playwright` scans and manual checks in the verification
 report, not asserted from design intent alone)
 
+## LX-1.2 addendum — production-integration accessibility findings
+
+Real axe scans against the production-integrated route (both the
+public `/` root with the cinematic flag enabled, and the auth
+surfaces it links to) found and fixed 2 genuine, pre-existing
+violations unrelated to the cinematic scene content itself:
+
+- `landmark-one-main`/`region` on `/login` and `/access-denied` —
+  `AuthShell.tsx`'s `AuthSplitShell`/`AuthCardShell` wrapped their
+  content in plain `<div>`s with no `<main>` landmark at all.
+  Pre-existing since before this mission (confirmed: these shells
+  were never touched by any of this mission's actual feature work).
+  Fixed by promoting the form-column container to `<main>` and the
+  brand/logo column to `<header>`.
+
+Zero violations after the fix, across: legacy root (desktop + mobile),
+cinematic root (desktop + mobile + reduced-motion + WebGL-disabled),
+`/login`, `/access-denied`. See
+`docs/verification/lx-1-2-production-integration.md` for the full scan
+matrix and raw results.
+
 ## Canvas semantics
 
 The `<Canvas>` element and every element inside it carry

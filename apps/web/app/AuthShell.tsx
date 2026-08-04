@@ -13,7 +13,7 @@ import Link from "next/link";
 export function AuthSplitShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
-      <div className="flex flex-1 flex-col items-center justify-center gap-lg bg-canvas p-xl text-center lg:max-w-md">
+      <header className="flex flex-1 flex-col items-center justify-center gap-lg bg-canvas p-xl text-center lg:max-w-md">
         <Link href="/" aria-label="Noor home" className="rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
           <Image
             src="/brand/noor-logo-primary.png"
@@ -29,10 +29,10 @@ export function AuthSplitShell({ children }: { children: React.ReactNode }) {
           Evidence-governed knowledge operations for clinical teams — controlled review, deterministic
           extraction, and auditable processing.
         </p>
-      </div>
-      <div className="flex flex-1 items-center justify-center bg-surface-soft p-xl">
+      </header>
+      <main className="flex flex-1 items-center justify-center bg-surface-soft p-xl">
         <div className="w-full max-w-sm">{children}</div>
-      </div>
+      </main>
     </div>
   );
 }
@@ -44,7 +44,7 @@ export function AuthSplitShell({ children }: { children: React.ReactNode }) {
  */
 export function AuthCardShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-lg bg-surface-soft p-xl">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-lg bg-surface-soft p-xl">
       <Link href="/" aria-label="Noor home" className="rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
         <Image
           src="/brand/noor-logo-navigation.png"
@@ -55,6 +55,6 @@ export function AuthCardShell({ children }: { children: React.ReactNode }) {
         />
       </Link>
       <div className="w-full max-w-sm">{children}</div>
-    </div>
+    </main>
   );
 }
