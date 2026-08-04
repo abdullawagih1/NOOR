@@ -24,6 +24,16 @@ export function getTimelineState(): TimelineState {
 
 export function setTimelineState(next: TimelineState): void {
   state = next;
+  // Test-safe global (mission §37 — "expose test-safe scene-state
+  // markers where needed"): harmless scroll-progress numbers, no
+  // secrets, no PII. Needed because the `?debug=1` overlay is
+  // correctly hard-disabled whenever NODE_ENV==="production" (mission
+  // §25) — including on a Preview deployment used specifically for
+  // this kind of automated verification, so this is the only way an
+  // external test script can read real scene/progress state there.
+  if (typeof window !== "undefined") {
+    (window as unknown as { __noorCinematicTimeline?: TimelineState }).__noorCinematicTimeline = next;
+  }
   listeners.forEach((listener) => listener());
 }
 
