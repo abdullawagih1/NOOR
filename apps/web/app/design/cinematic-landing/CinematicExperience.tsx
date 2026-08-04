@@ -11,6 +11,7 @@ import { CanvasErrorBoundary } from "./CanvasErrorBoundary";
 import { CinematicNav } from "./overlays/CinematicNav";
 import { DebugOverlay } from "./DebugOverlay";
 import { StaticPoster } from "./StaticPoster";
+import { MotionActiveProvider } from "./MotionActiveContext";
 
 const CinematicCanvas = dynamic(() => import("./CinematicCanvas").then((mod) => mod.CinematicCanvas), {
   ssr: false,
@@ -83,7 +84,15 @@ export function CinematicExperience({ children }: CinematicExperienceProps) {
     <div className="relative bg-[#040F1C]">
       <CinematicNav />
 
-      <div className="fixed inset-0 z-0" aria-hidden="true">
+      {/*
+        Mobile (mission §22): the visual object lives in its own fixed
+        top band (46vh), never full-screen — the concrete fix for the
+        rejected "canvas competing with text" defect. page.tsx pushes
+        every scene's copy below this band with matching top padding,
+        so the two zones never overlap regardless of scroll position.
+        Desktop/tablet keep the original full-viewport treatment.
+      */}
+      <div className="fixed inset-x-0 top-0 z-0 h-[46vh] sm:inset-0 sm:h-auto" aria-hidden="true">
         {motionActive ? (
           <CanvasErrorBoundary fallback={<StaticPoster />}>
             <CinematicCanvas qualityTier={tier} onContextLost={() => setCanvasFailed(true)} />
@@ -94,7 +103,7 @@ export function CinematicExperience({ children }: CinematicExperienceProps) {
       </div>
 
       <div ref={contentRef} className="relative z-10">
-        {children}
+        <MotionActiveProvider value={motionActive}>{children}</MotionActiveProvider>
       </div>
 
       {debug ? <DebugOverlay tier={tier} motionActive={motionActive} webglOk={webglOk} reducedMotion={reducedMotion} /> : null}

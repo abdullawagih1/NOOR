@@ -5,7 +5,7 @@ import Link from "next/link";
 export function FinalCta() {
   return (
     <div className="flex flex-col items-start gap-md">
-      <h2 className="max-w-xl text-3xl font-semibold text-white sm:text-4xl">
+      <h2 className="max-w-xl font-semibold leading-[1.05] text-white text-[clamp(1.9rem,3.6vw,3.25rem)]">
         Build clinical intelligence on evidence you can trace.
       </h2>
       <div className="flex flex-wrap items-center gap-md">
