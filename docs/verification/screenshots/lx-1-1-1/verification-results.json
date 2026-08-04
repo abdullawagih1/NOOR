@@ -1,0 +1,173 @@
+{
+  "gpu": "ANGLE (Intel, Intel(R) RaptorLake-S Mobile Graphics Controller, OpenGL 4.5.0)",
+  "checkpoints": [
+    {
+      "pct": 0,
+      "label": "scene1-source-established",
+      "state": {
+        "progress": "0.003965339991188133",
+        "sceneIndex": "0",
+        "sceneLocalProgress": "0.030502615316831794"
+      }
+    },
+    {
+      "pct": 0.1,
+      "label": "scene1-hold",
+      "state": {
+        "progress": "0.10163019532971068",
+        "sceneIndex": "0",
+        "sceneLocalProgress": "0.7817707333054668"
+      }
+    },
+    {
+      "pct": 0.16,
+      "label": "scene2-verification-gateway",
+      "state": {
+        "progress": "0.15626376854163607",
+        "sceneIndex": "1",
+        "sceneLocalProgress": "0.18759834672597187"
+      }
+    },
+    {
+      "pct": 0.2,
+      "label": "scene2-invalid-rejected",
+      "state": {
+        "progress": "0.20311352621530326",
+        "sceneIndex": "1",
+        "sceneLocalProgress": "0.5222394729664518"
+      }
+    },
+    {
+      "pct": 0.3,
+      "label": "scene3-finding-locked",
+      "state": {
+        "progress": "0.29681304156263766",
+        "sceneIndex": "2",
+        "sceneLocalProgress": "0.15772377389786849"
+      }
+    },
+    {
+      "pct": 0.37,
+      "label": "scene3-accepted-unlocked",
+      "state": {
+        "progress": "0.37494492583345573",
+        "sceneIndex": "2",
+        "sceneLocalProgress": "0.6173230931379748"
+      }
+    },
+    {
+      "pct": 0.47,
+      "label": "scene4-spans-chunks",
+      "state": {
+        "progress": "0.46879130562490823",
+        "sceneIndex": "3",
+        "sceneLocalProgress": "0.1919420374993882"
+      }
+    },
+    {
+      "pct": 0.62,
+      "label": "scene5-ranked-candidates",
+      "state": {
+        "progress": "0.6250550741665443",
+        "sceneIndex": "4",
+        "sceneLocalProgress": "0.2503933869038878"
+      }
+    },
+    {
+      "pct": 0.76,
+      "label": "scene6-product-vision",
+      "state": {
+        "progress": "0.7656043471875459",
+        "sceneIndex": "5",
+        "sceneLocalProgress": "0.32367588352314464"
+      }
+    },
+    {
+      "pct": 0.86,
+      "label": "scene7-intelligence-statement",
+      "state": {
+        "progress": "0.8593038625348803",
+        "sceneIndex": "6",
+        "sceneLocalProgress": "0.12064914084300227"
+      }
+    },
+    {
+      "pct": 0.93,
+      "label": "scene7-source-span",
+      "state": {
+        "progress": "0.9296519312674402",
+        "sceneIndex": "6",
+        "sceneLocalProgress": "0.5603245704215012"
+      }
+    },
+    {
+      "pct": 0.995,
+      "label": "scene7-final-cta",
+      "state": {
+        "progress": "0.9922161844617418",
+        "sceneIndex": "6",
+        "sceneLocalProgress": "0.951351152885886"
+      }
+    }
+  ],
+  "axe": [
+    {
+      "name": "desktop-motion-enabled",
+      "violations": 0,
+      "ids": []
+    },
+    {
+      "name": "desktop-reduced-motion",
+      "violations": 0,
+      "ids": []
+    },
+    {
+      "name": "mobile-390",
+      "violations": 0,
+      "ids": []
+    },
+    {
+      "name": "mobile-430",
+      "violations": 0,
+      "ids": []
+    },
+    {
+      "name": "mobile-360",
+      "violations": 0,
+      "ids": []
+    }
+  ],
+  "mobile": {
+    "390x844": {
+      "activeCount": 1,
+      "headingsVisible": [],
+      "overflowX": false,
+      "ctaFullyVisible": true
+    },
+    "430x932": {
+      "activeCount": 1,
+      "headingsVisible": [],
+      "overflowX": false,
+      "ctaFullyVisible": true
+    },
+    "360x800": {
+      "activeCount": 1,
+      "headingsVisible": [],
+      "overflowX": false,
+      "ctaFullyVisible": true
+    }
+  },
+  "reducedMotionConsistency": {
+    "navAnnouncement": "Scene 4 of 7: Structure the knowledge. Keep the provenance.",
+    "canvasCount": 0
+  },
+  "rtl": {
+    "logoTransform": "none",
+    "axeViolations": 0
+  },
+  "webglDisabled": {
+    "canvasCount": 0,
+    "ctaVisible": true,
+    "pageErrors": 0
+  }
+}
