@@ -1,0 +1,33 @@
+[
+  {
+    "tag": "A",
+    "text": "NOORClinical Intelligence OS",
+    "href": "/",
+    "hasVisibleOutline": true
+  },
+  {
+    "tag": "INPUT",
+    "text": "",
+    "href": null,
+    "hasVisibleOutline": true
+  },
+  {
+    "tag": "A",
+    "text": "Sign in",
+    "href": "/login",
+    "hasVisibleOutline": true
+  },
+  null,
+  {
+    "tag": "A",
+    "text": "NOORClinical Intelligence OS",
+    "href": "/",
+    "hasVisibleOutline": true
+  },
+  {
+    "tag": "INPUT",
+    "text": "",
+    "href": null,
+    "hasVisibleOutline": true
+  }
+]

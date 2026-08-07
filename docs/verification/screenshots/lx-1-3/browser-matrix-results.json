@@ -1,0 +1,32 @@
+[
+  {
+    "engine": "chromium",
+    "realOrEmulated": "real GPU hardware",
+    "canvasCount": 1,
+    "consoleErrorCount": 0,
+    "consoleErrors": [],
+    "scrollTimelineAdvanced": true,
+    "axeViolations": 0,
+    "axeIds": []
+  },
+  {
+    "engine": "firefox",
+    "realOrEmulated": "real Firefox/Gecko engine, software rendering",
+    "canvasCount": 1,
+    "consoleErrorCount": 0,
+    "consoleErrors": [],
+    "scrollTimelineAdvanced": true,
+    "axeViolations": 0,
+    "axeIds": []
+  },
+  {
+    "engine": "webkit",
+    "realOrEmulated": "real WebKit engine (not real Safari/macOS), software rendering",
+    "canvasCount": 1,
+    "consoleErrorCount": 0,
+    "consoleErrors": [],
+    "scrollTimelineAdvanced": true,
+    "axeViolations": 0,
+    "axeIds": []
+  }
+]

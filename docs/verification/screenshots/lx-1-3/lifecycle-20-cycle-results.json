@@ -1,0 +1,57 @@
+{
+  "cinematicRouteSamples": [
+    {
+      "cycle": 0,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 4,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 8,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 12,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 16,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 19,
+      "heapMB": 9.54
+    }
+  ],
+  "cinematicDelta": "0.00",
+  "controlRouteSamples": [
+    {
+      "cycle": 0,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 4,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 8,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 12,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 16,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 19,
+      "heapMB": 9.54
+    }
+  ],
+  "controlDelta": "0.00",
+  "finalCanvasCountAfter20Cycles": 1
+}

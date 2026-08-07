@@ -1,0 +1,8 @@
+{
+  "distinctOrigins": [
+    "http://localhost:4611"
+  ],
+  "externalOrigins": [],
+  "totalRequests": 23,
+  "secretScanHits": []
+}

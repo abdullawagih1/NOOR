@@ -1,0 +1,55 @@
+{
+  "runId": "070b1a99",
+  "steps": [
+    {
+      "step": "create synthetic auth user",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "step": "create profile row",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "step": "create active clinician membership",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "step": "cinematic root -> Sign in -> /login",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "step": "successful login redirects to \"/clinician\", never \"/\"",
+      "ok": true,
+      "detail": "landed on /clinician"
+    },
+    {
+      "step": "video captured",
+      "ok": true,
+      "detail": "C:\\ASTA\\NOOR\\noor-sprint0\\noor\\docs\\verification\\videos\\lx-1-3\\page@4b6756f2a28d2d7fbfabb35ced2106bb.webm"
+    },
+    {
+      "step": "cleanup: delete organization_membership row",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "step": "cleanup: delete profile row",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "step": "cleanup: delete auth user",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "step": "cleanup verification: zero residual rows",
+      "ok": true,
+      "detail": "profiles=0 memberships=0"
+    }
+  ]
+}

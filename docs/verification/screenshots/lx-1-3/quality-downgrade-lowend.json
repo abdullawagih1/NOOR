@@ -1,0 +1,11 @@
+{
+  "lowHardwareConcurrencyDeviceMemory": true,
+  "diagnosticsAfterLoad": {
+    "drawCalls": 16,
+    "triangles": 3088,
+    "points": 0,
+    "geometries": 7,
+    "textures": 2,
+    "activeParticles": 380
+  }
+}

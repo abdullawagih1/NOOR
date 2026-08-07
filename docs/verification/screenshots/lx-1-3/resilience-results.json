@@ -1,0 +1,36 @@
+{
+  "webglGetContextNull": {
+    "canvasCount": 0,
+    "ctaVisible": true,
+    "h1Visible": true,
+    "pageErrors": 0
+  },
+  "contextLossScene3": {
+    "lostSupported": true,
+    "canvasCountAfterLoss": 0,
+    "ctaAfterLoss": true,
+    "h1AfterLoss": true,
+    "pageErrors": 0
+  },
+  "noJavaScript": {
+    "h1Text": "Clinical intelligence begins with a source you can trust.",
+    "canvasCount": 0,
+    "ctaHref": "/login",
+    "bodyTextLength": 1673,
+    "sceneKeywordHits": 6
+  },
+  "rendererThrowsOnInit": {
+    "canvasCount": 0,
+    "ctaVisible": true,
+    "rawStackVisible": false,
+    "pageErrors": 0,
+    "consoleErrorCount": 0
+  },
+  "scrollReliability": {
+    "atEnd": 1,
+    "atStart": 0,
+    "atMid": 0.499926567777941,
+    "canvasAfterReload": 1,
+    "sequenceOk": true
+  }
+}

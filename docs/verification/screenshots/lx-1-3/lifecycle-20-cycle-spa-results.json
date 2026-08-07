@@ -1,0 +1,31 @@
+{
+  "samples": [
+    {
+      "cycle": 0,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 4,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 8,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 12,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 16,
+      "heapMB": 9.54
+    },
+    {
+      "cycle": 19,
+      "heapMB": 9.54
+    }
+  ],
+  "delta": 0,
+  "canvasCountFinal": 1,
+  "rafActive": true
+}

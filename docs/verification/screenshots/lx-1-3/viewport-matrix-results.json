@@ -1,0 +1,135 @@
+[
+  {
+    "label": "desktop",
+    "w": 1920,
+    "h": 1080,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "desktop",
+    "w": 1600,
+    "h": 900,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "desktop",
+    "w": 1440,
+    "h": 1000,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "desktop",
+    "w": 1440,
+    "h": 900,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "desktop",
+    "w": 1366,
+    "h": 768,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "desktop",
+    "w": 1280,
+    "h": 800,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "desktop",
+    "w": 1024,
+    "h": 768,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "mobile",
+    "w": 1024,
+    "h": 1366,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "mobile",
+    "w": 820,
+    "h": 1180,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "mobile",
+    "w": 768,
+    "h": 1024,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "mobile",
+    "w": 430,
+    "h": 932,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "mobile",
+    "w": 414,
+    "h": 896,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "mobile",
+    "w": 390,
+    "h": 844,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "mobile",
+    "w": 375,
+    "h": 812,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "mobile",
+    "w": 360,
+    "h": 800,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "mobile",
+    "w": 320,
+    "h": 568,
+    "overflow": false,
+    "ctaFound": true,
+    "ctaWithinViewport": true
+  },
+  {
+    "label": "orientation-change-at-scene5",
+    "overflowAfterRotate": false,
+    "canvasVisibleAfterRotate": true
+  }
+]

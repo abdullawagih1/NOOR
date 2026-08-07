@@ -1,0 +1,79 @@
+[
+  {
+    "attack": "https://example.com",
+    "finalUrl": "http://localhost:4610/login?next=https%3A%2F%2Fexample.com",
+    "hiddenNextValue": "/",
+    "stayedInternal": false,
+    "hiddenNextSafe": true
+  },
+  {
+    "attack": "//example.com",
+    "finalUrl": "http://localhost:4610/login?next=%2F%2Fexample.com",
+    "hiddenNextValue": "/",
+    "stayedInternal": false,
+    "hiddenNextSafe": true
+  },
+  {
+    "attack": "/%2F%2Fexample.com",
+    "finalUrl": "http://localhost:4610/login?next=%2F%252F%252Fexample.com",
+    "hiddenNextValue": "/%2F%2Fexample.com",
+    "stayedInternal": false,
+    "hiddenNextSafe": false
+  },
+  {
+    "attack": "javascript:alert(1)",
+    "finalUrl": "http://localhost:4610/login?next=javascript%3Aalert(1)",
+    "hiddenNextValue": "/",
+    "stayedInternal": true,
+    "hiddenNextSafe": true
+  },
+  {
+    "attack": "data:text/html,<script>alert(1)</script>",
+    "finalUrl": "http://localhost:4610/login?next=data%3Atext%2Fhtml%2C%3Cscript%3Ealert(1)%3C%2Fscript%3E",
+    "hiddenNextValue": "/",
+    "stayedInternal": true,
+    "hiddenNextSafe": true
+  },
+  {
+    "attack": "\\\\example.com",
+    "finalUrl": "http://localhost:4610/login?next=%5C%5Cexample.com",
+    "hiddenNextValue": "/",
+    "stayedInternal": false,
+    "hiddenNextSafe": true
+  },
+  {
+    "attack": "/\\example.com",
+    "finalUrl": "http://localhost:4610/login?next=%2F%5Cexample.com",
+    "hiddenNextValue": "/\\example.com",
+    "stayedInternal": false,
+    "hiddenNextSafe": false
+  },
+  {
+    "attack": "https:/example.com",
+    "finalUrl": "http://localhost:4610/login?next=https%3A%2Fexample.com",
+    "hiddenNextValue": "/",
+    "stayedInternal": false,
+    "hiddenNextSafe": true
+  },
+  {
+    "attack": "/redirect?next=https://example.com",
+    "finalUrl": "http://localhost:4610/login?next=%2Fredirect%3Fnext%3Dhttps%3A%2F%2Fexample.com",
+    "hiddenNextValue": "/",
+    "stayedInternal": false,
+    "hiddenNextSafe": true
+  },
+  {
+    "attack": "https%3A%2F%2Fexample.com",
+    "finalUrl": "http://localhost:4610/login?next=https%253A%252F%252Fexample.com",
+    "hiddenNextValue": "/",
+    "stayedInternal": false,
+    "hiddenNextSafe": true
+  },
+  {
+    "attack": "https://example.com%2f%2e%2e",
+    "finalUrl": "http://localhost:4610/login?next=https%3A%2F%2Fexample.com%252f%252e%252e",
+    "hiddenNextValue": "/",
+    "stayedInternal": false,
+    "hiddenNextSafe": true
+  }
+]

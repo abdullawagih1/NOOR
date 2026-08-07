@@ -1,0 +1,91 @@
+{
+  "scene1": {
+    "fps": 59,
+    "diagnostics": {
+      "drawCalls": 16,
+      "triangles": 3088,
+      "points": 0,
+      "geometries": 7,
+      "textures": 2,
+      "activeParticles": 850
+    }
+  },
+  "scene2": {
+    "fps": 58,
+    "diagnostics": {
+      "drawCalls": 20,
+      "triangles": 5328,
+      "points": 0,
+      "geometries": 12,
+      "textures": 2,
+      "activeParticles": 850
+    }
+  },
+  "scene3": {
+    "fps": 60,
+    "diagnostics": {
+      "drawCalls": 19,
+      "triangles": 4210,
+      "points": 0,
+      "geometries": 13,
+      "textures": 2,
+      "activeParticles": 850
+    }
+  },
+  "scene4": {
+    "fps": 56,
+    "diagnostics": {
+      "drawCalls": 25,
+      "triangles": 3698,
+      "points": 0,
+      "geometries": 19,
+      "textures": 2,
+      "activeParticles": 850
+    }
+  },
+  "scene5": {
+    "fps": 60,
+    "diagnostics": {
+      "drawCalls": 29,
+      "triangles": 4410,
+      "points": 467,
+      "geometries": 20,
+      "textures": 2,
+      "activeParticles": 467
+    }
+  },
+  "scene6": {
+    "fps": 61,
+    "diagnostics": {
+      "drawCalls": 47,
+      "triangles": 6720,
+      "points": 850,
+      "geometries": 23,
+      "textures": 3,
+      "activeParticles": 850
+    }
+  },
+  "scene7-mid": {
+    "fps": 61,
+    "diagnostics": {
+      "drawCalls": 47,
+      "triangles": 6720,
+      "points": 850,
+      "geometries": 24,
+      "textures": 3,
+      "activeParticles": 850
+    }
+  },
+  "scene7-final": {
+    "fps": 60,
+    "diagnostics": {
+      "drawCalls": 57,
+      "triangles": 9136,
+      "points": 850,
+      "geometries": 24,
+      "textures": 3,
+      "activeParticles": 850
+    }
+  },
+  "gpu": "ANGLE (Intel, Intel(R) RaptorLake-S Mobile Graphics Controller, OpenGL 4.5.0)"
+}
