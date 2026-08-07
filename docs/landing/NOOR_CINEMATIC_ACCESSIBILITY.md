@@ -1,8 +1,20 @@
 # NOOR Cinematic Accessibility
 
-Status: **LX-1.1 — In Progress** (checklist below is verified against
+Status: **LX-1.3 — Complete** (checklist below is verified against
 real `@axe-core/playwright` scans and manual checks in the verification
 report, not asserted from design intent alone)
+
+## LX-1.3 addendum — expanded coverage
+
+Beyond LX-1.2's landmark fixes (below), LX-1.3 added: real keyboard-only
+traversal (logical tab order, visible focus confirmed on every stop),
+125/150/200% browser zoom (0 overflow, CTA reachable at every level),
+`forced-colors: active` emulation (CTA remains visible), and axe scans
+against 3 real browser engines (Chromium/Firefox/WebKit), all 0
+violations. Real NVDA screen-reader testing remains unavailable in
+this environment — honestly marked LIMITED in
+`docs/launch/NOOR_LAUNCH_RISK_REGISTER.md` R-06, not claimed as done.
+Full detail: `docs/landing/NOOR_CINEMATIC_BROWSER_HARDENING.md`.
 
 ## LX-1.2 addendum — production-integration accessibility findings
 

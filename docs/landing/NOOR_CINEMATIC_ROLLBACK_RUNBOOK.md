@@ -1,6 +1,26 @@
 # NOOR Cinematic Rollback Runbook
 
-Status: **LX-1.2 — Complete. Rehearsed for real against the live Vercel project, not simulated.**
+Status: **LX-1.3 — Complete. Rehearsed for real a second time against the live Vercel project.**
+
+## LX-1.3 addendum — rehearsed again, plus a launch-day quick procedure
+
+Rehearsed a second time this mission using the identical procedure below (cinematic → legacy → cinematic), confirmed `Ready`/`target: preview` at every step via `vercel inspect`, total round trip under 2 minutes including verification. No new gaps found.
+
+### Launch-day quick procedure (mission §11)
+
+1. Detect a launch blocker (see `docs/launch/NOOR_CINEMATIC_LAUNCH_MONITORING.md` for explicit trigger criteria).
+2. Set `NOOR_PUBLIC_LANDING_EXPERIENCE=legacy` on the **Production** scope (`vercel env rm ... production` then `vercel env add ... production`).
+3. `vercel deploy --prod` to activate it (env changes require a new deployment to take effect on Production, same snapshot behavior as Preview).
+4. Verify `/` — real browser or `curl`, confirm legacy content renders.
+5. Verify `/login` — confirm it still resolves correctly (unaffected by this flag).
+6. Verify a real sign-in reaches an authorized workspace.
+7. Check the Vercel dashboard/CLI for deployment status (no dedicated status page exists — see `NOOR_CINEMATIC_LAUNCH_MONITORING.md` for what's actually observable today).
+8. Preserve `vercel logs`/`vercel inspect --logs` output from the incident window before it ages out.
+9. Investigate the root cause offline, without further public impact — the public site is already back on the known-good legacy experience.
+
+### A real, separate incident this mission found (not a rollback-mechanism defect)
+
+This mission also found and fixed a genuine Production outage (`docs/launch/NOOR_LAUNCH_RISK_REGISTER.md` R-01) caused by missing Supabase environment variables — unrelated to the feature-flag rollback mechanism itself (that mechanism worked correctly both times it was rehearsed), but a reminder that Production environment configuration as a whole, not just the landing-experience flag, is part of what "rollback readiness" depends on.
 
 ## The guarantee
 

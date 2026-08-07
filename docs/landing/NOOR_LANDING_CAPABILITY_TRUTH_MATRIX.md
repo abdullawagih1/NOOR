@@ -2,6 +2,16 @@
 
 Status: **LX-1.0 — In Progress**
 
+**LX-1.3 addendum:** re-audited a second time as part of launch-readiness
+hardening (mission §43). No row's status changed. Retrieval, vector
+evaluation, hybrid retrieval, reranking, and clinical-answer-generation
+claims were specifically re-checked and remain correctly labeled
+`Internal evaluation foundation`/`Future vision` — none of these are
+presented as clinician-facing in either landing variant. Every visible
+demonstration remains synthetic, non-patient, non-prescriptive,
+non-diagnostic — confirmed by direct scene-copy review, unchanged from
+LX-1.1.1.
+
 **LX-1.2 addendum:** every claim on both the legacy and cinematic
 landing variants was re-audited against this matrix as part of
 production integration (mission §12). No row's status changed — no

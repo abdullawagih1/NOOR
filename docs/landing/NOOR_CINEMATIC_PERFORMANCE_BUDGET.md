@@ -1,6 +1,20 @@
 # NOOR Cinematic Performance Budget
 
-Status: **LX-1.2 — Complete (Scene 5 optimization + production-integration numbers below).** Prior LX-1.1.1 real-GPU numbers are kept below as history.
+Status: **LX-1.3 — Complete, with one open finding.** Prior LX-1.1.1/LX-1.2 real-GPU numbers are kept below as history.
+
+## LX-1.3 update — honest 3-run Lighthouse methodology surfaced a real mobile gap
+
+Single-run Lighthouse numbers (LX-1.2's own methodology) are noisy on a shared local development machine. LX-1.3 ran **3 real Lighthouse passes** per state and reports the full run set plus the median (never cherry-picking the best run, per mission §13):
+
+| Route/variant | Runs | Median |
+| --- | --- | --- |
+| Cinematic desktop | 0.95, 1.00, 1.00 | **1.00** |
+| Cinematic mobile | 0.88, 0.89, 0.92 | **0.89** — below the ≥90 target |
+| Legacy mobile (control, same auth-check code path) | 0.98, 0.95, 0.96 | 0.96 — comfortably clears the target |
+
+The legacy-mobile control run (same machine, same methodology, same auth-check cost) comfortably clearing 90+ every time rules out pure environment noise as the full explanation for cinematic's shortfall — the cinematic route carries a real, measurable additional mobile cost. **This is the sole reason LX-1.3's Go/No-Go decision is NO-GO.** See `docs/launch/NOOR_LAUNCH_RISK_REGISTER.md` R-03 and `docs/launch/NOOR_CINEMATIC_GO_NO_GO.md`. Not chased to a fix this mission (would require further investigation without risking a rushed change to the frozen visual direction) — recommended as the first item for a follow-up mission before any LX-1.4 launch decision.
+
+Scene-by-scene FPS, by contrast, shows **zero regression** from the LX-1.2 optimization — all 7 scenes held 56-61fps across two independent real-GPU passes this mission. Full detail: `docs/landing/NOOR_CINEMATIC_RUNTIME_RELIABILITY.md`.
 
 ## LX-1.2 — Scene 5 optimization (mission §16)
 
