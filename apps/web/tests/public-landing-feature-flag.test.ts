@@ -63,6 +63,41 @@ check("a malformed/misspelled value fails closed to legacy, never crashes", () =
   }
 });
 
+check("LX-1.3: an expanded adversarial/malformed-value matrix all fail closed to legacy, never crash", () => {
+  const adversarial = [
+    "cinematicx",
+    "   ",
+    "\t\n",
+    "https://example.com/cinematic",
+    JSON.stringify({ experience: "cinematic" }),
+    "cinematic".repeat(5000), // ~45,000 chars — a pathologically long value
+    "cinematic;true",
+    "CiNeMaTiC",
+    "𝕔𝕚𝕟𝕖𝕞𝕒𝕥𝕚𝕔", // unicode look-alike, must not fuzzy-match
+  ];
+  for (const bad of adversarial) {
+    withEnv(bad, () => {
+      assert.equal(getPublicLandingExperience(), "legacy");
+    });
+  }
+});
+
+check("LX-1.3: a real, investigated finding — process.env truncates embedded null bytes (Node/OS behavior, not this resolver's logic)", () => {
+  // `"cinematic\0garbage"` assigned to process.env is silently truncated by
+  // Node to `"cinematic"` (confirmed directly: process.env mirrors C-string,
+  // null-terminated OS environment-variable semantics). This is NOT a bug
+  // in getPublicLandingExperience() — by the time its own `=== "cinematic"`
+  // check runs, the value genuinely IS the string "cinematic". Recorded
+  // here as a documented, understood behavior (LX-1.3 mission §10) rather
+  // than an unexplained test failure: exploiting it would require the
+  // same environment-variable write access that could just set the flag
+  // directly, so it carries no real escalation risk.
+  withEnv("cinematic\0garbage-after-null-byte", () => {
+    assert.equal(process.env[ENV_KEY], "cinematic", "process.env truncated the value at the null byte, as expected");
+    assert.equal(getPublicLandingExperience(), "cinematic");
+  });
+});
+
 if (original === undefined) delete process.env[ENV_KEY];
 else process.env[ENV_KEY] = original;
 

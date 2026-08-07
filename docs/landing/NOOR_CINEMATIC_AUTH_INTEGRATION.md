@@ -1,8 +1,14 @@
 # NOOR Cinematic Landing — Auth Integration
 
-Status: **LX-1.2 — Complete.** Records the post-login redirect defect (mission §3.3/§23), its root cause, the fix, and the real verification evidence.
+Status: **LX-1.3 — Complete.** Records the post-login redirect defect (mission §3.3/§23), its root cause, the fix, and the real verification evidence.
 
-## The defect, confirmed
+## LX-1.3 update — the missing video recorded, a real open-redirect gap found and fixed
+
+1. **The authentication-journey video** flagged as missing in LX-1.2's own report is now recorded (`docs/verification/videos/lx-1-3/05-authentication-journey.webm`) — same real-hosted-Supabase, synthetic-account methodology, this time captured on video and verified frame-by-frame.
+2. **A real, evidence-based open-redirect hardening gap** was found via WHATWG URL-parser analysis: `sanitizeNextPath()` only checked string prefixes and did not reject a leading `/\host` — confirmed via Node's own `URL` constructor that this resolves OFF the intended origin under standard URL resolution (`new URL("/\\evil.example", base).origin !== base`), even though one specific browser's address-bar navigation happens to normalize it back to same-origin. Fixed: the sanitizer now rejects any backslash outright and resolves every candidate against a fixed placeholder origin via the `URL` constructor rather than continuing to stack string-prefix checks. See `docs/landing/NOOR_CINEMATIC_SECURITY_REVIEW.md` and the regression tests in `apps/web/tests/redirect.test.ts`.
+3. **Re-verified**: the full login-routing test matrix (mission §24/§33) still passes end-to-end after the hardening change — 13 unit-test cases plus the real E2E run, all green.
+
+## The defect, confirmed (LX-1.2, unchanged)
 
 `apps/web/lib/auth/actions.ts::signInWithPassword` redirected every successful sign-in to whatever `next` resolved to — and `sanitizeNextPath("")` returns `"/"`, so a visitor who reached `/login` with no explicit `next` parameter (the common case: clicking "Sign in" from the landing page) was sent back to the public landing after successfully authenticating, never to their actual workspace. Confirmed by reading the code directly before making any change — not assumed from the mission description alone.
 

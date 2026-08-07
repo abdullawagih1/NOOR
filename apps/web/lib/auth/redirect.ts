@@ -2,14 +2,40 @@ import { PERMISSIONS, type PermissionKey } from "@/lib/auth/permissions";
 
 /**
  * Restricts a caller-supplied "next" path to a same-origin, relative path.
- * Rejects absolute URLs and protocol-relative ("//host") strings, which are
- * the two shapes used for open-redirect attacks against a login flow.
+ *
+ * LX-1.3 hardening (mission §34): the original version only checked
+ * string prefixes (`//`, `://`) — real, evidence-based testing this
+ * mission found that WHATWG URL resolution treats a leading `/\` (a
+ * single forward slash followed by a backslash) as protocol-relative
+ * for "special" schemes, resolving `"/\\example.com"` to origin
+ * `http://example.com`, confirmed directly via Node's own `URL`
+ * parser: `new URL("/\\example.com", base).origin` is NOT the base
+ * origin. A real Chromium address-bar navigation happens to normalize
+ * this to a same-origin path, but that is Chrome's own navigation-
+ * specific behavior, not guaranteed for every URL-consuming code path
+ * (a proxy, a different browser, Next's own redirect handling, a
+ * future dependency) — "do not rely only on string prefix checks if
+ * an existing URL parser is safer" (mission §34). Resolving the
+ * candidate against a fixed internal placeholder origin and requiring
+ * the resolved origin to stay unchanged is the robust version of the
+ * same check; a leading backslash is additionally rejected outright
+ * as belt-and-suspenders, since it should never appear in a real
+ * internal path.
  */
+const SANITIZE_BASE_ORIGIN = "http://noor-internal-sanitize-base.invalid";
+
 export function sanitizeNextPath(next: string | null | undefined): string {
   if (!next) return "/";
   if (!next.startsWith("/")) return "/";
   if (next.startsWith("//")) return "/";
   if (next.includes("://")) return "/";
+  if (next.includes("\\")) return "/";
+  try {
+    const resolved = new URL(next, SANITIZE_BASE_ORIGIN);
+    if (resolved.origin !== SANITIZE_BASE_ORIGIN) return "/";
+  } catch {
+    return "/";
+  }
   return next;
 }
 

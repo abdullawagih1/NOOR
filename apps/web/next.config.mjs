@@ -16,6 +16,24 @@ const nextConfig = {
   // supported config flag so local screenshots taken during this
   // corrective mission represent the real, shipped experience.
   devIndicators: false,
+
+  // LX-1.3: fixes the real, investigated `<meta name="description">`-
+  // renders-in-<body>-not-<head> issue on dynamic routes (LX-1.2's
+  // NOOR_CINEMATIC_SEO_METADATA.md). Root cause, confirmed against
+  // Next.js's own official docs this mission (not assumed): Next 15.2+
+  // "streaming metadata" — for any dynamically-rendered route, HEAD
+  // metadata streams in after the initial UI rather than blocking on
+  // it, and is only guaranteed synchronous/head-placed for a built-in
+  // list of known non-JS "HTML-limited" crawlers (Google's own
+  // crawlers were ALREADY on that default list, so real Google
+  // indexing was never actually at risk — but Lighthouse's Chrome
+  // client is not on it, hence the real 0.92 SEO score). `generateMetadata()`
+  // on `/` does no meaningful async work (it only reads an env var),
+  // so there is no real perceived-performance benefit to streaming it
+  // here — `htmlLimitedBots: /.*/ ` is Next's own documented, fully
+  // supported switch to disable streaming metadata for every request,
+  // not a user-agent hack or a workaround: https://nextjs.org/docs/app/api-reference/config/next-config-js/htmlLimitedBots
+  htmlLimitedBots: /.*/,
 };
 
 export default nextConfig;

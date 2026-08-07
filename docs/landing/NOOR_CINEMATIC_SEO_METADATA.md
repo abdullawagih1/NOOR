@@ -1,8 +1,12 @@
 # NOOR Cinematic Landing — SEO and Metadata
 
-Status: **LX-1.2 — Complete, with one honestly-documented framework limitation.**
+Status: **LX-1.3 — Complete. The LX-1.2 metadata-streaming limitation is now RESOLVED, not just documented.**
 
-## What was added
+## LX-1.3 update — the streaming-metadata gap is fixed
+
+The "known framework limitation" section below (LX-1.2's honest, unresolved finding) was investigated further from first principles this mission, including fetching current official Next.js documentation directly (not relying on memory). Root cause confirmed: Next.js 15.2+'s deliberate "streaming metadata" behavior for dynamic routes — which already exempts Google's own crawlers by default, so real search indexing was never actually at risk, only the Lighthouse score (a proxy metric) and any non-exempted tool/bot. **Fixed** via Next's own officially-documented `htmlLimitedBots: /.*/ ` config switch in `next.config.mjs` — not a workaround, not a route-architecture compromise, no sacrifice of the auth-aware CTA. Lighthouse SEO now reads a clean **1.00** (confirmed via a real post-fix run). Full investigation: `docs/landing/NOOR_NEXT_METADATA_STREAMING_ASSESSMENT.md`.
+
+## What was added (LX-1.2)
 
 - `apps/web/app/robots.ts` — the app's first real `robots.txt`. Disallows every workspace/auth-utility/internal-design route; allows `/`. Points `sitemap` at `/sitemap.xml`.
 - `apps/web/app/sitemap.ts` — the app's first real `sitemap.xml`. Lists only `/` — the one genuinely public, indexable page.
@@ -28,8 +32,8 @@ While measuring Lighthouse SEO scores against a real local production build, the
 
 This isolates the real cause to Next.js 15.5.21's own "streaming metadata" behavior (`node_modules/next/dist/server/lib/streaming-metadata.js`) for **any dynamically-rendered route**, not to anything this mission's code does. The framework deliberately exempts known simple/non-JS-executing "HTML-limited" bot user agents from this path — those crawlers already receive synchronous, correctly `<head>`-placed metadata unconditionally, regardless of this route. The residual, unresolved risk is narrower than the raw Lighthouse score suggests, but is not proven zero for a JS-executing crawler that reads `document.head` strictly rather than the whole document.
 
-**Why this wasn't chased further:** a real fix would require either ejecting `/` from dynamic rendering (which would break the auth-aware CTA — a mission requirement) or a Next.js version change, both out of scope for a bounded mission. Recorded as `KNOWN_LIMITATIONS.md` item — see that file for the exact entry — rather than silently accepted or falsely claimed fixed.
+**Why this wasn't chased further in LX-1.2:** at the time, a real fix appeared to require either ejecting `/` from dynamic rendering (which would break the auth-aware CTA) or a Next.js version change. **LX-1.3 found a third option**: Next.js's own `htmlLimitedBots` config already existed for exactly this purpose (it ships as of 15.2.0 — this app was already on 15.5.21, so the switch was available all along; LX-1.2 simply hadn't fetched the current official docs to find it). See the update at the top of this document and `NOOR_NEXT_METADATA_STREAMING_ASSESSMENT.md`.
 
 ## SEO score, honestly reported
 
-Lighthouse SEO consistently reads `0.92` (one point: `meta-description`) on every dynamically-rendered route in this app, including ones this mission never touched (`/login`). `/403` (fully static) reads `1.00`. This is the accurate, current state — not rounded up.
+**Post-LX-1.3 fix**: Lighthouse SEO now reads a clean `1.00` on the cinematic route, confirmed via a real Lighthouse run after applying `htmlLimitedBots: /.*/ ` in `next.config.mjs`. (Historical note, preserved for the record: prior to this fix, it consistently read `0.92` — one point, `meta-description` — on every dynamically-rendered route in this app, including `/login`; `/403`, fully static, already read `1.00`.)

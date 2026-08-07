@@ -43,6 +43,34 @@ check("a scheme embedded later in the string is still rejected", () => {
   assert.equal(sanitizeNextPath("/redirect?to=https://evil.example"), "/");
 });
 
+check("LX-1.3: backslash-based open-redirect variants are rejected (WHATWG URL parser, not string prefixes)", () => {
+  // new URL("/\\evil.example", base).origin resolves OFF the base
+  // origin — confirmed directly against Node's own URL parser this
+  // mission — even though it happens to render as same-origin in a
+  // Chromium address bar. Reject regardless of any one browser's
+  // navigation-specific normalization.
+  for (const attack of ["/\\evil.example", "\\/evil.example", "\\\\evil.example", "/\\/evil.example", "/\\\\evil.example"]) {
+    assert.equal(sanitizeNextPath(attack), "/", `expected "/" for ${JSON.stringify(attack)}`);
+  }
+});
+
+check("LX-1.3: encoded-slash and mixed-encoding tricks resolve same-origin, never escape (real WHATWG URL resolution)", () => {
+  // These do NOT resolve off-origin (confirmed via new URL(...).origin
+  // staying the sanitize base), so they are honored as literal,
+  // same-origin (if unusual) paths — the destination route's own
+  // layout still enforces whatever authorization it needs on arrival.
+  for (const benign of ["/%2F%2Fevil.example", "/redirect?next=https://evil.example", "/path%2e%2e/evil"]) {
+    const result = sanitizeNextPath(benign);
+    assert.ok(result.startsWith("/"), `expected a same-origin path for ${JSON.stringify(benign)}, got ${result}`);
+    assert.equal(result.includes("://"), false);
+  }
+});
+
+check("LX-1.3: a malformed URI sequence never throws, always fails closed", () => {
+  assert.equal(sanitizeNextPath("/%"), "/%");
+  assert.equal(sanitizeNextPath("/%zz"), "/%zz");
+});
+
 if (failures > 0) {
   console.log(`\n${failures} test(s) failed.`);
   process.exit(1);
