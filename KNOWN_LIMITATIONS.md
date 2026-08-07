@@ -792,29 +792,20 @@ the same PR that resolves an item.
     device before treating the cinematic route's mobile performance
     as production-verified.
 
-94. **`<meta name="description">` renders as a child of `<body>`, not
+94. ~~`<meta name="description">` renders as a child of `<body>`, not
     `<head>`, in the live DOM on every dynamically-rendered route in
-    this Next.js 15.5.21 app** — found during LX-1.2 while measuring
-    Lighthouse SEO scores against a real local production build, and
-    confirmed pre-existing (not introduced by LX-1.2): the same
-    misplacement already existed on `/login`, a route LX-1.2 never
-    touched, which has no page-level `generateMetadata` at all and
-    only inherits `layout.tsx`'s static metadata. A fully static route
-    (`/403`) does not exhibit this. Root-caused to Next.js's own
-    "streaming metadata" behavior for dynamically-rendered routes
-    (`node_modules/next/dist/server/lib/streaming-metadata.js`), which
-    deliberately exempts known simple/non-JS "HTML-limited" bot user
-    agents (they get synchronous, correctly `<head>`-placed metadata
-    unconditionally) but not ordinary browsers, Lighthouse, or
-    JS-executing crawlers. Neither making `generateMetadata`
-    synchronous nor removing the explicit `dynamic = "force-dynamic"`
-    export changed this (both tried against a real build). Not fixed
-    this mission — a real fix would require ejecting the route from
-    dynamic rendering, which would break the mandatory auth-aware CTA.
-    See `docs/landing/NOOR_CINEMATIC_SEO_METADATA.md` for the full
-    investigation. Lighthouse SEO consistently reads `0.92`, not
-    `1.00`, on every dynamic route in this app as a result — reported
-    honestly throughout LX-1.2's verification, not rounded up.
+    this Next.js 15.5.21 app.~~ **Resolved (LX-1.3).** Investigated
+    further from first principles, including fetching current official
+    Next.js documentation directly rather than relying on memory —
+    confirmed this is Next 15.2+'s deliberate "streaming metadata"
+    behavior, which already exempts Google's own crawlers by default
+    (real search indexing was never actually at risk). Next ships an
+    official, documented config switch for exactly this situation:
+    `htmlLimitedBots`. Applied `htmlLimitedBots: /.*/ ` in
+    `next.config.mjs` — not a workaround, not a route-architecture
+    compromise, no sacrifice of the auth-aware CTA. Lighthouse SEO now
+    reads a clean `1.00`, confirmed via a real post-fix run. See
+    `docs/landing/NOOR_NEXT_METADATA_STREAMING_ASSESSMENT.md`.
 
 95. **Direct HTTP verification of the real Vercel Preview URL's
     content was not possible during LX-1.2** — Deployment Protection
@@ -840,12 +831,79 @@ the same PR that resolves an item.
     and re-run the existing verification scripts against both before
     treating this route as cross-browser-verified.
 
-97. **Recording #05 (the real authentication journey) was captured as
+97. ~~Recording #05 (the real authentication journey) was captured as
     a scripted Playwright run + screenshot + JSON log, not as a
-    `.webm` video**, unlike recordings #01-#04/#06. The underlying
-    journey was genuinely exercised against the real hosted Supabase
-    project with a synthetic account (see
-    `docs/verification/screenshots/lx-1-2/auth-e2e-results.json`) —
-    only the video-capture step was skipped. See
-    `docs/verification/lx-1-2-media-index.md` for the honest
-    accounting of this gap.
+    `.webm` video.~~ **Resolved (LX-1.3).** A real video recording of
+    the full authentication journey now exists:
+    `docs/verification/videos/lx-1-3/05-authentication-journey.webm`,
+    frame-verified, using the same real-hosted-Supabase synthetic
+    account methodology (created, exercised, fully deleted with
+    cleanup verified).
+
+98. **Production's Vercel environment had zero environment variables
+    configured at all, causing a real, active HTTP 500 outage on both
+    `/` and `/login` at the start of LX-1.3.** Found via direct `curl`
+    against the live production URL, root-caused via live `vercel
+    logs` to a `ZodError` from `getPublicEnv()` requiring
+    `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`. This
+    predates LX-1.2 (`/login` was already silently broken; `/admin`
+    degraded gracefully via middleware's fail-closed redirect, which
+    itself then also 500'd) — LX-1.2's new auth-aware CTA is what
+    extended the same gap to the previously-static, previously-working
+    `/`. **Resolved**: with explicit user approval, the same values
+    already correct in Preview were copied into the Production scope
+    and a real `vercel deploy --prod` was run; re-verified `/` → 200,
+    `/login` → 200, `/admin` → 200. A related architectural gap
+    remains open (see item 99) — this entry covers only the specific
+    incident, which is fully fixed. See
+    `docs/launch/NOOR_LAUNCH_RISK_REGISTER.md` R-01.
+
+99. **`resolveLandingCta()` has no defensive fallback if
+    `getAuthenticatedContext()` throws for any reason** (a Supabase
+    misconfiguration, a transient outage, a network blip) — item 98's
+    exact failure mode proves a single upstream dependency can crash
+    the ENTIRE public landing page, not just the auth-aware CTA
+    feature. Not fixed this mission (the immediate trigger, item 98,
+    is fixed) — recommended: wrap the call in `try/catch`, falling
+    back to the unauthenticated "Sign in" CTA on any error. See
+    `docs/launch/NOOR_LAUNCH_RISK_REGISTER.md` R-02.
+
+100. **Cinematic mobile Lighthouse Performance does not reliably clear
+     the ≥90 target under honest 3-run median methodology** — real
+     runs: `0.88, 0.89, 0.92` (median 0.89). Legacy `/` (the identical
+     auth-check code path, same machine, same methodology) scored a
+     comfortable median `0.96` in the same session, ruling out pure
+     environment noise as the full explanation. Not chased to a fix
+     this mission, to avoid a rushed change under time pressure to the
+     frozen visual direction. **This is the sole reason LX-1.3's
+     Go/No-Go verdict is NO-GO.** See
+     `docs/launch/NOOR_LAUNCH_RISK_REGISTER.md` R-03 and
+     `docs/launch/NOOR_CINEMATIC_GO_NO_GO.md`.
+
+101. **No CSP or security headers are configured anywhere in the
+     application** — confirmed via direct inspection of
+     `next.config.mjs` (no `headers()` function) and the repository
+     root (no `vercel.json`). This is the existing baseline for the
+     ENTIRE app, not something specific to or newly introduced by the
+     cinematic landing — out of LX-1.3's scope to introduce narrowly
+     for one route. See `docs/launch/NOOR_LAUNCH_RISK_REGISTER.md`
+     R-05.
+
+102. **No real screen-reader (NVDA), real Safari/macOS, or real
+     physical mobile device testing was performed during LX-1.3** —
+     none of this software/hardware is available in this environment.
+     Real Firefox and real WebKit browser *engine* testing (installed
+     this mission) substituted where possible, honestly labeled as
+     engine-level testing, not device/OS-level testing. See
+     `docs/launch/NOOR_LAUNCH_RISK_REGISTER.md` R-06/R-07.
+
+103. **`apps/worker`'s pytest suite could not be run during LX-1.3** —
+     `apps/worker/.venv/Scripts/python.exe -m pytest tests/ -q` fails
+     at collection with `pydantic_core.ValidationError: ocr_render_dpi`
+     because a local `apps/worker/.env` has `OCR_RENDER_DPI=` (empty
+     value), which `pydantic-settings` cannot parse as the required
+     `int` type. Pre-existing, local-environment-only, unrelated to
+     the cinematic landing (confirmed zero Worker files touched this
+     mission) — not fixed, since `apps/worker` is out of this
+     mission's scope. See `docs/launch/NOOR_LAUNCH_RISK_REGISTER.md`
+     R-08.

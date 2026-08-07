@@ -1,5 +1,33 @@
 # Changelog
 
+## [Unreleased] — LX-1.3: Production Hardening, Reliability, Accessibility, SEO, Performance, and Launch Readiness
+
+The final technical hardening gate before a possible LX-1.4 launch.
+Verdict: NO-GO — one real, honestly-measured mobile-performance gap
+remains. Production continued serving the legacy landing throughout.
+
+### Fixed
+
+* **A real, active Production outage** — `/` and `/login` were returning HTTP 500 because Production's Vercel environment had zero variables configured (`NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` missing). Fixed by copying the correct values (already present in Preview) into the Production scope and redeploying, with explicit user approval before touching Production credentials.
+* `apps/web/lib/auth/redirect.ts::sanitizeNextPath()` — a real open-redirect hardening gap: a backslash-prefixed `next` value resolved off-origin under WHATWG URL parsing. Rewritten to reject backslashes outright and resolve every candidate via the `URL` constructor against a fixed placeholder origin, instead of stacking string-prefix checks.
+* `apps/web/next.config.mjs` — the LX-1.2 SEO metadata-streaming limitation (`<meta name="description">` rendering outside `<head>` on dynamic routes) is now genuinely fixed via Next's own officially-documented `htmlLimitedBots: /.*/ ` config switch, found through fresh official-documentation research. Lighthouse SEO now reads 1.00.
+
+### Added
+
+* `docs/launch/NOOR_LAUNCH_RISK_REGISTER.md`, `NOOR_CINEMATIC_GO_NO_GO.md`, `NOOR_CINEMATIC_LAUNCH_MONITORING.md`.
+* `docs/landing/NOOR_NEXT_METADATA_STREAMING_ASSESSMENT.md`, `NOOR_CINEMATIC_BROWSER_HARDENING.md`, `NOOR_CINEMATIC_RUNTIME_RELIABILITY.md`, `NOOR_CINEMATIC_SECURITY_REVIEW.md`.
+* `docs/verification/lx-1-3-baseline.md`, `lx-1-3-test-matrix.md`, `lx-1-3-hardening-report.md`, `lx-1-3-media-index.md`, `docs/verification/screenshots/lx-1-3/`, `docs/verification/videos/lx-1-3/` (7 clean recordings, including the authentication-journey video LX-1.2 was missing).
+* Real Firefox and WebKit Playwright browser binaries (installed this mission via `npx playwright install firefox webkit`) — used for genuine cross-engine verification, not previously available.
+* New regression test cases in `apps/web/tests/redirect.test.ts` (backslash/encoded-slash open-redirect variants) and `apps/web/tests/public-landing-feature-flag.test.ts` (expanded adversarial value matrix, incl. a documented `process.env` null-byte-truncation finding).
+
+### Changed
+
+* `docs/landing/NOOR_CINEMATIC_PERFORMANCE_BUDGET.md`, `NOOR_CINEMATIC_ACCESSIBILITY.md`, `NOOR_CINEMATIC_ROLLBACK_RUNBOOK.md`, `NOOR_CINEMATIC_SEO_METADATA.md`, `NOOR_CINEMATIC_AUTH_INTEGRATION.md`, `NOOR_LANDING_CAPABILITY_TRUTH_MATRIX.md` — updated with LX-1.3's real findings, prior content preserved as history.
+
+### Known gap, honestly reported (not fixed this mission)
+
+* Cinematic mobile Lighthouse Performance median (0.89, 3 real runs) falls short of the ≥90 target — legacy mobile (same auth-check code path, same machine/methodology) scored a comfortable median 0.96 in the same session, ruling out pure measurement noise. See `docs/launch/NOOR_LAUNCH_RISK_REGISTER.md` R-03.
+
 ## [Unreleased] — LX-1.2: Production Cinematic Landing Implementation and Controlled Integration
 
 Promotes the approved LX-1.1.1 cinematic prototype into

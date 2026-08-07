@@ -1,10 +1,117 @@
 # PROJECT_STATE.md
 
-**Last updated:** LX-1.2 — Production Cinematic Landing Implementation
-and Controlled Integration session (Claude Code, this environment)
+**Last updated:** LX-1.3 — Production Hardening, Reliability,
+Accessibility, SEO, Performance, and Launch Readiness session (Claude
+Code, this environment)
 **Updated by:** Noor Delivery Council (Claude Code)
 
 ---
+
+## -19. This session: LX-1.3 — Production Hardening, Reliability, Accessibility, SEO, Performance, and Launch Readiness
+
+The final technical hardening gate before a possible LX-1.4 launch —
+answering one question with evidence: is the approved cinematic
+landing technically safe to enable in Production? The verdict is
+**not yet** — one real, honestly-measured gap remains. Production
+stayed on the legacy landing throughout this entire mission,
+confirmed via `vercel env ls production` before and after every
+change.
+
+**A real, active production outage was found and fixed before any
+planned hardening work began.** Before capturing any baseline, a
+direct `curl` against the live production URL returned HTTP 500 on
+both `/` and `/login`. Root-caused via live `vercel logs` (not
+guessed): Production's Vercel environment had **zero environment
+variables configured at all** — `NEXT_PUBLIC_SUPABASE_URL`/
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` were missing entirely. This predated
+LX-1.2 (`/login` was already silently broken), but LX-1.2's new
+auth-aware CTA extended the same gap to the previously-static,
+previously-working `/`, turning a partial issue into a full homepage
+outage. Fixed, with explicit user approval before touching Production
+credentials: copied the same values already correct in Preview into
+the Production scope, then ran a real `vercel deploy --prod`. Both
+routes confirmed 200 afterward; a side effect (the canonical URL
+resolving to `http://localhost:3000`) was also fixed by the same
+change. `NOOR_PUBLIC_LANDING_EXPERIENCE` was never touched — the site
+remained on `legacy` throughout.
+
+**Real cross-browser testing was substantially upgraded this
+session**: Playwright's Firefox and WebKit browser binaries were
+installed (previously absent), and both real engines render the
+cinematic experience correctly — 0 console errors, 0 axe violations,
+matching Chromium's real-GPU results, confirmed via direct screenshot
+review. 16 viewport configurations plus an orientation-change test all
+passed with 0 horizontal overflow. 20 real Three.js mount/unmount
+cycles (using genuine in-app SPA navigation, the rigorous variant, not
+just full page reloads) showed 0.00MB heap growth and exactly 1
+surviving canvas. WebGL initialization failure, real
+`WEBGL_lose_context` context loss mid-scene, a simulated renderer
+exception, and full JavaScript disablement all converged on the same
+safe outcome — complete static/semantic fallback, CTA and heading
+intact, zero raw stack traces.
+
+**The LX-1.2 metadata-streaming SEO gap is now genuinely fixed, not
+just documented.** Re-investigated from first principles, including
+fetching current official Next.js documentation directly rather than
+relying on memory — confirmed Next 15.2+'s deliberate "streaming
+metadata" behavior already exempts Google's own crawlers by default
+(real indexing was never actually at risk), and that Next ships an
+official, documented config switch (`htmlLimitedBots`) for exactly
+this situation. Applied `htmlLimitedBots: /.*/ ` in `next.config.mjs`
+— no workaround, no architecture compromise, no sacrifice of the
+auth-aware CTA. Lighthouse SEO now reads a clean 1.00.
+
+**A real, evidence-based open-redirect hardening gap was found and
+fixed.** `sanitizeNextPath()` only checked string prefixes; WHATWG
+URL-parser analysis (confirmed directly against Node's own `URL`
+constructor, not assumed) showed a leading `/\host` value resolves OFF
+the intended origin under standard URL resolution, even though one
+specific browser's address-bar navigation happens to normalize it back
+to same-origin. Fixed by rejecting backslashes outright and resolving
+every candidate against a fixed placeholder origin via the URL
+constructor. New regression tests cover 5 backslash variants plus
+encoded-slash and malformed-URI edge cases.
+
+**The real, previously-missing authentication-journey video (flagged
+as a gap in LX-1.2) is now recorded** — a synthetic account created
+against the real hosted Supabase project, driven through a real
+browser sign-in with no `next` parameter, landing on `/clinician`
+(never `/`), captured on video, then fully deleted with cleanup itself
+verified (zero residual rows).
+
+**The one genuine, unresolved finding: cinematic mobile Lighthouse
+Performance does not reliably clear the ≥90 target under honest 3-run
+median methodology.** Real runs: `0.88, 0.89, 0.92` (median 0.89).
+Legacy `/` (the same auth-check code path, same machine, same
+methodology) scored a comfortable median 0.96 in the same session —
+ruling out pure measurement noise as the full explanation and
+confirming the cinematic route carries a real, measurable additional
+mobile cost. Desktop performance, accessibility, security, and every
+other Core Web Vitals target passed cleanly. Not chased to a fix this
+mission — flagged as the sole blocking item for the Go/No-Go decision
+below, to avoid a rushed change under time pressure to the frozen
+visual direction.
+
+Wrote 8 new docs (`NOOR_LAUNCH_RISK_REGISTER.md`,
+`NOOR_CINEMATIC_GO_NO_GO.md`, `NOOR_CINEMATIC_LAUNCH_MONITORING.md`,
+`NOOR_NEXT_METADATA_STREAMING_ASSESSMENT.md`,
+`NOOR_CINEMATIC_BROWSER_HARDENING.md`,
+`NOOR_CINEMATIC_RUNTIME_RELIABILITY.md`,
+`NOOR_CINEMATIC_SECURITY_REVIEW.md`) plus 4 verification reports
+(baseline, test matrix, hardening report, media index); updated 6
+existing docs with LX-1.3 findings, all history preserved. Added
+regression tests for the open-redirect hardening and the expanded
+feature-flag adversarial matrix; all 25 `apps/web` test files,
+typecheck, and lint pass. `apps/worker`'s pytest suite could not run
+due to a pre-existing, unrelated local `.env` gap (`OCR_RENDER_DPI=`
+empty) — documented, not fixed, since `apps/worker` is out of this
+mission's scope. No backend/database/Worker code file was touched,
+confirmed via `git status`.
+
+Status: **LX-1.3 — Hardening Complete, Launch Readiness Failed,
+Blockers Remaining** — one open HIGH-severity item (cinematic mobile
+performance), zero open BLOCKER items. The platform's own next step
+remains `S1-E3 — Hybrid Retrieval`, unaffected.
 
 ## -18. This session: LX-1.2 — Production Cinematic Landing Implementation and Controlled Integration
 
